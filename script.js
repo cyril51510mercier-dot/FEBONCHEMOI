@@ -73,7 +73,7 @@ function restoreSessionData() {
 }
 
 // ============================================================
-// 2. MOTEUR PHYSIQUE : CALCUL DES TEMPÉRATURES DE PAROIS
+// 2. MOTEUR PHYSIQUE : CALCUL DES TEMPÉRATURES DE PAROIS=
 // ============================================================
 function calculateMeanRadiantTemp(zone, t_air) {
     // Si la zone n'est pas définie, on suppose que Tr = T_air (bâtiment neutre)
@@ -418,4 +418,5 @@ const inputs = document.querySelectorAll('input, select');
 inputs.forEach(input => {
     input.addEventListener('input', calculateAndDisplay);
     input.addEventListener('change', calculateAndDisplay);
+
 });
