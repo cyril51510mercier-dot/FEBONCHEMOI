@@ -65,7 +65,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const isSunny = data.sun_status && data.sun_status.toLowerCase().includes('clear');
     
     const now = new Date();
-    const isNight = now.getHours() < 8 || now.getHours() > 19;
+    // NOUVEAU CODE DYNAMIQUE :
+const isSunny = data.sun_status && data.sun_status.toLowerCase().includes('clear');
+const now = new Date().getTime(); // L'heure exacte en millisecondes
+
+// On récupère les heures du soleil de l'API (avec une sécurité par défaut si l'API a échoué)
+const sunrise = parseInt(sessionStorage.getItem('sunriseTime')) || new Date().setHours(8,0,0,0);
+const sunset = parseInt(sessionStorage.getItem('sunsetTime')) || new Date().setHours(19,0,0,0);
+
+// Il fait nuit si l'heure actuelle est avant le lever OU après le coucher du soleil
+const isNight = now < sunrise || now > sunset;
+    
 
     // --- A. HYGIÈNE ET HUMIDITÉ ---
     if (data.rh_int > 70) {
@@ -208,3 +218,4 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 });
+
