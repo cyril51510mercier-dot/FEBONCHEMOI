@@ -128,19 +128,52 @@ function calculateMeanRadiantTemp(zone, t_air) {
     totalArea += floorArea;
     sumAreaTemp += (t_floor * floorArea);
     totalArea += floorArea;
-
-    // 3. Vitrages (On remplace une partie des murs par du verre)
+    
+        // 3. Vitrages (Calcul des Déperditions ET Apports Solaires)
     if (zone.windows && zone.windows.length > 0) {
+        
+        // On vérifie s'il fait jour et s'il y a du soleil
+        const now = new Date().getTime();
+        const sunrise = parseInt(sessionStorage.getItem('sunriseTime')) || now - 1000;
+        const sunset = parseInt(sessionStorage.getItem('sunsetTime')) || now + 1000;
+        const isDaytime = (now > sunrise && now < sunset);
+        const isSunny = sunshineStatus.toLowerCase().includes('clear');
+
         zone.windows.forEach(win => {
             const wArea = parseFloat(win.area) || 2;
-            const t_win = getSurfaceTemp('outside', U_window);
             
-            // On soustrait l'équivalent mur et on ajoute le vitrage
+            // A. DÉPERDITION : Qualité du vitrage
+            let U_win = 1.5; // Double standard par défaut
+            if (win.glass === 'single') U_win = 5.8; // Passoire thermique
+            if (win.glass === 'triple') U_win = 0.8; // Très isolant
+            if (win.glass === 'double_recent') U_win = 1.1;
+
+            // Température de base de la vitre intérieure sans soleil
+            let t_win = getSurfaceTemp('outside', U_win);
+
+            // B. APPORTS SOLAIRES : L'effet "Radiateur"
+            if (isDaytime && isSunny && win.mask !== 'heavy') {
+                let solarBoost = 0; // Bonus de température en degrés
+                
+                // Puissance du soleil selon l'orientation
+                if (win.orient === 'S') solarBoost = 4.0; // Plein Sud = Max de chaleur
+                else if (win.orient === 'SE' || win.orient === 'SW') solarBoost = 2.5;
+                else if (win.orient === 'E' || win.orient === 'W') solarBoost = 1.0;
+                else if (win.orient === 'N') solarBoost = 0.0; // Aucun apport direct au Nord
+
+                // Réduction si un arbre ou balcon fait de l'ombre
+                if (win.mask === 'partial') solarBoost *= 0.5;
+
+                // On ajoute cette chaleur gratuite à la température de la vitre
+                t_win += solarBoost; 
+            }
+
+            // On retire la surface de mur équivalente, et on intègre notre vitre calculée
             sumAreaTemp -= (getSurfaceTemp('outside', U_wall) * wArea);
             sumAreaTemp += (t_win * wArea);
-            // La totalArea ne change pas (la fenêtre est dans le mur)
         });
     }
+    
 
     // Température Rayonnante Moyenne (Tr)
     return sumAreaTemp / totalArea;
@@ -424,4 +457,5 @@ inputs.forEach(input => {
     input.addEventListener('change', calculateAndDisplay);
 
 });
+
 
