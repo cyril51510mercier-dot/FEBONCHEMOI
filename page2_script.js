@@ -62,9 +62,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const needsHeat = data.pmv < -0.5;
     const needsCooling = data.pmv > 0.5;
-    const isSunny = data.sun_status && data.sun_status.toLowerCase().includes('clear');
-    
-    const now = new Date();
     // NOUVEAU CODE DYNAMIQUE :
 const isSunny = data.sun_status && data.sun_status.toLowerCase().includes('clear');
 const now = new Date().getTime(); // L'heure exacte en millisecondes
@@ -218,4 +215,5 @@ const isNight = now < sunrise || now > sunset;
 
 
 });
+
 
