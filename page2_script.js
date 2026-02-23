@@ -96,15 +96,16 @@ document.addEventListener('DOMContentLoaded', function() {
             `Vous avez frais, mais vous êtes légèrement vêtu. Au lieu de monter ${heatSysName}, ajoutez une couche (pull).<br>
             <strong style="color:#27ae60;">Gain financier : Éviter de monter de 1°C sauve 7% d'énergie.</strong>`);
         } 
-        // Si la personne a vraiment froid malgré le pull
-        else if (data.pmv < -1.0) {
+        // L'habitant a froid MALGRÉ le fait qu'il soit bien habillé (Clo >= 1.0)
+        else {
             if (data.heatingSystem === 'floor') {
-                pushRec("type-heat", "🌡️ Anticipation requise", `Montez le thermostat. ⚠️ Vu votre plancher chauffant (très forte inertie), la chaleur mettra plusieurs heures à se faire sentir. Ne le poussez pas à fond !`);
+                pushRec("type-heat", "🌡️ Anticipation requise", `Vous avez frais. ⚠️ Vu votre plancher chauffant (très forte inertie), la chaleur mettra plusieurs heures à se faire sentir. Montez le thermostat de 1°C maximum et patientez.`);
             } else {
-                pushRec("type-heat", "🌡️ Chauffage Requis", `Le confort n'est pas atteint. Vous pouvez augmenter ${heatSysName} de 1°C.`);
+                pushRec("type-heat", "🌡️ Chauffage Requis", `Le confort n'est pas atteint (vous avez légèrement frais). Même avec une tenue adaptée, vous pouvez augmenter ${heatSysName} d'environ 1°C.`);
             }
         }
     }
+
 
     // --- D. SPÉCIFIQUE NUIT / CHAMBRE ---
     if (data.roomType === 'bedroom' && !needsCooling) {
@@ -204,5 +205,6 @@ document.addEventListener('DOMContentLoaded', function() {
             loadHistory();
         });
     }
+
 
 });
