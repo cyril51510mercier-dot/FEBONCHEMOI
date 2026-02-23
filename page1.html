@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fébonchémoi - Mesures Habitant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Fébonchémoi - Mesures Rapides</h1>
+
+    <div class="section" style="background-color: #f8f9fa; border-left: 5px solid #2ecc71;">
+        <h2>1. Quelle zone souhaitez-vous analyser ?</h2>
+        <select id="zoneSelect" style="width: 100%; padding: 10px; font-size: 1.1em; border-radius: 5px;">
+            <option value="">-- Chargement des zones expertes --</option>
+        </select>
+        <p style="font-size: 0.85em; color: #666; margin-top: 5px;">
+            ℹ️ Les caractéristiques des murs et vitrages de cette zone seront calculées automatiquement d'après la configuration de l'expert.
+        </p>
+    </div>
+
+    <div class="section">
+        <h2>2. Environnement & Météo</h2>
+        
+        <div>
+            <label for="location">Ville (Manuelle ou Automatique) :</label>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <input type="text" id="location" placeholder="Ex: Paris" style="flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                <button id="getWeatherButton" style="padding: 10px 15px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer;">🔍 Chercher</button> 
+                <button id="geoLocateButton" style="background-color: #3498db; color: white; border: none; border-radius: 4px; padding: 10px 15px; cursor: pointer; font-weight: bold;">📍 Me localiser</button>
+            </div>
+        </div>
+        
+        <div style="margin-top: 15px;">
+            <label for="airTemp">Température de l'air ambiant (°C) :</label>
+            <input type="number" id="airTemp" step="0.1" placeholder="Ex: 20">
+        </div>
+
+        <div>
+            <label for="relativeHumidity">Humidité Relative (%) :</label>
+            <input type="number" id="relativeHumidity" step="1" placeholder="Ex: 50">
+        </div>
+
+        <div>
+            <label for="airVelocity">Vitesse de l'air (m/s) :</label>
+            <input type="number" id="airVelocity" step="0.01" value="0.1">
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>3. Vêtements (Votre isolation)</h2>
+        <div id="cloVisualizer">
+            Isolation actuelle : <span id="currentCloValue">1.0</span> Clo 
+            <br><small id="cloTypeText">Tenue normale</small>
+            <br><br>
+            <button onclick="adjustClothing(-0.2)">👕 Enlever une couche</button>
+            <button onclick="adjustClothing(0.2)">🧥 Ajouter une couche</button>
+            <button onclick="resetClothing()">Réinitialiser</button>
+        </div>
+    </div>
+
+    <div class="section" style="background-color: #e8f4f8;">
+        <h2>Résultats de Confort</h2>
+        <p>Température Opérative Calculée : <strong><span id="operativeTempValue">--</span> °C</strong></p>
+        <p><em>(Prend en compte le rayonnement des murs évalué par l'IA)</em></p>
+        <p><strong>PMV : <span id="pmvValue">--</span></strong></p>
+        <div id="comfortIndicator">
+            <p><span id="comfortStatusText">En attente de données...</span></p>
+        </div>
+    </div>
+
+    <div class="section">
+        <button id="viewRecommendationsButton" style="width: 100%; padding: 15px; font-size: 1.2em; background-color: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer;">Voir l'Analyse et les Recommandations →</button>
+    </div>
+
+    <center style="margin-bottom: 20px;">
+        <a href="setup.html" style="color: #95a5a6; text-decoration: none; font-size: 0.9em;">⚙️ Accès Expert (Paramétrage des zones)</a>
+    </center>
+
+    <script src="script.js" defer></script>
+</body>
+</html>

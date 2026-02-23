@@ -1,0 +1,235 @@
+/**
+ * ==================================================================
+ * FÉBONCHÉMOI - DESIGN SYSTEM (V1)
+ * ==================================================================
+ */
+
+:root {
+    /* Palette de couleurs (Inspirée du flat design moderne) */
+    --primary: #2c3e50;      /* Bleu Nuit (Texte principal, En-têtes) */
+    --secondary: #3498db;    /* Bleu Clair (Boutons d'action, Liens) */
+    --bg-color: #f4f7f6;     /* Fond de l'application (Gris très clair/frais) */
+    --card-bg: #ffffff;      /* Fond des cartes */
+    
+    /* Couleurs de statut (Thermique & Financier) */
+    --cold: #3498db;         /* Froid */
+    --hot: #e74c3c;          /* Chaud */
+    --comfort: #2ecc71;      /* Confort / Parfait */
+    --eco: #27ae60;          /* Économie financière (Vert plus profond) */
+    --warning: #f39c12;      /* Solaire / Attention */
+
+    /* Ombres et Bordures */
+    --shadow-sm: 0 2px 5px rgba(0,0,0,0.05);
+    --shadow-md: 0 5px 15px rgba(0,0,0,0.08);
+    --radius: 10px;
+}
+
+/* --- BASE --- */
+body {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--primary);
+    line-height: 1.6;
+    margin: 0;
+    padding: 15px;
+    max-width: 600px; /* Parfait pour mobile/tablette. Centré sur PC. */
+    margin: 0 auto;
+}
+
+h1 {
+    text-align: center;
+    font-size: 1.8em;
+    color: var(--primary);
+    margin-bottom: 5px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+h2 {
+    font-size: 1.2em;
+    border-bottom: 2px solid #ecf0f1;
+    padding-bottom: 8px;
+    margin-top: 0;
+    color: var(--primary);
+}
+
+/* --- CARTES ET SECTIONS --- */
+.section, .summary-card, .config-section {
+    background-color: var(--card-bg);
+    padding: 20px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    margin-bottom: 20px;
+    transition: transform 0.2s ease;
+}
+
+/* --- FORMULAIRES ET INPUTS --- */
+label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+    font-size: 0.9em;
+    color: #555;
+}
+
+input[type="text"], 
+input[type="number"], 
+select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #dfe6e9;
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-size: 1em;
+    background-color: #fcfcfc;
+    transition: border-color 0.3s ease;
+    margin-bottom: 15px;
+}
+
+input:focus, select:focus {
+    border-color: var(--secondary);
+    outline: none;
+    background-color: #fff;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+/* --- BOUTONS --- */
+button {
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 12px 20px;
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+/* Style par défaut (Localiser, Chercher) */
+#geoLocateButton, #getWeatherButton, .btn-load {
+    background-color: var(--secondary);
+    color: white;
+}
+
+#geoLocateButton:hover, #getWeatherButton:hover, .btn-load:hover {
+    background-color: #2980b9;
+}
+
+/* Bouton d'action principal (Voir recommandations) */
+#viewRecommendationsButton, .save-btn {
+    background-color: var(--eco);
+    color: white;
+    width: 100%;
+    font-size: 1.1em;
+    padding: 15px;
+    box-shadow: 0 4px 6px rgba(39, 174, 96, 0.2);
+}
+
+#viewRecommendationsButton:hover, .save-btn:hover {
+    background-color: #219150;
+    box-shadow: 0 6px 10px rgba(39, 174, 96, 0.3);
+}
+
+/* Boutons secondaires (Vêtements) */
+#cloVisualizer button {
+    background-color: #ecf0f1;
+    color: var(--primary);
+    margin: 5px 2px;
+    font-size: 0.9em;
+}
+#cloVisualizer button:hover {
+    background-color: #bdc3c7;
+}
+
+/* --- PAGE COACH (PAGE 2) --- */
+.stat-box {
+    text-align: center;
+    padding: 10px;
+}
+
+.stat-value {
+    font-size: 1.8em;
+    font-weight: 800;
+}
+
+.stat-label {
+    font-size: 0.8em;
+    text-transform: uppercase;
+    color: #7f8c8d;
+    letter-spacing: 0.5px;
+}
+
+/* Grid pour le résumé en haut de la page 2 */
+.summary-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+}
+
+/* Cartes de Recommandations */
+.advice-card {
+    padding: 15px 20px;
+    margin-bottom: 15px;
+    border-radius: var(--radius);
+    border-left: 5px solid #ccc;
+    background-color: var(--card-bg);
+    box-shadow: var(--shadow-sm);
+}
+
+.advice-card p {
+    margin: 0;
+    font-size: 0.95em;
+    color: #555;
+}
+
+.advice-title {
+    font-weight: bold;
+    font-size: 1.1em;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+}
+
+/* Couleurs dynamiques des conseils */
+.type-air { border-left-color: var(--secondary); background-color: #ebf5fb; }
+.type-sun { border-left-color: var(--warning); background-color: #fef9e7; }
+.type-heat { border-left-color: var(--hot); background-color: #fdedec; }
+.type-eco { border-left-color: var(--eco); background-color: #e9f7ef; }
+
+/* --- TABLEAU HISTORIQUE --- */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+th {
+    background-color: #f8f9fa;
+    color: #7f8c8d;
+    font-weight: 600;
+    text-align: left;
+    padding: 12px 10px;
+    border-bottom: 2px solid #ecf0f1;
+}
+
+td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+/* --- LIENS --- */
+a {
+    color: var(--secondary);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s;
+}
+
+a:hover {
+    color: #2980b9;
+    text-decoration: underline;
+}

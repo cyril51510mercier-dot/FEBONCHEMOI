@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fébonchémoi - Le Coach</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <h2>📊 Diagnostic & Actions</h2>
+
+	<div class="summary-card">
+    <div class="stat-box">
+        <div class="stat-value" id="disp-pmv">--</div>
+        <div class="stat-label">Votre PMV</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-value" id="disp-top">--°C</div>
+        <div class="stat-label">T° Opérative</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-value" id="disp-rh">--%</div>
+        <div class="stat-label">Humidité Int.</div>
+    </div>
+
+    <div class="stat-box" style="border-left: 2px solid #eee;">
+        <div class="stat-value" id="disp-clo" style="color: #666;">--</div>
+        <div class="stat-label">Isol. Vêtements (Clo)</div>
+    </div>
+    
+    <div class="stat-box">
+        <div class="stat-value" id="disp-insul" style="font-size: 1.1em; color: #0056b3;">--</div>
+        <div class="stat-label">Isol. Maison</div>
+    </div>
+
+    <div class="stat-box">
+        <div class="stat-value" id="disp-room" style="font-size: 1.1em;">--</div>
+        <div class="stat-label">Pièce</div>
+    </div>
+</div>
+
+    <h3>💡 Les recommandations du Coach</h3>
+    
+    <div id="recommendations-container">
+        </div>
+
+<div id="recommendations-container"></div>
+
+    <div class="summary-card" style="margin-top: 30px; border-top: 4px solid #34495e;">
+        <h3 style="color: #2c3e50; margin-top: 0;">📅 Historique de cette zone</h3>
+        
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 0.9em; text-align: left;">
+                <thead>
+                    <tr style="background-color: #ecf0f1; border-bottom: 2px solid #bdc3c7;">
+                        <th style="padding: 10px;">Date</th>
+                        <th style="padding: 10px;">T° Air</th>
+                        <th style="padding: 10px;">T° Ext</th>
+                        <th style="padding: 10px;">PMV</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                    </tbody>
+            </table>
+        </div>
+
+        <button id="saveHistoryBtn" style="width: 100%; background-color: #3498db; color: white; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer;">
+            💾 Enregistrer le bilan d'aujourd'hui
+        </button>
+    </div>
+
+    <center style="margin-top: 30px;">
+        <a href="index.html" class="btn-back" style="color: #7f8c8d; text-decoration: none; font-weight: bold;">← Retour aux mesures</a>
+    </center>
+
+    <center>
+        <a href="page1.html" class="btn-back">← Retour aux mesures</a>
+    </center>
+
+    <script src="page2_script.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Fébonchémoi - Configuration Expert Multi-Zones</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <h1>⚙️ Console Expert - Paramétrage Habitat</h1>
+    <p class="subtitle">Définissez vos zones thermiques et l'ensemble de leurs parois (BEM).</p>
+
+    <div class="zone-selector-container">
+        <h3>1. Définition de la Zone Thermique</h3>
+        
+        <div class="zone-inputs">
+            <div>
+                <label>Modifier une zone existante :</label>
+                <select id="existingZones">
+                    <option value="">-- Créer une nouvelle zone --</option>
+                </select>
+            </div>
+            <div>
+                <label>Nom de la zone (ex: "Espace de vie RDC") :</label>
+                <input type="text" id="zoneName" placeholder="Saisir le nom...">
+            </div>
+        </div>
+
+        <label style="color:#bdc3c7; font-size:0.9em; display:block; margin-bottom:8px;">Usages de cette zone :</label>
+        <div class="usage-grid" id="usageCheckboxes">
+            <label><input type="checkbox" name="usage" value="living"> 🛋️ Salon / Repos</label>
+            <label><input type="checkbox" name="usage" value="dining"> 🍽️ Repas</label>
+            <label><input type="checkbox" name="usage" value="kitchen"> 🍳 Cuisine</label>
+            <label><input type="checkbox" name="usage" value="bedroom"> 🛏️ Sommeil</label>
+            <label><input type="checkbox" name="usage" value="bath"> 🚿 Salle d'eau</label>
+            <label><input type="checkbox" name="usage" value="office"> 💻 Bureau / Actif</label>
+        </div>
+
+        <button type="button" class="btn-load" id="loadZoneBtn">Ouvrir les paramètres de cette Zone ↓</button>
+        <div id="zoneStatus" class="status-badge" style="display:none;"></div>
+    </div>
+
+    <form id="expertForm" style="display:none;">
+        
+        <div class="config-section">
+            <h2>A. Géométrie & Structure (Inertie)</h2>
+            <div class="form-grid">
+                <div><label>Surface (m²)</label><input type="number" id="roomArea" placeholder="ex: 45"></div>
+                <div><label>Hauteur plafond (m)</label><input type="number" id="ceilingHeight" step="0.1" value="2.5"></div>
+                <div class="full-width">
+                    <label>Matériau des Murs Extérieurs (Structure Portante)</label>
+                    <select id="wallMaterial">
+                        <option value="cinderblock">Parpaing Creux (Standard)</option>
+                        <option value="concrete">Béton Banché (Très Lourd)</option>
+                        <option value="stone">Pierre (Très Lourd / Conducteur)</option>
+                        <option value="brick">Brique Creuse</option>
+                        <option value="wood">Ossature Bois (Léger)</option>
+                    </select>
+                </div>
+                <div><label>Épaisseur Mur (cm)</label><input type="number" id="wallThickness" placeholder="ex: 30"></div>
+                <div>
+                    <label>Isolation</label>
+                    <select id="insulationPosition">
+                        <option value="ITI">ITI (Intérieure - Coupe l'inertie)</option>
+                        <option value="ITE">ITE (Extérieure - Inertie Max)</option>
+                        <option value="ITR">Répartie (Monomur)</option>
+                        <option value="NONE">Aucune</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <h2>B. Environnement (Adjacences des 6 faces)</h2>
+            <div class="form-grid-3">
+                <div>
+                    <label>Mur 1</label>
+                    <select id="adjWall1">
+                        <option value="outside">Extérieur</option>
+                        <option value="unheated">Pièce non chauffée</option>
+                        <option value="heated">Pièce chauffée</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Mur 2</label>
+                    <select id="adjWall2">
+                        <option value="outside">Extérieur</option>
+                        <option value="unheated">Pièce non chauffée</option>
+                        <option value="heated" selected>Pièce chauffée</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Mur 3</label>
+                    <select id="adjWall3">
+                        <option value="outside">Extérieur</option>
+                        <option value="unheated">Pièce non chauffée</option>
+                        <option value="heated" selected>Pièce chauffée</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Mur 4</label>
+                    <select id="adjWall4">
+                        <option value="outside">Extérieur</option>
+                        <option value="unheated">Pièce non chauffée</option>
+                        <option value="heated" selected>Pièce chauffée</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label>Plafond</label>
+                    <select id="adjCeiling">
+                        <option value="outside">Extérieur (Toit / Terrasse)</option>
+                        <option value="unheated">Pièce non chauffée (Combles)</option>
+                        <option value="heated" selected>Pièce chauffée (Étage)</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Plancher</label>
+                    <select id="adjFloor">
+                        <option value="outside">Extérieur / Sol (Terre-plein/Vide Sanitaire)</option>
+                        <option value="unheated">Pièce non chauffée (Cave / SS)</option>
+                        <option value="heated" selected>Pièce chauffée</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <h2>C. Apports Solaires (Vitrages)</h2>
+            <div id="windowsContainer">
+                </div>
+            <button type="button" class="btn-add-window" id="addWindowBtn">+ Ajouter un autre vitrage à cette zone</button>
+        </div>
+        
+        <div class="config-section">
+            <h2>D. Chauffage</h2>
+            <div class="full-width">
+                <select id="heatingSystem">
+                    <option value="convection">Convecteurs Électriques (0 Inertie)</option>
+                    <option value="radiator_steel">Radiateurs Acier/Alu (Faible Inertie)</option>
+                    <option value="radiator_cast">Radiateurs Fonte (Inertie Moyenne)</option>
+                    <option value="floor">Plancher Chauffant (Très Forte Inertie)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="action-bar">
+            <button type="button" class="reset-btn" onclick="clearCurrentForm()">Effacer le formulaire</button>
+            <button type="button" class="save-btn" id="saveConfigBtn">💾 SAUVEGARDER CETTE ZONE</button>
+        </div>
+    </form>
+
+    <center style="margin-top:40px; margin-bottom:40px;">
+        <a href="index.html" style="color:#2c3e50; text-decoration:underline; font-weight:bold;">→ Retour à l'Espace Habitant (Outil de Mesure)</a>
+    </center>
+
+    <script>
+        // BASE DE DONNÉES LOCALE
+        let GLOBAL_HOUSE_CONFIG = {};
+        let currentZoneId = null;
+
+        // UI Elements
+        const zoneNameInput = document.getElementById('zoneName');
+        const existingZonesSelect = document.getElementById('existingZones');
+        const form = document.getElementById('expertForm');
+        const statusBadge = document.getElementById('zoneStatus');
+        const windowsContainer = document.getElementById('windowsContainer');
+
+        // 1. CHARGEMENT INITIAL
+        window.addEventListener('load', () => {
+            const savedData = localStorage.getItem('HOUSE_CONFIG');
+            if (savedData) {
+                GLOBAL_HOUSE_CONFIG = JSON.parse(savedData);
+                refreshExistingZonesDropdown();
+            }
+        });
+
+        // 2. SÉLECTION ZONE EXISTANTE
+        existingZonesSelect.addEventListener('change', () => {
+            const selectedId = existingZonesSelect.value;
+            if(selectedId && GLOBAL_HOUSE_CONFIG[selectedId]) {
+                zoneNameInput.value = GLOBAL_HOUSE_CONFIG[selectedId].name;
+                // Met à jour les cases à cocher en avance
+                document.querySelectorAll('input[name="usage"]').forEach(cb => {
+                    cb.checked = GLOBAL_HOUSE_CONFIG[selectedId].usages.includes(cb.value);
+                });
+            } else {
+                zoneNameInput.value = "";
+                // On laisse les cases cochées par l'utilisateur telles quelles pour une nouvelle zone
+            }
+            form.style.display = 'none';
+            statusBadge.style.display = 'none';
+        });
+
+        // 3. BOUTON CHARGER / CRÉER LA ZONE
+        document.getElementById('loadZoneBtn').addEventListener('click', () => {
+            const name = zoneNameInput.value.trim();
+            if(!name) { alert("Veuillez donner un nom à cette zone (ex: Salon RDC)."); return; }
+
+            currentZoneId = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+            form.style.display = 'block';
+            
+            if (GLOBAL_HOUSE_CONFIG[currentZoneId]) {
+                populateForm(GLOBAL_HOUSE_CONFIG[currentZoneId]);
+                statusBadge.textContent = "✅ Zone existante chargée (Mode Modification)";
+                statusBadge.className = "status-badge status-configured";
+            } else {
+                clearCurrentForm(); // Ne vide PLUS les cases usages (laissé pour la nouvelle zone)
+                statusBadge.textContent = "🆕 Nouvelle Zone à configurer";
+                statusBadge.className = "status-badge status-missing";
+            }
+            statusBadge.style.display = 'block';
+        });
+
+        // --- GESTION DES VITRAGES DYNAMIQUES ---
+        let windowCounter = 0;
+
+        document.getElementById('addWindowBtn').addEventListener('click', () => addWindowBlock());
+
+        function addWindowBlock(data = null) {
+            windowCounter++;
+            const div = document.createElement('div');
+            div.className = 'window-block';
+            div.innerHTML = `
+                <h4>Vitrage ${windowCounter}</h4>
+                <button type="button" class="btn-remove-window" onclick="this.parentElement.remove()">❌ Supprimer</button>
+                <div class="form-grid">
+                    <div>
+                        <label>Surface (m²)</label>
+                        <input type="number" step="0.1" class="win-area" value="${data ? data.area : '2'}" placeholder="ex: 2.5">
+                    </div>
+                    <div>
+                        <label>Orientation</label>
+                        <select class="win-orient">
+                            <option value="S" ${data && data.orient=='S'?'selected':''}>SUD (Gain Max)</option>
+                            <option value="SE" ${data && data.orient=='SE'?'selected':''}>SUD-EST</option>
+                            <option value="SW" ${data && data.orient=='SW'?'selected':''}>SUD-OUEST</option>
+                            <option value="E" ${data && data.orient=='E'?'selected':''}>EST</option>
+                            <option value="W" ${data && data.orient=='W'?'selected':''}>OUEST</option>
+                            <option value="N" ${data && data.orient=='N'?'selected':''}>NORD (Perte)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Masque Solaire</label>
+                        <select class="win-mask">
+                            <option value="none" ${data && data.mask=='none'?'selected':''}>Aucun (Dégagé)</option>
+                            <option value="partial" ${data && data.mask=='partial'?'selected':''}>Partiel</option>
+                            <option value="heavy" ${data && data.mask=='heavy'?'selected':''}>Lourd (Ombre)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Type de Vitrage</label>
+                        <select class="win-glass">
+                            <option value="double_recent" ${data && data.glass=='double_recent'?'selected':''}>Double Récent (VIR)</option>
+                            <option value="double_old" ${data && data.glass=='double_old'?'selected':''}>Double Ancien</option>
+                            <option value="single" ${data && data.glass=='single'?'selected':''}>Simple vitrage</option>
+                            <option value="triple" ${data && data.glass=='triple'?'selected':''}>Triple vitrage</option>
+                        </select>
+                    </div>
+                    <div class="full-width">
+                        <label>Volets (Fermeture)</label>
+                        <select class="win-shutter">
+                            <option value="rolling_pvc" ${data && data.shutter=='rolling_pvc'?'selected':''}>Roulant PVC (Étanche)</option>
+                            <option value="rolling_alu" ${data && data.shutter=='rolling_alu'?'selected':''}>Roulant Alu</option>
+                            <option value="swing_wood" ${data && data.shutter=='swing_wood'?'selected':''}>Battant Bois</option>
+                            <option value="none" ${data && data.shutter=='none'?'selected':''}>Aucun / Intérieur</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+            windowsContainer.appendChild(div);
+        }
+
+        // 4. SAUVEGARDE
+        document.getElementById('saveConfigBtn').addEventListener('click', function() {
+            if(!currentZoneId) return;
+
+            const usagesCoches = Array.from(document.querySelectorAll('input[name="usage"]:checked')).map(cb => cb.value);
+            if(usagesCoches.length === 0) { alert("Cochez au moins un usage."); return; }
+
+            // Récupérer les vitrages
+            const windows = [];
+            document.querySelectorAll('.window-block').forEach(block => {
+                windows.push({
+                    area: block.querySelector('.win-area').value,
+                    orient: block.querySelector('.win-orient').value,
+                    mask: block.querySelector('.win-mask').value,
+                    glass: block.querySelector('.win-glass').value,
+                    shutter: block.querySelector('.win-shutter').value
+                });
+            });
+
+            const zoneConfig = {
+                id: currentZoneId,
+                name: zoneNameInput.value.trim(),
+                usages: usagesCoches,
+                
+                // Géométrie
+                area: document.getElementById('roomArea').value,
+                height: document.getElementById('ceilingHeight').value,
+                wallMat: document.getElementById('wallMaterial').value,
+                wallThick: document.getElementById('wallThickness').value,
+                insulPos: document.getElementById('insulationPosition').value,
+                
+                // Adjacences (Les 6 faces)
+                adj: {
+                    wall1: document.getElementById('adjWall1').value,
+                    wall2: document.getElementById('adjWall2').value,
+                    wall3: document.getElementById('adjWall3').value,
+                    wall4: document.getElementById('adjWall4').value,
+                    ceiling: document.getElementById('adjCeiling').value,
+                    floor: document.getElementById('adjFloor').value
+                },
+                
+                // Vitrages array
+                windows: windows,
+                
+                // Chauffage
+                heatSys: document.getElementById('heatingSystem').value,
+                lastUpdate: new Date().toLocaleString()
+            };
+
+            GLOBAL_HOUSE_CONFIG[currentZoneId] = zoneConfig;
+            localStorage.setItem('HOUSE_CONFIG', JSON.stringify(GLOBAL_HOUSE_CONFIG));
+            
+            refreshExistingZonesDropdown();
+            existingZonesSelect.value = currentZoneId;
+            
+            statusBadge.textContent = "✅ Zone Sauvegardée avec succès !";
+            statusBadge.className = "status-badge status-configured";
+            
+            const btn = document.getElementById('saveConfigBtn');
+            const originalText = btn.textContent;
+            btn.textContent = "👌 C'est enregistré !";
+            setTimeout(() => { btn.textContent = originalText; }, 2000);
+        });
+
+        // --- FONCTIONS UTILITAIRES ---
+        function refreshExistingZonesDropdown() {
+            existingZonesSelect.innerHTML = '<option value="">-- Créer une nouvelle zone --</option>';
+            for (const key in GLOBAL_HOUSE_CONFIG) {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = `⚙️ ${GLOBAL_HOUSE_CONFIG[key].name}`;
+                existingZonesSelect.appendChild(opt);
+            }
+        }
+
+        function populateForm(data) {
+            // Ne touche aux cases à cocher que si on charge explicitement des données existantes
+            document.querySelectorAll('input[name="usage"]').forEach(cb => {
+                cb.checked = data.usages.includes(cb.value);
+            });
+
+            document.getElementById('roomArea').value = data.area || '';
+            document.getElementById('ceilingHeight').value = data.height || 2.5;
+            document.getElementById('wallMaterial').value = data.wallMat || 'cinderblock';
+            document.getElementById('wallThickness').value = data.wallThick || '';
+            document.getElementById('insulationPosition').value = data.insulPos || 'ITI';
+            
+            if(data.adj) {
+                document.getElementById('adjWall1').value = data.adj.wall1 || 'outside';
+                document.getElementById('adjWall2').value = data.adj.wall2 || 'heated';
+                document.getElementById('adjWall3').value = data.adj.wall3 || 'heated';
+                document.getElementById('adjWall4').value = data.adj.wall4 || 'heated';
+                document.getElementById('adjCeiling').value = data.adj.ceiling || 'heated';
+                document.getElementById('adjFloor').value = data.adj.floor || 'heated';
+            }
+            
+            document.getElementById('heatingSystem').value = data.heatSys || 'radiator_steel';
+
+            // Restaurer les vitrages
+            windowsContainer.innerHTML = '';
+            windowCounter = 0;
+            if(data.windows && data.windows.length > 0) {
+                data.windows.forEach(win => addWindowBlock(win));
+            } else {
+                addWindowBlock(); // Met au moins un vitrage par défaut
+            }
+        }
+
+        function clearCurrentForm() {
+            // ON NE VIDE PLUS les cases usages (pour conserver le choix de l'utilisateur lors d'une nouvelle création)
+            
+            document.getElementById('roomArea').value = '';
+            document.getElementById('wallThickness').value = '';
+            
+            // Remise à zéro des adjacences
+            document.getElementById('adjWall1').value = 'outside';
+            document.getElementById('adjWall2').value = 'heated';
+            document.getElementById('adjWall3').value = 'heated';
+            document.getElementById('adjWall4').value = 'heated';
+            document.getElementById('adjCeiling').value = 'heated';
+            document.getElementById('adjFloor').value = 'heated';
+
+            // Reset vitrages
+            windowsContainer.innerHTML = '';
+            windowCounter = 0;
+            addWindowBlock(); // Un vitrage vierge par défaut
+        }
+    </script>
+</body>
+</html>
