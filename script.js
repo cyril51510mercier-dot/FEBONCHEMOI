@@ -163,6 +163,7 @@ document.getElementById('getWeatherButton').addEventListener('click', () => {
     
     // On appelle la fonction en lui passant le bouton pour qu'il s'anime
     fetchWeather(url, searchBtn, originalText); 
+
 });
 
 // B. Méthode Automatique (Géolocalisation GPS)
@@ -206,6 +207,9 @@ function fetchWeather(url, btnElement = null, originalBtnText = "") {
             outdoorPressure = data.main.pressure;
             outdoorWind = (data.wind.speed * 3.6); 
             sunshineStatus = data.weather[0].main;
+// NOUVEAU : On capture les heures de lever/coucher (fournies en secondes, on passe en millisecondes pour le JS)
+sessionStorage.setItem('sunriseTime', data.sys.sunrise * 1000);
+sessionStorage.setItem('sunsetTime', data.sys.sunset * 1000);
 
             // 2. Auto-remplissage du champ ville avec le nom officiel renvoyé par l'API
             document.getElementById('location').value = data.name;
@@ -420,3 +424,4 @@ inputs.forEach(input => {
     input.addEventListener('change', calculateAndDisplay);
 
 });
+
