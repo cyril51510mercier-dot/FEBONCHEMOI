@@ -48,7 +48,7 @@ function restoreSessionData() {
         document.getElementById('zoneSelect').value = sessionStorage.getItem('currentZoneId');
     }
     
-    const fields = ['airTemp', 'relativeHumidity', 'airVelocity', 'location'];
+    const fields = ['airTemp', 'relativeHumidity', 'location'];
     fields.forEach(id => {
         const val = sessionStorage.getItem(id);
         if(val !== null && document.getElementById(id)) {
@@ -370,7 +370,29 @@ function calculatePMV(ta, tr, vel, rh, met, clo) {
 function calculateAndDisplay() {
     const zoneId = document.getElementById('zoneSelect').value;
     const ta = parseFloat(document.getElementById('airTemp').value);
-    const vel = parseFloat(document.getElementById('airVelocity').value) || 0.1;
+        let vel = 0.1; // Vitesse de base (air calme dans un logement)
+
+    // --- GESTION DES INFILTRATIONS (Courants d'air parasites) ---
+    if (zoneId && GLOBAL_HOUSE_CONFIG[zoneId]) {
+        const zone = GLOBAL_HOUSE_CONFIG[zoneId];
+        
+        // On vérifie s'il y a des fenêtres anciennes dans la zone (qui laissent passer l'air)
+        let hasOldWindows = false;
+        if (zone.windows) {
+            zone.windows.forEach(win => {
+                if (win.glass === 'single' || win.glass === 'double_old') {
+                    hasOldWindows = true;
+                }
+            });
+        }
+
+        // Si la zone a des fenêtres fuyardes ET que le vent extérieur souffle fort (> 20 km/h)
+        if (hasOldWindows && outdoorWind > 20) {
+            // Le vent s'infiltre : on augmente la vitesse de l'air intérieur ressentie
+            // Cela va faire chuter le PMV (sensation de froid parasite)
+            vel = 0.25; 
+        }
+    }
     const rh = parseFloat(document.getElementById('relativeHumidity').value) || 50;
     
     let tr = ta; // Par défaut si aucune zone n'est sélectionnée
@@ -433,7 +455,6 @@ document.getElementById('viewRecommendationsButton').addEventListener('click', (
         // Sauvegarde inputs
         sessionStorage.setItem('indoorAirTemp', ta);
         sessionStorage.setItem('indoorHumidity', document.getElementById('relativeHumidity').value);
-        sessionStorage.setItem('airVelocity', document.getElementById('airVelocity').value);
         sessionStorage.setItem('location', document.getElementById('location').value);
         sessionStorage.setItem('manualCloAdjustment', manualCloAdjustment); 
 
@@ -457,5 +478,6 @@ inputs.forEach(input => {
     input.addEventListener('change', calculateAndDisplay);
 
 });
+
 
 
