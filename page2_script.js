@@ -29,6 +29,20 @@ document.addEventListener('DOMContentLoaded', function() {
         area: zone ? parseFloat(zone.area) : 20
     };
 
+        // --- NOUVEAU : CALCUL DE L'HUMIDITÉ ABSOLUE (Formule de Tetens en g/m³) ---
+    function getAbsoluteHumidity(t, rh) {
+        // Pression de vapeur saturante (hPa)
+        const pSat = 6.112 * Math.exp((17.67 * t) / (t + 243.5)); 
+        // Pression de vapeur réelle
+        const pVap = pSat * (rh / 100.0); 
+        // Humidité absolue en g/m³
+        return (2.16679 * pVap * 100.0) / (273.15 + t); 
+    }
+
+    const ah_int = getAbsoluteHumidity(data.t_air_int, data.rh_int);
+    const ah_ext = getAbsoluteHumidity(data.t_ext, data.rh_ext);
+    
+
     // 2. AFFICHAGE DES VALEURS RÉSUMÉES DANS LE HTML
     function safeUpdate(id, text, color = null) {
         const el = document.getElementById(id);
@@ -74,21 +88,39 @@ const sunset = parseInt(sessionStorage.getItem('sunsetTime')) || new Date().setH
 const isNight = now < sunrise || now > sunset;
     
 
-    // --- A. HYGIÈNE ET HUMIDITÉ ---
-    if (data.rh_int > 70) {
-        pushRec("type-air", "💨 Urgence Humidité", `Humidité critique (>70%). Ouvrez 5 min. L'air sec chauffe plus vite : vous économiserez sur ${heatSysName} ensuite.`);
-    }
-
-    // --- B. SURCHAUFFE HIVERNALE (Le plus gros potentiel d'économie) ---
-    if (needsCooling && data.t_ext < 15) {
-        const diffDeg = Math.min(2, Math.floor(data.t_air_int - 20)); // Estimation de la surchauffe
-        if (diffDeg > 0) {
-            const savings = diffDeg * 7;
-            pushRec("type-eco", "💰 Chauffage Excessif", 
-            `Vous avez chaud (PMV > 0.5) alors qu'il fait froid dehors. Baissez le thermostat de ${diffDeg}°C.<br>
-            <strong style="color:#27ae60;">Gain financier : ~${savings}% d'économie sur la consommation de cette zone (${data.area} m²).</strong>`);
+        // --- A. HYGIÈNE ET HUMIDITÉ (Croisement Absolu) ---
+    if (data.rh_int > 65) {
+        if (ah_ext < ah_int) {
+            pushRec("type-air", "💨 Assèchement Gratuit", 
+            `Alerte Humidité (${data.rh_int}%). L'air extérieur est plus sec (${ah_ext.toFixed(1)} g/m³ dehors vs ${ah_int.toFixed(1)} g/m³ dedans). <strong>Ouvrez les fenêtres 10 min !</strong> L'air sec chauffera plus vite ensuite.`);
+        } else {
+            pushRec("type-warning", "🌧️ Confinement Requis", 
+            `Alerte Humidité (${data.rh_int}%). Ne ventilez pas par les fenêtres ! L'air extérieur est plus chargé en eau (${ah_ext.toFixed(1)} g/m³). Laissez la VMC agir ou utilisez un déshumidificateur.`);
         }
     }
+
+    // --- B. FREE COOLING & SURCHAUFFE (Croisement Température) ---
+    if (needsCooling) {
+        if (data.t_ext < data.t_air_int - 1) {
+            // S'il fait plus frais dehors, on ouvre (Free Cooling)
+            pushRec("type-air", "🌬️ Climatisation Naturelle", 
+            `Vous avez chaud (PMV > 0.5) et il fait plus frais dehors (${data.t_ext}°C). <strong>Ouvrez grand les fenêtres</strong> pour rafraîchir la pièce gratuitement !`);
+        } else if (data.t_ext < 15) {
+            // S'il fait froid dehors, c'est le chauffage qui est trop fort
+            const diffDeg = Math.min(2, Math.floor(data.t_air_int - 20)); 
+            if (diffDeg > 0) {
+                const savings = diffDeg * 7;
+                pushRec("type-eco", "💰 Chauffage Excessif", 
+                `Il fait froid dehors (${data.t_ext}°C) mais vous avez chaud dedans. Baissez le thermostat de ${diffDeg}°C.<br>
+                <strong style="color:#27ae60;">Gain financier : ~${savings}% d'économie sur la consommation de cette zone.</strong>`);
+            }
+        } else {
+            // S'il fait chaud dedans ET encore plus chaud dehors (Canicule)
+             pushRec("type-heat", "🥵 Chaleur Bloquée", 
+            `Vous avez chaud mais il fait encore plus chaud dehors (${data.t_ext}°C). Gardez fenêtres et volets fermés !`);
+        }
+    }
+
 
     // --- C. SOLLICITATION DU CHAUFFAGE (Froid) ---
     if (needsHeat) {
@@ -215,5 +247,6 @@ const isNight = now < sunrise || now > sunset;
 
 
 });
+
 
 
