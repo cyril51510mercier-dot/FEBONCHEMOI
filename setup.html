@@ -59,13 +59,15 @@
                 </div>
                 <div><label>Épaisseur Mur (cm)</label><input type="number" id="wallThickness" placeholder="ex: 30"></div>
                 <div>
-                    <label>Isolation</label>
-                    <select id="insulationPosition">
-                        <option value="ITI">ITI (Intérieure - Coupe l'inertie)</option>
-                        <option value="ITE">ITE (Extérieure - Inertie Max)</option>
-                        <option value="ITR">Répartie (Monomur)</option>
-                        <option value="NONE">Aucune</option>
-                    </select>
+                    <label for="zoneInsulation">Type d'isolation des murs (Impacte la déperdition et l'inertie) :</label>
+<select id="zoneInsulation" required>
+    <option value="low">Passoire (Mur plein non isolé, forte inertie mais glacé)</option>
+    <option value="iti_old">ITI Ancienne (Isolant intérieur fin, ex: 1980-2000)</option>
+    <option value="iti_recent" selected>ITI Récente (Isolant intérieur performant, faible inertie)</option>
+    <option value="ite_old">ITE Ancienne (Isolant extérieur fin, inertie conservée)</option>
+    <option value="ite_recent">ITE Récente (Isolant extérieur performant, forte inertie)</option>
+</select>
+                    
                 </div>
             </div>
         </div>
@@ -400,4 +402,5 @@
         }
     </script>
 </body>
+
 </html>
