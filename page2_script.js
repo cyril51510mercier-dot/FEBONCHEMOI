@@ -27,6 +27,8 @@ document.addEventListener('DOMContentLoaded', function() {
         roomType: sessionStorage.getItem('roomType') || 'living',
         heatingSystem: zone ? zone.heatSys : 'convection',
         area: zone ? parseFloat(zone.area) : 20
+        // NOUVEAU : Récupération de l'inertie (light ou heavy)
+        inertia: sessionStorage.getItem('zoneInertia') || 'light'
     };
 
         // --- NOUVEAU : CALCUL DE L'HUMIDITÉ ABSOLUE (Formule de Tetens en g/m³) ---
@@ -101,9 +103,16 @@ const isNight = now < sunrise || now > sunset;
 
     // --- B. FREE COOLING & SURCHAUFFE (Croisement Température) ---
     if (needsCooling) {
-        if (data.t_ext < data.t_air_int - 1) {
-            // S'il fait plus frais dehors, on ouvre (Free Cooling)
-            pushRec("type-air", "🌬️ Climatisation Naturelle", 
+                if (data.t_ext < data.t_air_int - 1) {
+            // S'il fait plus frais dehors, on ouvre (Free Cooling) en fonction de l'inertie
+            if (data.inertia === 'heavy') {
+                pushRec("type-air", "🌬️ Stockage de Fraîcheur (Forte Inertie)", 
+                `Il fait plus frais dehors (${data.t_ext}°C). Ouvrez grand ! Vos murs lourds (ITE ou pierre) vont "stocker" ce froid gratuit cette nuit et vous protéger de la chaleur demain en pleine journée.`);
+            } else {
+                pushRec("type-air", "🌬️ Rafraîchissement Rapide (Faible Inertie)", 
+                `Il fait plus frais dehors (${data.t_ext}°C). Ouvrez pour rafraîchir l'air ! ⚠️ Attention : votre pièce a une faible inertie (ITI), elle ne stockera pas ce froid. Pensez à fermer les fenêtres et volets très tôt demain matin.`);
+            }
+                }
             `Vous avez chaud (PMV > 0.5) et il fait plus frais dehors (${data.t_ext}°C). <strong>Ouvrez grand les fenêtres</strong> pour rafraîchir la pièce gratuitement !`);
         } else if (data.t_ext < 15) {
             // S'il fait froid dehors, c'est le chauffage qui est trop fort
@@ -140,7 +149,20 @@ const isNight = now < sunrise || now > sunset;
             if (data.heatingSystem === 'floor') {
                 pushRec("type-heat", "🌡️ Anticipation requise", `Vous avez frais. ⚠️ Vu votre plancher chauffant (très forte inertie), la chaleur mettra plusieurs heures à se faire sentir. Montez le thermostat de 1°C maximum et patientez.`);
             } else {
-                pushRec("type-heat", "🌡️ Chauffage Requis", `Le confort n'est pas atteint (vous avez légèrement frais). Même avec une tenue adaptée, vous pouvez augmenter ${heatSysName} d'environ 1°C.`);
+                        // L'habitant a froid MALGRÉ le fait qu'il soit bien habillé
+        else {
+            if (data.heatingSystem === 'floor') {
+                pushRec("type-heat", "🌡️ Anticipation requise", `Vous avez frais. ⚠️ Vu votre plancher chauffant, la chaleur mettra plusieurs heures à se faire sentir. Montez le thermostat de 1°C maximum.`);
+            } else {
+                // Conseil adapté à l'inertie des murs
+                if (data.inertia === 'heavy') {
+                    pushRec("type-heat", "🌡️ Chauffage & Inertie Forte", `Le confort n'est pas atteint. Augmentez ${heatSysName} d'environ 1°C.<br><strong>💡 Astuce :</strong> Avec votre forte inertie (ITE/Murs lourds), ne coupez jamais le chauffage lors d'absences courtes, baissez-le juste de 1 ou 2°C. La relance serait trop longue et coûteuse.`);
+                } else {
+                    pushRec("type-heat", "🌡️ Chauffage & Inertie Légère", `Le confort n'est pas atteint. Vous pouvez augmenter ${heatSysName} d'environ 1°C.<br><strong>💡 Astuce :</strong> Votre pièce a une faible inertie (ITI), elle chauffe vite. Vous pouvez baisser le thermostat sans crainte lorsque vous quittez le logement pour faire des économies.`);
+                }
+            }
+        }
+                
             }
         }
     }
@@ -247,6 +269,7 @@ const isNight = now < sunrise || now > sunset;
 
 
 });
+
 
 
 
