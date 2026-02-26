@@ -79,11 +79,36 @@ function calculateMeanRadiantTemp(zone, t_air) {
     // Si la zone n'est pas définie, on suppose que Tr = T_air (bâtiment neutre)
     if (!zone || !zone.adj) return t_air;
 
-    // Détermination de l'isolation (Coefficient U estimé en W/m².K)
-    let U_wall = 2.5; // Par défaut : passoire thermique
-    if (zone.insulPos === 'ITI' || zone.insulPos === 'ITE') U_wall = 0.4; // Bien isolé
-    else if (zone.insulPos === 'ITR') U_wall = 0.8; // Moyen
-    else if (zone.wallMat === 'wood') U_wall = 1.0; 
+        // 1. Définition des performances thermiques (U en W/m².K) et de l'Inertie
+    const insulation = zone.insulation || 'iti_recent'; 
+    
+    let U_wall = 0.3;  
+    let U_roof = 0.2;
+    let U_floor = 0.3;
+    let inertia = 'light'; // Inertie par défaut (placo)
+
+    if (insulation === 'iti_recent') {
+        U_wall = 0.25; inertia = 'light'; // Isole bien, mais stocke peu
+    } 
+    else if (insulation === 'ite_recent') {
+        U_wall = 0.25; inertia = 'heavy'; // Isole bien ET stocke la chaleur (Mur lourd intérieur)
+    } 
+    else if (insulation === 'iti_old') {
+        U_wall = 0.8;  inertia = 'light';
+        U_roof = 0.5;  U_floor = 0.8;
+    } 
+    else if (insulation === 'ite_old') {
+        U_wall = 0.8;  inertia = 'heavy';
+        U_roof = 0.5;  U_floor = 0.8;
+    } 
+    else if (insulation === 'low') {
+        U_wall = 2.5;  inertia = 'heavy'; // Un vieux mur de pierre stocke beaucoup (mais perd tout dehors)
+        U_roof = 2.0;  U_floor = 2.0;
+    }
+
+    // NOUVEAU : On sauvegarde l'inertie dans la session pour que la Page 2 (Coach) s'en serve !
+    sessionStorage.setItem('zoneInertia', inertia);
+
 
     const U_window = 1.5; // Simplification (on pourrait affiner selon vitrage)
     const hi = 8.0; // Coefficient d'échange superficiel intérieur (Constant physique)
@@ -478,6 +503,7 @@ inputs.forEach(input => {
     input.addEventListener('change', calculateAndDisplay);
 
 });
+
 
 
 
