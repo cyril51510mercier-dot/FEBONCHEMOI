@@ -1,54 +1,46 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <link rel="stylesheet" href="style.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fébonchémoi - Le Coach</title>
+    <title>Fébonchémoi - Diagnostic & Coach</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <h1>📊 Diagnostic & Actions</h1>
 
-    <h2>📊 Diagnostic & Actions</h2>
+    <div class="summary-card">
+        <div class="stat-box">
+            <div class="stat-value" id="disp-pmv">--</div>
+            <div class="stat-label">Votre PMV</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="disp-top">--</div>
+            <div class="stat-label">T° Opérative</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="disp-rh">--</div>
+            <div class="stat-label">Humidité Int.</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="disp-clo">--</div>
+            <div class="stat-label">Isol. Vêtements (Clo)</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="disp-insul">--</div>
+            <div class="stat-label">Isol. Maison</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="disp-room">--</div>
+            <div class="stat-label">Pièce</div>
+        </div>
+    </div>
 
-	<div class="summary-card">
-    <div class="stat-box">
-        <div class="stat-value" id="disp-pmv">--</div>
-        <div class="stat-label">Votre PMV</div>
-    </div>
-    <div class="stat-box">
-        <div class="stat-value" id="disp-top">--°C</div>
-        <div class="stat-label">T° Opérative</div>
-    </div>
-    <div class="stat-box">
-        <div class="stat-value" id="disp-rh">--%</div>
-        <div class="stat-label">Humidité Int.</div>
-    </div>
-
-    <div class="stat-box" style="border-left: 2px solid #eee;">
-        <div class="stat-value" id="disp-clo" style="color: #666;">--</div>
-        <div class="stat-label">Isol. Vêtements (Clo)</div>
-    </div>
-    
-    <div class="stat-box">
-        <div class="stat-value" id="disp-insul" style="font-size: 1.1em; color: #0056b3;">--</div>
-        <div class="stat-label">Isol. Maison</div>
-    </div>
-
-    <div class="stat-box">
-        <div class="stat-value" id="disp-room" style="font-size: 1.1em;">--</div>
-        <div class="stat-label">Pièce</div>
-    </div>
-</div>
-
-    <h3>💡 Les recommandations du Coach</h3>
-    
+    <h2 style="margin-top: 30px;">💡 Les recommandations du Coach</h2>
     <div id="recommendations-container">
         </div>
 
-<div id="recommendations-container"></div>
-
-    <div class="summary-card" style="margin-top: 30px; border-top: 4px solid #34495e;">
+    <div class="section" style="margin-top: 30px; border-top: 4px solid #34495e;">
         <h3 style="color: #2c3e50; margin-top: 0;">📅 Historique de cette zone</h3>
         
         <div style="overflow-x: auto;">
@@ -71,15 +63,10 @@
         </button>
     </div>
 
-    <center style="margin-top: 30px;">
+    <center style="margin-top: 30px; margin-bottom: 30px;">
         <a href="index.html" class="btn-back" style="color: #7f8c8d; text-decoration: none; font-weight: bold;">← Retour aux mesures</a>
     </center>
 
-    <center>
-        <a href="page1.html" class="btn-back">← Retour aux mesures</a>
-    </center>
-
     <script src="page2_script.js"></script>
-
 </body>
 </html>
