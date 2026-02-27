@@ -73,25 +73,24 @@ function restoreSessionData() {
 }
 
 // ============================================================
-// 2. MOTEUR PHYSIQUE : CALCUL DES TEMPÉRATURES DE PAROIS=
+// 2. MOTEUR PHYSIQUE : CALCUL DES TEMPÉRATURES DE PAROIS
 // ============================================================
 function calculateMeanRadiantTemp(zone, t_air) {
-    // Si la zone n'est pas définie, on suppose que Tr = T_air (bâtiment neutre)
     if (!zone || !zone.adj) return t_air;
 
-        // 1. Définition des performances thermiques (U en W/m².K) et de l'Inertie
+    // 1. Définition des performances thermiques (U en W/m².K) et de l'Inertie
     const insulation = zone.insulation || 'iti_recent'; 
     
     let U_wall = 0.3;  
     let U_roof = 0.2;
     let U_floor = 0.3;
-    let inertia = 'light'; // Inertie par défaut (placo)
+    let inertia = 'light'; 
 
     if (insulation === 'iti_recent') {
-        U_wall = 0.25; inertia = 'light'; // Isole bien, mais stocke peu
+        U_wall = 0.25; inertia = 'light'; 
     } 
     else if (insulation === 'ite_recent') {
-        U_wall = 0.25; inertia = 'heavy'; // Isole bien ET stocke la chaleur (Mur lourd intérieur)
+        U_wall = 0.25; inertia = 'heavy'; 
     } 
     else if (insulation === 'iti_old') {
         U_wall = 0.8;  inertia = 'light';
@@ -102,37 +101,32 @@ function calculateMeanRadiantTemp(zone, t_air) {
         U_roof = 0.5;  U_floor = 0.8;
     } 
     else if (insulation === 'low') {
-        U_wall = 2.5;  inertia = 'heavy'; // Un vieux mur de pierre stocke beaucoup (mais perd tout dehors)
+        U_wall = 2.5;  inertia = 'heavy'; 
         U_roof = 2.0;  U_floor = 2.0;
     }
 
-    // NOUVEAU : On sauvegarde l'inertie dans la session pour que la Page 2 (Coach) s'en serve !
     sessionStorage.setItem('zoneInertia', inertia);
 
+    const U_window = 1.5; 
+    const hi = 8.0; 
 
-    const U_window = 1.5; // Simplification (on pourrait affiner selon vitrage)
-    const hi = 8.0; // Coefficient d'échange superficiel intérieur (Constant physique)
-
-    // Calcul géométrique (On suppose une pièce carrée pour répartir les surfaces)
     const area = parseFloat(zone.area) || 16;
     const h = parseFloat(zone.height) || 2.5;
     const side = Math.sqrt(area);
-    const wallArea = side * h; // Surface d'un seul mur
+    const wallArea = side * h; 
     const floorArea = area;
 
     let totalArea = 0;
     let sumAreaTemp = 0;
 
-    // Fonction de calcul de la T° de surface (Tsi) selon l'adjacence
     function getSurfaceTemp(adjacency, U) {
-        if (adjacency === 'heated') return t_air; // Mur mitoyen chauffé = T°air
+        if (adjacency === 'heated') return t_air; 
         
         let t_ext_adj = outdoorTemp;
         if (adjacency === 'unheated') {
-            t_ext_adj = (t_air + outdoorTemp) / 2; // Garage/Cellier à mi-chemin
+            t_ext_adj = (t_air + outdoorTemp) / 2; 
         }
         
-        // Formule physique du gradient thermique : Tsi = Tint - (U/hi) * (Tint - Text)
         return t_air - (U / hi) * (t_air - t_ext_adj);
     }
 
@@ -144,20 +138,18 @@ function calculateMeanRadiantTemp(zone, t_air) {
         totalArea += wallArea;
     });
 
-    // 2. Plafond et Sol (U ajusté pour sol)
-    let U_floor = (zone.floorType === 'heavy') ? 1.5 : 0.8;
-    const t_ceiling = getSurfaceTemp(zone.adj.ceiling, U_wall);
-    const t_floor = getSurfaceTemp(zone.adj.floor, U_floor);
+    // 2. Plafond et Sol
+    let U_floor_actual = (zone.floorType === 'heavy') ? 1.5 : 0.8;
+    const t_ceiling = getSurfaceTemp(zone.adj.ceiling, U_roof);
+    const t_floor = getSurfaceTemp(zone.adj.floor, U_floor_actual);
     
     sumAreaTemp += (t_ceiling * floorArea);
     totalArea += floorArea;
     sumAreaTemp += (t_floor * floorArea);
     totalArea += floorArea;
     
-        // 3. Vitrages (Calcul des Déperditions ET Apports Solaires)
+    // 3. Vitrages
     if (zone.windows && zone.windows.length > 0) {
-        
-        // On vérifie s'il fait jour et s'il y a du soleil
         const now = new Date().getTime();
         const sunrise = parseInt(sessionStorage.getItem('sunriseTime')) || now - 1000;
         const sunset = parseInt(sessionStorage.getItem('sunsetTime')) || now + 1000;
@@ -167,64 +159,49 @@ function calculateMeanRadiantTemp(zone, t_air) {
         zone.windows.forEach(win => {
             const wArea = parseFloat(win.area) || 2;
             
-            // A. DÉPERDITION : Qualité du vitrage
-            let U_win = 1.5; // Double standard par défaut
-            if (win.glass === 'single') U_win = 5.8; // Passoire thermique
-            if (win.glass === 'triple') U_win = 0.8; // Très isolant
+            let U_win = 1.5; 
+            if (win.glass === 'single') U_win = 5.8; 
+            if (win.glass === 'triple') U_win = 0.8; 
             if (win.glass === 'double_recent') U_win = 1.1;
 
-            // Température de base de la vitre intérieure sans soleil
             let t_win = getSurfaceTemp('outside', U_win);
 
-            // B. APPORTS SOLAIRES : L'effet "Radiateur"
             if (isDaytime && isSunny && win.mask !== 'heavy') {
-                let solarBoost = 0; // Bonus de température en degrés
+                let solarBoost = 0; 
                 
-                // Puissance du soleil selon l'orientation
-                if (win.orient === 'S') solarBoost = 4.0; // Plein Sud = Max de chaleur
+                if (win.orient === 'S') solarBoost = 4.0; 
                 else if (win.orient === 'SE' || win.orient === 'SW') solarBoost = 2.5;
                 else if (win.orient === 'E' || win.orient === 'W') solarBoost = 1.0;
-                else if (win.orient === 'N') solarBoost = 0.0; // Aucun apport direct au Nord
+                else if (win.orient === 'N') solarBoost = 0.0; 
 
-                // Réduction si un arbre ou balcon fait de l'ombre
                 if (win.mask === 'partial') solarBoost *= 0.5;
 
-                // On ajoute cette chaleur gratuite à la température de la vitre
                 t_win += solarBoost; 
             }
 
-            // On retire la surface de mur équivalente, et on intègre notre vitre calculée
             sumAreaTemp -= (getSurfaceTemp('outside', U_wall) * wArea);
             sumAreaTemp += (t_win * wArea);
         });
     }
     
-
-    // Température Rayonnante Moyenne (Tr)
     return sumAreaTemp / totalArea;
 }
 
 // ============================================================
 // 3. GESTION MÉTÉO (API & GÉOLOCALISATION)
 // ============================================================
-
-// A. Méthode Manuelle (par nom de ville)
 document.getElementById('getWeatherButton').addEventListener('click', () => {
     const city = document.getElementById('location').value.trim();
     if (!city) { alert("Veuillez entrer une ville."); return; }
 
     const searchBtn = document.getElementById('getWeatherButton');
     const originalText = searchBtn.textContent;
-    searchBtn.textContent = "⏳..."; // Petit effet d'attente
+    searchBtn.textContent = "⏳..."; 
 
     const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=fr`;
-    
-    // On appelle la fonction en lui passant le bouton pour qu'il s'anime
     fetchWeather(url, searchBtn, originalText); 
-
 });
 
-// B. Méthode Automatique (Géolocalisation GPS)
 document.getElementById('geoLocateButton').addEventListener('click', () => {
     const geoBtn = document.getElementById('geoLocateButton');
     
@@ -251,7 +228,6 @@ document.getElementById('geoLocateButton').addEventListener('click', () => {
     }
 });
 
-// C. Fonction commune de traitement des données Météo
 function fetchWeather(url, btnElement = null, originalBtnText = "") {
     fetch(url)
         .then(res => {
@@ -259,35 +235,29 @@ function fetchWeather(url, btnElement = null, originalBtnText = "") {
             return res.json();
         })
         .then(data => {
-            // 1. Mise à jour des variables globales
             outdoorTemp = data.main.temp;
             outdoorHumidity = data.main.humidity;
             outdoorPressure = data.main.pressure;
             outdoorWind = (data.wind.speed * 3.6); 
             sunshineStatus = data.weather[0].main;
-// NOUVEAU : On capture les heures de lever/coucher (fournies en secondes, on passe en millisecondes pour le JS)
-sessionStorage.setItem('sunriseTime', data.sys.sunrise * 1000);
-sessionStorage.setItem('sunsetTime', data.sys.sunset * 1000);
 
-            // 2. Auto-remplissage du champ ville avec le nom officiel renvoyé par l'API
+            sessionStorage.setItem('sunriseTime', data.sys.sunrise * 1000);
+            sessionStorage.setItem('sunsetTime', data.sys.sunset * 1000);
+
             document.getElementById('location').value = data.name;
 
-            // 3. Pré-remplir les champs intérieurs si vides
             if(document.getElementById('airTemp').value === '') document.getElementById('airTemp').value = outdoorTemp.toFixed(1);
             if(document.getElementById('relativeHumidity').value === '') document.getElementById('relativeHumidity').value = outdoorHumidity;
 
-            // 4. Mettre à jour les calculs
             updateClothingDisplay();
             calculateAndDisplay();
             
-            // 5. Retour visuel de SUCCÈS sur le bouton cliqué (Chercher ou Localiser)
             if (btnElement) {
                 btnElement.textContent = "✅ Fait !";
-                btnElement.style.backgroundColor = "#27ae60"; // Passe au vert
+                btnElement.style.backgroundColor = "#27ae60"; 
                 btnElement.style.color = "white";
                 btnElement.style.borderColor = "#27ae60";
                 
-                // Remet le bouton à son état normal après 2 secondes
                 setTimeout(() => {
                     btnElement.textContent = originalBtnText;
                     btnElement.style.backgroundColor = ""; 
@@ -315,43 +285,35 @@ function adjustClothing(amount) { manualCloAdjustment += amount; calculateAndDis
 function resetClothing() { manualCloAdjustment = 0; calculateAndDisplay(); }
 
 function getBaseCloAndMet() {
-    let met = 1.0; // Métabolisme par défaut (assis au repos)
+    let met = 1.0; 
     let baseClo = 1.0; 
 
-    // 1. Tenue de base de jour selon la météo
-    if (outdoorTemp > 25) baseClo = 0.5; // Été (T-shirt)
-    else if (outdoorTemp < 15) baseClo = 1.2; // Hiver (Pull)
+    if (outdoorTemp > 25) baseClo = 0.5; 
+    else if (outdoorTemp < 15) baseClo = 1.2; 
 
-    // 2. Adaptation selon l'USAGE de la zone
     const zoneId = document.getElementById('zoneSelect').value;
     if (zoneId && GLOBAL_HOUSE_CONFIG[zoneId]) {
         const usages = GLOBAL_HOUSE_CONFIG[zoneId].usages;
         
-        // Zones actives
         if (usages.includes('gym') || usages.includes('kitchen')) {
-            met = 1.6; // On bouge beaucoup
+            met = 1.6; 
         } 
         else if (usages.includes('office')) {
-            met = 1.2; // Activité de bureau
+            met = 1.2; 
         }
-        // Zone de sommeil (La gestion intelligente de la couette)
         else if (usages.includes('bedroom')) {
-            met = 0.8; // Le métabolisme chute pendant le sommeil
+            met = 0.8; 
             
-            // --- NOUVELLE LOGIQUE : Couette saisonnière ---
-            const currentMonth = new Date().getMonth(); // 0 = Janvier, 11 = Décembre
+            const currentMonth = new Date().getMonth(); 
             
-            // Hiver (Décembre, Janvier, Février)
             if (currentMonth === 11 || currentMonth === 0 || currentMonth === 1) {
-                baseClo = 2.5; // Grosse couette d'hiver
+                baseClo = 2.5; 
             }
-            // Été (Juin, Juillet, Août)
             else if (currentMonth >= 5 && currentMonth <= 7) {
-                baseClo = 0.8; // Simple drap ou couette très d'été
+                baseClo = 0.8; 
             }
-            // Mi-saison (Printemps: Mars-Mai / Automne: Sept-Nov)
             else {
-                baseClo = 1.5; // Couette légère mi-saison
+                baseClo = 1.5; 
             }
         }
     }
@@ -395,13 +357,11 @@ function calculatePMV(ta, tr, vel, rh, met, clo) {
 function calculateAndDisplay() {
     const zoneId = document.getElementById('zoneSelect').value;
     const ta = parseFloat(document.getElementById('airTemp').value);
-        let vel = 0.1; // Vitesse de base (air calme dans un logement)
+    let vel = 0.1; 
 
-    // --- GESTION DES INFILTRATIONS (Courants d'air parasites) ---
     if (zoneId && GLOBAL_HOUSE_CONFIG[zoneId]) {
         const zone = GLOBAL_HOUSE_CONFIG[zoneId];
         
-        // On vérifie s'il y a des fenêtres anciennes dans la zone (qui laissent passer l'air)
         let hasOldWindows = false;
         if (zone.windows) {
             zone.windows.forEach(win => {
@@ -411,18 +371,14 @@ function calculateAndDisplay() {
             });
         }
 
-        // Si la zone a des fenêtres fuyardes ET que le vent extérieur souffle fort (> 20 km/h)
         if (hasOldWindows && outdoorWind > 20) {
-            // Le vent s'infiltre : on augmente la vitesse de l'air intérieur ressentie
-            // Cela va faire chuter le PMV (sensation de froid parasite)
             vel = 0.25; 
         }
     }
-    const rh = parseFloat(document.getElementById('relativeHumidity').value) || 50;
     
-    let tr = ta; // Par défaut si aucune zone n'est sélectionnée
+    const rh = parseFloat(document.getElementById('relativeHumidity').value) || 50;
+    let tr = ta; 
 
-    // --- LE MOTEUR MAGIQUE ---
     if (zoneId && GLOBAL_HOUSE_CONFIG[zoneId] && !isNaN(ta)) {
         tr = calculateMeanRadiantTemp(GLOBAL_HOUSE_CONFIG[zoneId], ta);
     }
@@ -463,27 +419,23 @@ document.getElementById('viewRecommendationsButton').addEventListener('click', (
     if (opTemp !== '--' && ta !== '') {
         sessionStorage.setItem('currentZoneId', zoneId);
         
-        // Traduction de la zone experte pour la Page 2
         const zone = GLOBAL_HOUSE_CONFIG[zoneId];
-        sessionStorage.setItem('roomType', zone.usages[0] || 'living'); // On prend le 1er usage principal
+        sessionStorage.setItem('roomType', zone.usages[0] || 'living'); 
         
         let insulationLvl = 'medium';
-        if(zone.insulPos === 'NONE') insulationLvl = 'low';
-        else if(zone.insulPos === 'ITE' || zone.insulPos === 'ITI') insulationLvl = 'high';
+        if(zone.insulation === 'low') insulationLvl = 'low';
+        else if(zone.insulation === 'ite_recent' || zone.insulation === 'iti_recent') insulationLvl = 'high';
         sessionStorage.setItem('buildingInsulation', insulationLvl);
 
-        // Sauvegarde résultats
         sessionStorage.setItem('calculatedOperativeTemp', opTemp);
         sessionStorage.setItem('calculatedPMV', document.getElementById('pmvValue').textContent);
         sessionStorage.setItem('calculatedClo', document.getElementById('currentCloValue').textContent);
         
-        // Sauvegarde inputs
         sessionStorage.setItem('indoorAirTemp', ta);
         sessionStorage.setItem('indoorHumidity', document.getElementById('relativeHumidity').value);
         sessionStorage.setItem('location', document.getElementById('location').value);
         sessionStorage.setItem('manualCloAdjustment', manualCloAdjustment); 
 
-        // Sauvegarde météo
         sessionStorage.setItem('outdoorTemp', outdoorTemp);
         sessionStorage.setItem('outdoorHumidity', outdoorHumidity);
         sessionStorage.setItem('outdoorPressure', outdoorPressure);
@@ -496,14 +448,8 @@ document.getElementById('viewRecommendationsButton').addEventListener('click', (
     }
 });
 
-// Écouteurs de mise à jour temps réel
 const inputs = document.querySelectorAll('input, select');
 inputs.forEach(input => {
     input.addEventListener('input', calculateAndDisplay);
     input.addEventListener('change', calculateAndDisplay);
-
 });
-
-
-
-
