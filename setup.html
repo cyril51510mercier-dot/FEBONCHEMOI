@@ -302,7 +302,7 @@
                 height: document.getElementById('ceilingHeight').value,
                 wallMat: document.getElementById('wallMaterial').value,
                 wallThick: document.getElementById('wallThickness').value,
-                insulPos: document.getElementById('insulationPosition').value,
+                insulation: document.getElementById('zoneInsulation').value,
                 
                 // Adjacences (Les 6 faces)
                 adj: {
@@ -358,7 +358,7 @@
             document.getElementById('ceilingHeight').value = data.height || 2.5;
             document.getElementById('wallMaterial').value = data.wallMat || 'cinderblock';
             document.getElementById('wallThickness').value = data.wallThick || '';
-            document.getElementById('insulationPosition').value = data.insulPos || 'ITI';
+            document.getElementById('zoneInsulation').value = data.insulation || 'iti_recent';
             
             if(data.adj) {
                 document.getElementById('adjWall1').value = data.adj.wall1 || 'outside';
@@ -404,3 +404,4 @@
 </body>
 
 </html>
+
