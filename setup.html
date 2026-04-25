@@ -424,6 +424,41 @@
             windowCounter = 0;
             addWindowBlock(); // Un vitrage vierge par défaut
         }
+                // ==========================================
+        // SAUVEGARDE SÉCURISÉE DES CLÉS IOT (NETATMO)
+        // ==========================================
+        
+        // Charger les clés existantes à l'ouverture de la page
+        window.addEventListener('load', () => {
+            document.getElementById('netatmoClientId').value = localStorage.getItem('NETATMO_CLIENT_ID') || '';
+            document.getElementById('netatmoClientSecret').value = localStorage.getItem('NETATMO_CLIENT_SECRET') || '';
+            document.getElementById('netatmoRefreshToken').value = localStorage.getItem('NETATMO_REFRESH_TOKEN') || '';
+        });
+
+        // Fonction pour sauvegarder les clés localement
+        function saveIoTConfig() {
+            const clientId = document.getElementById('netatmoClientId').value.trim();
+            const clientSecret = document.getElementById('netatmoClientSecret').value.trim();
+            const refreshToken = document.getElementById('netatmoRefreshToken').value.trim();
+
+            if (!clientId || !clientSecret || !refreshToken) {
+                alert("Veuillez remplir les 3 champs Netatmo.");
+                return;
+            }
+
+            // Enregistrement dans le coffre-fort du navigateur
+            localStorage.setItem('NETATMO_CLIENT_ID', clientId);
+            localStorage.setItem('NETATMO_CLIENT_SECRET', clientSecret);
+            localStorage.setItem('NETATMO_REFRESH_TOKEN', refreshToken);
+
+            const status = document.getElementById('iotStatus');
+            status.textContent = "✅ Clés IoT sécurisées sur cet appareil !";
+            status.className = "status-badge status-configured";
+            status.style.display = "block";
+            
+            setTimeout(() => { status.style.display = "none"; }, 3000);
+        }
+        
     </script>
 </body>
 
