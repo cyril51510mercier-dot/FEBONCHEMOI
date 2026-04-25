@@ -145,6 +145,30 @@
                 </select>
             </div>
         </div>
+                <div class="config-section" style="border-left: 5px solid #8e44ad;">
+            <h2>E. Connectivité IoT (Netatmo)</h2>
+            <p style="font-size: 0.85em; color: #7f8c8d; margin-top: 0;">🔒 Ces clés restent stockées secrètement dans la mémoire de cet appareil. Elles ne seront jamais publiées sur internet.</p>
+            
+            <div class="form-grid">
+                <div class="full-width">
+                    <label>Client ID</label>
+                    <input type="text" id="netatmoClientId" placeholder="ex: 69ece36566...">
+                </div>
+                <div class="full-width">
+                    <label>Client Secret</label>
+                    <input type="password" id="netatmoClientSecret" placeholder="Votre code secret...">
+                </div>
+                <div class="full-width">
+                    <label>Refresh Token</label>
+                    <input type="password" id="netatmoRefreshToken" placeholder="Généré tout en bas de la page dev.netatmo...">
+                </div>
+            </div>
+            
+            <button type="button" class="btn-load" onclick="saveIoTConfig()" style="background-color: #8e44ad; width: 100%; margin-top: 10px;">
+                🔐 Enregistrer les clés dans ce téléphone
+            </button>
+            <div id="iotStatus" class="status-badge" style="display:none; margin-top: 10px;"></div>
+        </div>
 
         <div class="action-bar">
             <button type="button" class="reset-btn" onclick="clearCurrentForm()">Effacer le formulaire</button>
