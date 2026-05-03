@@ -457,87 +457,99 @@ inputs.forEach(input => {
 // ============================================================
 // 7. CONNEXION IOT : API NETATMO (THERMOSTAT)
 // ============================================================
-const btnNetatmo = document.getElementById('btnNetatmo');
+window.lancerNetatmo = async function() {
+    const btn = document.getElementById('btnNetatmo');
+    const originalText = btn.textContent;
+    
+    // Test visuel pour prouver que le clic fonctionne bien
+    btn.textContent = "⏳ Initialisation...";
+    btn.style.backgroundColor = "#f39c12";
 
-if (btnNetatmo) {
-    btnNetatmo.addEventListener('click', async () => {
+    try {
         const clientId = localStorage.getItem('NETATMO_CLIENT_ID');
         const clientSecret = localStorage.getItem('NETATMO_CLIENT_SECRET');
         const refreshToken = localStorage.getItem('NETATMO_REFRESH_TOKEN');
 
         if (!clientId || !clientSecret || !refreshToken) {
             alert("🔒 Les clés Netatmo ne sont pas configurées.\nVeuillez vous rendre dans l'Espace Expert pour les saisir.");
+            btn.textContent = originalText;
+            btn.style.backgroundColor = "#e67e22";
             return;
         }
 
-        const originalText = btnNetatmo.textContent;
-        btnNetatmo.textContent = "⏳ Connexion...";
-        btnNetatmo.style.backgroundColor = "#f39c12";
+        btn.textContent = "⏳ Auth Netatmo...";
 
-        try {
-            // Étape 1 : Obtenir un jeton d'accès frais (Access Token)
-            const tokenResponse = await fetch('https://api.netatmo.com/oauth2/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    grant_type: 'refresh_token',
-                    refresh_token: refreshToken,
-                    client_id: clientId,
-                    client_secret: clientSecret
-                })
-            });
+        // Étape 1 : Obtenir un jeton d'accès frais (Access Token)
+        const tokenResponse = await fetch('https://api.netatmo.com/oauth2/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                grant_type: 'refresh_token',
+                refresh_token: refreshToken,
+                client_id: clientId,
+                client_secret: clientSecret
+            })
+        });
 
-            if (!tokenResponse.ok) throw new Error("Authentification refusée par Netatmo (Vérifiez vos clés).");
-            const tokenData = await tokenResponse.json();
-            const accessToken = tokenData.access_token;
-            
-            // Netatmo génère un nouveau refresh token à chaque fois, il faut le sauvegarder !
-            localStorage.setItem('NETATMO_REFRESH_TOKEN', tokenData.refresh_token);
-
-            // Étape 2 : Récupérer l'ID de la maison
-            btnNetatmo.textContent = "⏳ Lecture...";
-            const homesResponse = await fetch('https://api.netatmo.com/api/homesdata', {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
-            const homesData = await homesResponse.json();
-            const homeId = homesData.body.homes[0].id;
-
-            // Étape 3 : Récupérer les températures actuelles de la maison
-            const statusResponse = await fetch(`https://api.netatmo.com/api/homestatus?home_id=${homeId}`, {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
-            const statusData = await statusResponse.json();
-            
-            // On cherche la température lue par le thermostat
-            let foundTemp = null;
-            const rooms = statusData.body.home.rooms;
-            for (let room of rooms) {
-                if (room.therm_measured_temperature) {
-                    foundTemp = room.therm_measured_temperature;
-                    break; // On prend la première température trouvée (MVP)
-                }
-            }
-
-            if (foundTemp !== null) {
-                document.getElementById('airTemp').value = foundTemp;
-                calculateAndDisplay(); // On relance le moteur Fanger avec la nouvelle T° !
-                
-                // Retour visuel de succès
-                btnNetatmo.textContent = "✅ " + foundTemp + "°C";
-                btnNetatmo.style.backgroundColor = "#27ae60";
-                setTimeout(() => {
-                    btnNetatmo.textContent = originalText;
-                    btnNetatmo.style.backgroundColor = "#e67e22";
-                }, 4000);
-            } else {
-                throw new Error("Thermostat introuvable ou éteint.");
-            }
-
-        } catch (error) {
-            console.error("Erreur Netatmo:", error);
-            alert("❌ Échec de la connexion Netatmo : " + error.message);
-            btnNetatmo.textContent = originalText;
-            btnNetatmo.style.backgroundColor = "#e67e22";
+        if (!tokenResponse.ok) {
+            throw new Error("Authentification refusée (Code " + tokenResponse.status + ")");
         }
-    });
-}
+        
+        const tokenData = await tokenResponse.json();
+        const accessToken = tokenData.access_token;
+        
+        // Sauvegarde du nouveau refresh token
+        localStorage.setItem('NETATMO_REFRESH_TOKEN', tokenData.refresh_token);
+
+        // Étape 2 : Récupérer l'ID de la maison
+        btn.textContent = "⏳ Lecture Maison...";
+        const homesResponse = await fetch('https://api.netatmo.com/api/homesdata', {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        const homesData = await homesResponse.json();
+        const homeId = homesData.body.homes[0].id;
+
+        // Étape 3 : Récupérer les températures
+        btn.textContent = "⏳ Lecture Capteurs...";
+        const statusResponse = await fetch(`https://api.netatmo.com/api/homestatus?home_id=${homeId}`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        const statusData = await statusResponse.json();
+        
+        let foundTemp = null;
+        const rooms = statusData.body.home.rooms;
+        for (let room of rooms) {
+            if (room.therm_measured_temperature) {
+                foundTemp = room.therm_measured_temperature;
+                break; 
+            }
+        }
+
+        if (foundTemp !== null) {
+            document.getElementById('airTemp').value = foundTemp;
+            calculateAndDisplay(); // On relance le moteur Fanger
+            
+            btn.textContent = "✅ " + foundTemp + "°C";
+            btn.style.backgroundColor = "#27ae60";
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.backgroundColor = "#e67e22";
+            }, 4000);
+        } else {
+            throw new Error("Thermostat introuvable dans cette maison.");
+        }
+
+    } catch (error) {
+        console.error("Erreur Netatmo:", error);
+        
+        // Alerte détaillée pour le diagnostic
+        if (error.message.includes("Failed to fetch")) {
+            alert("❌ Erreur réseau ou blocage de sécurité (CORS) par Netatmo.");
+        } else {
+            alert("❌ Erreur : " + error.message);
+        }
+        
+        btn.textContent = originalText;
+        btn.style.backgroundColor = "#e67e22";
+    }
+};
