@@ -135,7 +135,7 @@
         </div>
         
         <div class="config-section">
-            <h2>D. Chauffage</h2>
+            <h2>D. Chauffage & Capteurs</h2>
             <div class="full-width">
                 <select id="heatingSystem">
                     <option value="convection">Convecteurs Électriques (0 Inertie)</option>
@@ -143,6 +143,12 @@
                     <option value="radiator_cast">Radiateurs Fonte (Inertie Moyenne)</option>
                     <option value="floor">Plancher Chauffant (Très Forte Inertie)</option>
                 </select>
+            </div>
+            <!-- NOUVEAU BLOC CAPTEUR -->
+            <div class="full-width" style="margin-top: 15px; padding: 10px; background-color: #fdf2e9; border-left: 4px solid #e67e22;">
+                <label style="cursor: pointer; font-weight: bold; color: #d35400;">
+                    <input type="checkbox" id="hasNetatmo"> 🟠 Lier cette zone au thermostat Netatmo
+                </label>
             </div>
         </div>
                 <div class="config-section" style="border-left: 5px solid #8e44ad;">
@@ -343,6 +349,7 @@
                 
                 // Chauffage
                 heatSys: document.getElementById('heatingSystem').value,
+                hasNetatmo: document.getElementById('hasNetatmo').checked,
                 lastUpdate: new Date().toLocaleString()
             };
 
@@ -378,6 +385,7 @@
                 cb.checked = data.usages.includes(cb.value);
             });
 
+            document.getElementById('hasNetatmo').checked = data.hasNetatmo || false;
             document.getElementById('roomArea').value = data.area || '';
             document.getElementById('ceilingHeight').value = data.height || 2.5;
             document.getElementById('wallMaterial').value = data.wallMat || 'cinderblock';
@@ -408,6 +416,7 @@
         function clearCurrentForm() {
             // ON NE VIDE PLUS les cases usages (pour conserver le choix de l'utilisateur lors d'une nouvelle création)
             
+            document.getElementById('hasNetatmo').checked = false;
             document.getElementById('roomArea').value = '';
             document.getElementById('wallThickness').value = '';
             

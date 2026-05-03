@@ -454,6 +454,16 @@ inputs.forEach(input => {
     input.addEventListener('change', calculateAndDisplay);
 });
 
+// Déclenchement automatique du Netatmo lors du choix de la zone
+document.getElementById('zoneSelect').addEventListener('change', (e) => {
+    const zoneId = e.target.value;
+    if (zoneId && GLOBAL_HOUSE_CONFIG[zoneId] && GLOBAL_HOUSE_CONFIG[zoneId].hasNetatmo) {
+        if (typeof window.lancerNetatmo === 'function') {
+            window.lancerNetatmo(); // Lance l'API automatiquement !
+        }
+    }
+});
+
 // ============================================================
 // 7. CONNEXION IOT : API NETATMO (THERMOSTAT)
 // ============================================================

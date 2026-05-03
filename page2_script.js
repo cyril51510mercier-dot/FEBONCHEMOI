@@ -181,3 +181,54 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error("Erreur critique détectée :", error);
     }
 });
+
+window.refreshNetatmoPage2 = async function() {
+    const btn = document.getElementById('btnRefreshNetatmo');
+    btn.textContent = "⏳ Interrogation Netatmo...";
+    btn.style.backgroundColor = "#f39c12";
+
+    try {
+        const clientId = localStorage.getItem('NETATMO_CLIENT_ID');
+        const clientSecret = localStorage.getItem('NETATMO_CLIENT_SECRET');
+        const refreshToken = localStorage.getItem('NETATMO_REFRESH_TOKEN');
+
+        if (!clientId || !clientSecret || !refreshToken) throw new Error("Clés Netatmo absentes.");
+
+        // Échange du Token
+        const tokenRes = await fetch('https://api.netatmo.com/oauth2/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: clientId, client_secret: clientSecret })
+        });
+        if (!tokenRes.ok) throw new Error("Erreur Auth");
+        const tokenData = await tokenRes.json();
+        localStorage.setItem('NETATMO_REFRESH_TOKEN', tokenData.refresh_token);
+
+        // Lecture de la maison
+        const homesRes = await fetch('https://api.netatmo.com/api/homesdata', { headers: { 'Authorization': `Bearer ${tokenData.access_token}` } });
+        const homesData = await homesRes.json();
+        const homeId = homesData.body.homes[0].id;
+
+        // Lecture Température
+        const statusRes = await fetch(`https://api.netatmo.com/api/homestatus?home_id=${homeId}`, { headers: { 'Authorization': `Bearer ${tokenData.access_token}` } });
+        const statusData = await statusRes.json();
+        
+        let foundTemp = null;
+        for (let room of statusData.body.home.rooms) {
+            if (room.therm_measured_temperature) { foundTemp = room.therm_measured_temperature; break; }
+        }
+
+        if (foundTemp !== null) {
+            // On sauvegarde la nouvelle température en session et on recharge la page pour tout recalculer
+            sessionStorage.setItem('indoorAirTemp', foundTemp);
+            btn.textContent = "✅ T° Mise à jour ! Rechargement...";
+            btn.style.backgroundColor = "#27ae60";
+            setTimeout(() => { window.location.reload(); }, 1000);
+        }
+
+    } catch (error) {
+        alert("❌ Impossible de rafraîchir : " + error.message);
+        btn.textContent = "🔄 Réessayer";
+        btn.style.backgroundColor = "#e74c3c";
+    }
+};
