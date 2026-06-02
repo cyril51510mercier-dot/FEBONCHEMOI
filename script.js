@@ -574,7 +574,7 @@ async function lancerSonoff() {
     btn.style.backgroundColor = "#2980b9";
     
     try {
-        const response = await fetch('https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd');
+        const response = await fetch('[https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd](https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd)');
         if (!response.ok) throw new Error("Le serveur Make n'a pas répondu.");
         
         const data = await response.json();
