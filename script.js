@@ -566,36 +566,33 @@ window.lancerNetatmo = async function() {
 
 async function lancerSonoff() {
     const btn = document.getElementById('btn-sonoff');
-    const tempInput = document.getElementById('indoorAirTemp'); // Vérifiez que c'est bien l'ID de votre case température
+    const tempInput = document.getElementById('airTemp'); 
+    const humInput = document.getElementById('relativeHumidity'); // <-- Remplacez par le vrai ID de votre case Humidité
     
-    // On change l'apparence du bouton pendant la recherche
     const texteInitial = btn.textContent;
     btn.textContent = "⏳ Lecture Sonoff en cours...";
     btn.style.backgroundColor = "#2980b9";
     
     try {
-        // L'application appelle votre API secrète Make.com
         const response = await fetch('https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd');
-        
         if (!response.ok) throw new Error("Le serveur Make n'a pas répondu.");
         
-        // On lit le texte brut (le fameux {"temperature": 20.4})
         const data = await response.json();
         
-        if (data.temperature) {
-            // On injecte la valeur dans la case
+        if (data.temperature && data.humidity) {
+            // On injecte les deux valeurs
             tempInput.value = data.temperature;
+            humInput.value = data.humidity;
             
-            // On remet le bouton au vert
-            btn.textContent = "✅ Sonoff : " + data.temperature + "°C";
+            btn.textContent = `✅ Sonoff : ${data.temperature}°C / ${data.humidity}%`;
             btn.style.backgroundColor = "#27ae60";
             
-            // On force le Coach à recalculer le PMV immédiatement !
+            // On force le recalcul
             if (typeof calculateAndDisplay === 'function') {
                 calculateAndDisplay();
             }
         } else {
-            throw new Error("Température introuvable dans les données.");
+            throw new Error("Données incomplètes.");
         }
         
     } catch (error) {
