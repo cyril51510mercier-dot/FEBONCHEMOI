@@ -563,3 +563,44 @@ window.lancerNetatmo = async function() {
         btn.style.backgroundColor = "#e67e22";
     }
 };
+
+async function lancerSonoff() {
+    const btn = document.getElementById('btn-sonoff');
+    const tempInput = document.getElementById('indoorAirTemp'); // Vérifiez que c'est bien l'ID de votre case température
+    
+    // On change l'apparence du bouton pendant la recherche
+    const texteInitial = btn.textContent;
+    btn.textContent = "⏳ Lecture Sonoff en cours...";
+    btn.style.backgroundColor = "#2980b9";
+    
+    try {
+        // L'application appelle votre API secrète Make.com
+        const response = await fetch('VOTRE_URL_MAKE_ICI');
+        
+        if (!response.ok) throw new Error("Le serveur Make n'a pas répondu.");
+        
+        // On lit le texte brut (le fameux {"temperature": 20.4})
+        const data = await response.json();
+        
+        if (data.temperature) {
+            // On injecte la valeur dans la case
+            tempInput.value = data.temperature;
+            
+            // On remet le bouton au vert
+            btn.textContent = "✅ Sonoff : " + data.temperature + "°C";
+            btn.style.backgroundColor = "#27ae60";
+            
+            // On force le Coach à recalculer le PMV immédiatement !
+            if (typeof calculateAndDisplay === 'function') {
+                calculateAndDisplay();
+            }
+        } else {
+            throw new Error("Température introuvable dans les données.");
+        }
+        
+    } catch (error) {
+        alert("❌ Erreur de connexion au Sonoff : " + error.message);
+        btn.textContent = texteInitial;
+        btn.style.backgroundColor = "#e74c3c";
+    }
+}

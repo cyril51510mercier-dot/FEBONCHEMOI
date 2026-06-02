@@ -36,8 +36,13 @@
             <div style="display: flex; gap: 10px;">
                 <input type="number" id="airTemp" step="0.1" placeholder="Ex: 20" style="flex-grow: 1;">
                 <button type="button" id="btnNetatmo" onclick="lancerNetatmo()" style="background-color: #e67e22; color: white; border: none; border-radius: 4px; padding: 10px 15px; cursor: pointer; font-weight: bold;">🟠 Lire Netatmo</button>
+                <button type="button" id="btn-sonoff" onclick="lancerSonoff()" style="background-color: #3498db; color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 10px;">
+    🔵 Lire Sonoff
+</button>
             </div>
         </div>
+
+        
 
         <div>
             <label for="relativeHumidity">Humidité Relative (%) :</label>
