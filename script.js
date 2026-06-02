@@ -575,7 +575,7 @@ async function lancerSonoff() {
     
     try {
         // L'application appelle votre API secrète Make.com
-        const response = await fetch('VOTRE_URL_MAKE_ICI');
+        const response = await fetch('https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd');
         
         if (!response.ok) throw new Error("Le serveur Make n'a pas répondu.");
         
