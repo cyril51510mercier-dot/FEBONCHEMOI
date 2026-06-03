@@ -579,30 +579,37 @@ const capteursMaison = {
     "Salle de bain - Bas": "a70def7d-7071-4950-99d1-3a16e9759eee"
 };
 
-// 2. La fonction d'interrogation universelle
 async function lancerSonoffIntelligent() {
+    // 1. On repère les éléments HTML
     const btn = document.getElementById('btn-sonoff');
     const tempInput = document.getElementById('indoorAirTemp');
     const humInput = document.getElementById('indoorAirHumidity');
-    
-    // On lit la pièce sélectionnée dans le menu déroulant HTML
-    const pieceSelectionnee = document.getElementById('select-piece').value; 
+    const menuPiece = document.getElementById('select-piece'); // On cherche le menu
 
-    // On cherche l'ID du capteur correspondant dans notre dictionnaire
+    // --- RADARS DE SÉCURITÉ ---
+    if (!menuPiece) {
+        alert("❌ Erreur HTML : Le menu déroulant avec l'id='select-piece' est introuvable sur la page.");
+        return; // On arrête tout proprement
+    }
+    if (!tempInput || !humInput) {
+        alert("❌ Erreur HTML : Les cases 'indoorAirTemp' ou 'indoorAirHumidity' sont introuvables.");
+        return;
+    }
+    // --------------------------
+
+    // Si tout va bien, on lit la pièce sélectionnée
+    const pieceSelectionnee = menuPiece.value; 
     const capteur_id = capteursMaison[pieceSelectionnee];
 
-    // Vérification de sécurité
     if (!capteur_id) {
-        alert("⚠️ Aucun capteur n'est trouvé pour : " + pieceSelectionnee);
+        alert("⚠️ Aucun capteur n'est configuré dans le dictionnaire pour : " + pieceSelectionnee);
         return; 
     }
 
-    // On prépare l'interface
     const texteInitial = btn.textContent;
     btn.textContent = "⏳ Lecture " + pieceSelectionnee + "...";
     btn.style.backgroundColor = "#2980b9";
     
-    // On appelle votre URL Make.com avec le capteur_id dynamique
     const url = 'https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd?capteur_id=' + capteur_id;
     
     try {
@@ -612,20 +619,17 @@ async function lancerSonoffIntelligent() {
         const data = await response.json();
         
         if (data.temperature && data.humidity) {
-            // On remplit les cases
             tempInput.value = data.temperature;
             humInput.value = data.humidity;
             
-            // On valide visuellement
             btn.textContent = `✅ ${pieceSelectionnee} : ${data.temperature}°C / ${data.humidity}%`;
             btn.style.backgroundColor = "#27ae60";
             
-            // On déclenche le calcul du PMV
             if (typeof calculateAndDisplay === 'function') {
                 calculateAndDisplay();
             }
         } else {
-            throw new Error("Données de température ou d'humidité manquantes.");
+            throw new Error("Données manquantes dans la réponse de Make.");
         }
     } catch (error) {
         alert("❌ Erreur de lecture : " + error.message);
