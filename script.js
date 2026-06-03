@@ -48,7 +48,8 @@ function restoreSessionData() {
         document.getElementById('zoneSelect').value = sessionStorage.getItem('currentZoneId');
     }
     
-    const fields = ['airTemp', 'relativeHumidity', 'location'];
+    // CORRECTION ICI : Utilisation des bons ID HTML
+    const fields = ['indoorAirTemp', 'indoorAirHumidity', 'location'];
     fields.forEach(id => {
         const val = sessionStorage.getItem(id);
         if(val !== null && document.getElementById(id)) {
@@ -78,7 +79,6 @@ function restoreSessionData() {
 function calculateMeanRadiantTemp(zone, t_air) {
     if (!zone || !zone.adj) return t_air;
 
-    // 1. Définition des performances thermiques (U en W/m².K) et de l'Inertie
     const insulation = zone.insulation || 'iti_recent'; 
     
     let U_wall = 0.3;  
@@ -130,7 +130,6 @@ function calculateMeanRadiantTemp(zone, t_air) {
         return t_air - (U / hi) * (t_air - t_ext_adj);
     }
 
-    // 1. Les 4 Murs
     const wallsAdj = [zone.adj.wall1, zone.adj.wall2, zone.adj.wall3, zone.adj.wall4];
     wallsAdj.forEach(adj => {
         const tsi = getSurfaceTemp(adj, U_wall);
@@ -138,7 +137,6 @@ function calculateMeanRadiantTemp(zone, t_air) {
         totalArea += wallArea;
     });
 
-    // 2. Plafond et Sol
     let U_floor_actual = (zone.floorType === 'heavy') ? 1.5 : 0.8;
     const t_ceiling = getSurfaceTemp(zone.adj.ceiling, U_roof);
     const t_floor = getSurfaceTemp(zone.adj.floor, U_floor_actual);
@@ -148,7 +146,6 @@ function calculateMeanRadiantTemp(zone, t_air) {
     sumAreaTemp += (t_floor * floorArea);
     totalArea += floorArea;
     
-    // 3. Vitrages
     if (zone.windows && zone.windows.length > 0) {
         const now = new Date().getTime();
         const sunrise = parseInt(sessionStorage.getItem('sunriseTime')) || now - 1000;
@@ -246,8 +243,9 @@ function fetchWeather(url, btnElement = null, originalBtnText = "") {
 
             document.getElementById('location').value = data.name;
 
-            if(document.getElementById('airTemp').value === '') document.getElementById('airTemp').value = outdoorTemp.toFixed(1);
-            if(document.getElementById('relativeHumidity').value === '') document.getElementById('relativeHumidity').value = outdoorHumidity;
+            // CORRECTION ICI : Utilisation des bons ID HTML
+            if(document.getElementById('indoorAirTemp').value === '') document.getElementById('indoorAirTemp').value = outdoorTemp.toFixed(1);
+            if(document.getElementById('indoorAirHumidity').value === '') document.getElementById('indoorAirHumidity').value = outdoorHumidity;
 
             updateClothingDisplay();
             calculateAndDisplay();
@@ -356,7 +354,15 @@ function calculatePMV(ta, tr, vel, rh, met, clo) {
 
 function calculateAndDisplay() {
     const zoneId = document.getElementById('zoneSelect').value;
-    const ta = parseFloat(document.getElementById('airTemp').value);
+    
+    // CORRECTION ICI : Remplacement de 'airTemp' et 'relativeHumidity' par les bons ID
+    const taInput = document.getElementById('indoorAirTemp');
+    const rhInput = document.getElementById('indoorAirHumidity');
+    
+    // Si les cases n'existent pas sur la page, on arrête pour ne pas planter
+    if (!taInput || !rhInput) return; 
+
+    const ta = parseFloat(taInput.value);
     let vel = 0.1; 
 
     if (zoneId && GLOBAL_HOUSE_CONFIG[zoneId]) {
@@ -376,7 +382,7 @@ function calculateAndDisplay() {
         }
     }
     
-    const rh = parseFloat(document.getElementById('relativeHumidity').value) || 50;
+    const rh = parseFloat(rhInput.value) || 50;
     let tr = ta; 
 
     if (zoneId && GLOBAL_HOUSE_CONFIG[zoneId] && !isNaN(ta)) {
@@ -414,7 +420,8 @@ document.getElementById('viewRecommendationsButton').addEventListener('click', (
     }
 
     const opTemp = document.getElementById('operativeTempValue').textContent;
-    const ta = document.getElementById('airTemp').value;
+    // CORRECTION ICI
+    const ta = document.getElementById('indoorAirTemp').value;
 
     if (opTemp !== '--' && ta !== '') {
         sessionStorage.setItem('currentZoneId', zoneId);
@@ -432,7 +439,8 @@ document.getElementById('viewRecommendationsButton').addEventListener('click', (
         sessionStorage.setItem('calculatedClo', document.getElementById('currentCloValue').textContent);
         
         sessionStorage.setItem('indoorAirTemp', ta);
-        sessionStorage.setItem('indoorHumidity', document.getElementById('relativeHumidity').value);
+        // CORRECTION ICI
+        sessionStorage.setItem('indoorHumidity', document.getElementById('indoorAirHumidity').value);
         sessionStorage.setItem('location', document.getElementById('location').value);
         sessionStorage.setItem('manualCloAdjustment', manualCloAdjustment); 
 
@@ -471,7 +479,6 @@ window.lancerNetatmo = async function() {
     const btn = document.getElementById('btnNetatmo');
     const originalText = btn.textContent;
     
-    // Test visuel pour prouver que le clic fonctionne bien
     btn.textContent = "⏳ Initialisation...";
     btn.style.backgroundColor = "#f39c12";
 
@@ -489,7 +496,6 @@ window.lancerNetatmo = async function() {
 
         btn.textContent = "⏳ Auth Netatmo...";
 
-        // Étape 1 : Obtenir un jeton d'accès frais (Access Token)
         const tokenResponse = await fetch('https://api.netatmo.com/oauth2/token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -501,17 +507,12 @@ window.lancerNetatmo = async function() {
             })
         });
 
-        if (!tokenResponse.ok) {
-            throw new Error("Authentification refusée (Code " + tokenResponse.status + ")");
-        }
+        if (!tokenResponse.ok) throw new Error("Authentification refusée (Code " + tokenResponse.status + ")");
         
         const tokenData = await tokenResponse.json();
         const accessToken = tokenData.access_token;
-        
-        // Sauvegarde du nouveau refresh token
         localStorage.setItem('NETATMO_REFRESH_TOKEN', tokenData.refresh_token);
 
-        // Étape 2 : Récupérer l'ID de la maison
         btn.textContent = "⏳ Lecture Maison...";
         const homesResponse = await fetch('https://api.netatmo.com/api/homesdata', {
             headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -519,7 +520,6 @@ window.lancerNetatmo = async function() {
         const homesData = await homesResponse.json();
         const homeId = homesData.body.homes[0].id;
 
-        // Étape 3 : Récupérer les températures
         btn.textContent = "⏳ Lecture Capteurs...";
         const statusResponse = await fetch(`https://api.netatmo.com/api/homestatus?home_id=${homeId}`, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -536,8 +536,9 @@ window.lancerNetatmo = async function() {
         }
 
         if (foundTemp !== null) {
-            document.getElementById('airTemp').value = foundTemp;
-            calculateAndDisplay(); // On relance le moteur Fanger
+            // CORRECTION ICI
+            document.getElementById('indoorAirTemp').value = foundTemp;
+            calculateAndDisplay(); 
             
             btn.textContent = "✅ " + foundTemp + "°C";
             btn.style.backgroundColor = "#27ae60";
@@ -551,19 +552,19 @@ window.lancerNetatmo = async function() {
 
     } catch (error) {
         console.error("Erreur Netatmo:", error);
-        
-        // Alerte détaillée pour le diagnostic
         if (error.message.includes("Failed to fetch")) {
             alert("❌ Erreur réseau ou blocage de sécurité (CORS) par Netatmo.");
         } else {
             alert("❌ Erreur : " + error.message);
         }
-        
         btn.textContent = originalText;
         btn.style.backgroundColor = "#e67e22";
     }
 };
-// 1. Dictionnaire complet des capteurs de la maison
+
+// ============================================================
+// 8. CONNEXION IOT : API SONOFF (SMARTTHINGS / MAKE)
+// ============================================================
 const capteursMaison = {
     "Cuisine": "98e2d34a-769f-4296-93ed-6083772e703e",
     "Chambre parents": "051291b5-d2d0-43a8-b783-08b8509d2c84",
@@ -580,24 +581,20 @@ const capteursMaison = {
 };
 
 async function lancerSonoffIntelligent() {
-    // 1. On repère les éléments HTML
     const btn = document.getElementById('btn-sonoff');
     const tempInput = document.getElementById('indoorAirTemp');
     const humInput = document.getElementById('indoorAirHumidity');
-    const menuPiece = document.getElementById('select-piece'); // On cherche le menu
+    const menuPiece = document.getElementById('select-piece');
 
-    // --- RADARS DE SÉCURITÉ ---
     if (!menuPiece) {
         alert("❌ Erreur HTML : Le menu déroulant avec l'id='select-piece' est introuvable sur la page.");
-        return; // On arrête tout proprement
+        return;
     }
     if (!tempInput || !humInput) {
         alert("❌ Erreur HTML : Les cases 'indoorAirTemp' ou 'indoorAirHumidity' sont introuvables.");
         return;
     }
-    // --------------------------
 
-    // Si tout va bien, on lit la pièce sélectionnée
     const pieceSelectionnee = menuPiece.value; 
     const capteur_id = capteursMaison[pieceSelectionnee];
 
