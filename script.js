@@ -563,40 +563,72 @@ window.lancerNetatmo = async function() {
         btn.style.backgroundColor = "#e67e22";
     }
 };
+// 1. Dictionnaire complet des capteurs de la maison
+const capteursMaison = {
+    "Cuisine": "98e2d34a-769f-4296-93ed-6083772e703e",
+    "Chambre parents": "051291b5-d2d0-43a8-b783-08b8509d2c84",
+    "Chambre Orso": "c432fd4b-3836-4d98-94fd-3e6822aa96c5",
+    "Garage": "762dd667-b30a-4bed-8bf6-2fc2a09fc29b",
+    "Entrée": "598d83ea-cfcd-43f8-89f6-cfed3a4517d4",
+    "Cave": "d8906d8b-68d2-4100-a074-03129a672ae1",
+    "Chambre Ysée": "5ac8836a-c232-4225-a688-f161dcca60f6",
+    "Extérieur - Jardin": "50ad97e0-a6e1-4b54-9b6a-dc306df7c068",
+    "Salle de bain - Haut": "322388c4-c9b2-475d-9c68-3e13e501ce6a",
+    "Extérieur - Rue": "c755bde8-9f8a-4ea4-ac2e-2fea154e9c09",
+    "Salon": "20fee90c-95f2-47ea-b477-e3d8a6058440",
+    "Salle de bain - Bas": "a70def7d-7071-4950-99d1-3a16e9759eee"
+};
 
-async function lancerSonoff() {
+// 2. La fonction d'interrogation universelle
+async function lancerSonoffIntelligent() {
     const btn = document.getElementById('btn-sonoff');
-    const tempInput = document.getElementById('airTemp'); 
-    const humInput = document.getElementById('relativeHumidity'); // <-- Remplacez par le vrai ID de votre case Humidité
+    const tempInput = document.getElementById('indoorAirTemp');
+    const humInput = document.getElementById('indoorAirHumidity');
     
+    // On lit la pièce sélectionnée dans le menu déroulant HTML
+    const pieceSelectionnee = document.getElementById('select-piece').value; 
+
+    // On cherche l'ID du capteur correspondant dans notre dictionnaire
+    const capteur_id = capteursMaison[pieceSelectionnee];
+
+    // Vérification de sécurité
+    if (!capteur_id) {
+        alert("⚠️ Aucun capteur n'est trouvé pour : " + pieceSelectionnee);
+        return; 
+    }
+
+    // On prépare l'interface
     const texteInitial = btn.textContent;
-    btn.textContent = "⏳ Lecture Sonoff en cours...";
+    btn.textContent = "⏳ Lecture " + pieceSelectionnee + "...";
     btn.style.backgroundColor = "#2980b9";
     
+    // On appelle votre URL Make.com avec le capteur_id dynamique
+    const url = 'https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd?capteur_id=' + capteur_id;
+    
     try {
-        const response = await fetch('[https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd](https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd)');
+        const response = await fetch(url);
         if (!response.ok) throw new Error("Le serveur Make n'a pas répondu.");
         
         const data = await response.json();
         
         if (data.temperature && data.humidity) {
-            // On injecte les deux valeurs
+            // On remplit les cases
             tempInput.value = data.temperature;
             humInput.value = data.humidity;
             
-            btn.textContent = `✅ Sonoff : ${data.temperature}°C / ${data.humidity}%`;
+            // On valide visuellement
+            btn.textContent = `✅ ${pieceSelectionnee} : ${data.temperature}°C / ${data.humidity}%`;
             btn.style.backgroundColor = "#27ae60";
             
-            // On force le recalcul
+            // On déclenche le calcul du PMV
             if (typeof calculateAndDisplay === 'function') {
                 calculateAndDisplay();
             }
         } else {
-            throw new Error("Données incomplètes.");
+            throw new Error("Données de température ou d'humidité manquantes.");
         }
-        
     } catch (error) {
-        alert("❌ Erreur de connexion au Sonoff : " + error.message);
+        alert("❌ Erreur de lecture : " + error.message);
         btn.textContent = texteInitial;
         btn.style.backgroundColor = "#e74c3c";
     }

@@ -30,6 +30,34 @@
                 <button id="geoLocateButton" style="background-color: #3498db; color: white; border: none; border-radius: 4px; padding: 10px 15px; cursor: pointer; font-weight: bold;">📍 Me localiser</button>
             </div>
         </div>
+
+        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+    <h3 style="margin-top: 0;">📍 Importation des données Capteur</h3>
+    
+    <!-- Le menu déroulant pour choisir la pièce -->
+    <label for="select-piece"><strong>Sélectionnez la zone à diagnostiquer :</strong></label>
+    <select id="select-piece" style="padding: 8px; margin-left: 10px; border-radius: 4px;">
+        <option value="Cuisine">Cuisine</option>
+        <option value="Chambre parents">Chambre parents</option>
+        <option value="Chambre Orso">Chambre Orso</option>
+        <option value="Garage">Garage</option>
+        <option value="Entrée">Entrée</option>
+        <option value="Cave">Cave</option>
+        <option value="Chambre Ysée">Chambre Ysée</option>
+        <option value="Extérieur - Jardin">Extérieur - Jardin</option>
+        <option value="Salle de bain - Haut">Salle de bain - Haut</option>
+        <option value="Extérieur - Rue">Extérieur - Rue</option>
+        <option value="Salon" selected>Salon</option>
+        <option value="Salle de bain - Bas">Salle de bain - Bas</option>
+    </select>
+
+    <br><br>
+
+    <!-- Le bouton unique qui va lancer la fonction universelle -->
+    <button type="button" id="btn-sonoff" onclick="lancerSonoffIntelligent()" style="background-color: #3498db; color: white; border: none; padding: 12px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 16px;">
+        🔵 Importer Température & Humidité
+    </button>
+</div>
         
         <div style="margin-top: 15px;">
             <label for="airTemp">Température de l'air ambiant (°C) :</label>
