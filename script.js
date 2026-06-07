@@ -10,8 +10,6 @@ let sunshineStatus = 'Clouds';
 let manualCloAdjustment = 0; 
 const apiKey = '4ec1eb2b0cc90a4b18a79008b17581a8'; 
 let GLOBAL_HOUSE_CONFIG = {};
-
-// NOUVEAU : Mémoire des températures pour recalculer sans rappeler Make.com
 let DONNEES_HABITAT = {}; 
 
 const capteursMaison = {
@@ -29,6 +27,12 @@ const capteursMaison = {
     "Salle de bain - Bas": "a70def7d-7071-4950-99d1-3a16e9759eee"
 };
 
+// --- NOUVEAU HELPER (Le Traducteur Domotique <-> Expert) ---
+function getZoneConfigByName(roomName) {
+    return Object.values(GLOBAL_HOUSE_CONFIG).find(z => z.name === roomName);
+}
+// -----------------------------------------------------------
+
 // ============================================================
 // 1. INITIALISATION DU DASHBOARD
 // ============================================================
@@ -36,7 +40,7 @@ window.addEventListener('load', () => {
     const savedConfig = localStorage.getItem('HOUSE_CONFIG');
     if (savedConfig) {
         GLOBAL_HOUSE_CONFIG = JSON.parse(savedConfig);
-        initialiserDashboard(); // ⬅️ On dessine les tuiles !
+        initialiserDashboard();
     } else {
         alert("⚠️ Aucune zone n'a été paramétrée par l'expert.\nVeuillez d'abord créer vos pièces dans l'espace Expert.");
         window.location.href = 'setup.html';
@@ -45,22 +49,19 @@ window.addEventListener('load', () => {
     restoreSessionData();
 });
 
-// Génération visuelle des tuiles HTML pour chaque pièce
-// Génération visuelle des tuiles HTML pour chaque pièce
 function initialiserDashboard() {
     const grid = document.getElementById('dashboard-grid');
     if (!grid) return;
     grid.innerHTML = ''; 
 
-    // On boucle sur toutes les pièces du dictionnaire domotique
     for (const [nomPiece, idCapteur] of Object.entries(capteursMaison)) {
         
         const tuile = document.createElement('div');
         tuile.style.cssText = 'background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: transform 0.2s;';
         
-        // Vérifie si la configuration expert existe pour afficher le bon badge
-        const isConfigured = GLOBAL_HOUSE_CONFIG[nomPiece];
-        const badgeExpert = isConfigured 
+        // C'est ICI que l'on vérifie si la pièce a été bien configurée par l'expert
+        const configExpert = getZoneConfigByName(nomPiece);
+        const badgeExpert = configExpert 
             ? `<span style="font-size: 0.7em; color: #27ae60; background: #e9f7ef; padding: 2px 6px; border-radius: 4px;">⚙️ Config. OK</span>`
             : `<span style="font-size: 0.7em; color: #e74c3c; background: #fdedec; padding: 2px 6px; border-radius: 4px;">⚠️ Manque Config. Expert</span>`;
 
@@ -117,17 +118,17 @@ function restoreSessionData() {
 }
 
 // ============================================================
-// 2. MOTEUR PHYSIQUE ET CALCULS (Refondus pour le Multi-Pièces)
+// 2. MOTEUR PHYSIQUE ET CALCULS
 // ============================================================
-function getBaseCloAndMet(zoneId) {
+function getBaseCloAndMet(zoneConfig) {
     let met = 1.0; 
     let baseClo = 1.0; 
 
     if (outdoorTemp > 25) baseClo = 0.5; 
     else if (outdoorTemp < 15) baseClo = 1.2; 
 
-    if (zoneId && GLOBAL_HOUSE_CONFIG[zoneId]) {
-        const usages = GLOBAL_HOUSE_CONFIG[zoneId].usages;
+    if (zoneConfig) {
+        const usages = zoneConfig.usages || [];
         if (usages.includes('gym') || usages.includes('kitchen')) met = 1.6; 
         else if (usages.includes('office')) met = 1.2; 
         else if (usages.includes('bedroom')) {
@@ -233,22 +234,26 @@ function calculatePMV(ta, tr, vel, rh, met, clo) {
     return ts * (M - perte_vapeur - perte_sueur - perte_resp_latente - perte_resp_sensible - perte_rayonnement - perte_convection);
 }
 
-// Fonction centrale pour calculer le confort d'UNE tuile et modifier ses couleurs
 function mettreAJourTuile(nomPiece) {
     const data = DONNEES_HABITAT[nomPiece];
     const idCapteur = capteursMaison[nomPiece];
-    if (!data || !idCapteur) return; // Pas encore de données pour cette pièce
+    if (!data || !idCapteur) return; 
 
-    const zone = GLOBAL_HOUSE_CONFIG[nomPiece];
+    const zoneConfig = getZoneConfigByName(nomPiece);
+    if (!zoneConfig) {
+        document.getElementById('temp-' + idCapteur).textContent = data.ta.toFixed(1) + "°C";
+        document.getElementById('hum-' + idCapteur).textContent = data.rh.toFixed(1) + "%";
+        return;
+    }
+
     let vel = 0.1; 
-    if (zone.windows && zone.windows.some(w => w.glass === 'single') && outdoorWind > 20) vel = 0.25;
+    if (zoneConfig.windows && zoneConfig.windows.some(w => w.glass === 'single') && outdoorWind > 20) vel = 0.25;
 
-    const tr = calculateMeanRadiantTemp(zone, data.ta);
-    const config = getBaseCloAndMet(nomPiece);
-    let pmv = calculatePMV(data.ta, tr, vel, data.rh, config.met, config.totalClo);
+    const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
+    const configMet = getBaseCloAndMet(zoneConfig);
+    let pmv = calculatePMV(data.ta, tr, vel, data.rh, configMet.met, configMet.totalClo);
     pmv = Math.max(-3, Math.min(3, pmv)); 
 
-    // Mise à jour visuelle (Le Feu Tricolore)
     document.getElementById('temp-' + idCapteur).textContent = data.ta.toFixed(1) + "°C";
     document.getElementById('hum-' + idCapteur).textContent = data.rh.toFixed(1) + "%";
     
@@ -273,7 +278,6 @@ function mettreAJourTuile(nomPiece) {
     }
 }
 
-// Relancer toutes les tuiles d'un coup (Quand on change d'habit ou que la météo change)
 function recalculerToutLeDashboard() {
     for (const nomPiece in DONNEES_HABITAT) {
         mettreAJourTuile(nomPiece);
@@ -281,12 +285,12 @@ function recalculerToutLeDashboard() {
 }
 
 // ============================================================
-// 3. VÊTEMENTS ET MÉTÉO (Interactions Globales)
+// 3. VÊTEMENTS ET MÉTÉO
 // ============================================================
 function adjustClothing(amount) { 
     manualCloAdjustment += amount; 
     updateClothingDisplay();
-    recalculerToutLeDashboard(); // ⬅️ On actualise toutes les tuiles
+    recalculerToutLeDashboard(); 
 }
 function resetClothing() { 
     manualCloAdjustment = 0; 
@@ -294,12 +298,11 @@ function resetClothing() {
     recalculerToutLeDashboard(); 
 }
 function updateClothingDisplay() {
-    const config = getBaseCloAndMet(null); // Moyenne
+    const config = getBaseCloAndMet(null); 
     const cloSpan = document.getElementById('currentCloValue');
     if (cloSpan) cloSpan.textContent = config.totalClo.toFixed(1);
 }
 
-// --- DEBUT DU BLOC METEO A REMPLACER ---
 document.getElementById('getWeatherButton').addEventListener('click', () => {
     const city = document.getElementById('location').value.trim();
     if (!city) { alert("Veuillez entrer une ville."); return; }
@@ -364,28 +367,23 @@ function fetchWeather(url, btnElement, originalBtnText) {
             if(btnElement) btnElement.textContent = originalBtnText; 
         });
 }
-// --- FIN DU BLOC METEO ---
 
 // ============================================================
-// 4. LECTURE DES CAPTEURS (Stratégie 1 en préparation)
+// 4. LECTURE DES CAPTEURS
 // ============================================================
-// Attention : En attendant l'URL Make.com globale (Bulk API), 
-// ce bouton interroge actuellement les pièces une par une.
 async function synchroniserTouteLaMaison() {
     const btn = document.getElementById('btn-sync-all');
     btn.innerHTML = "⏳ Scan des capteurs en cours...";
     btn.style.backgroundColor = "#9b59b6";
 
-    // On boucle sur toutes les pièces configurées
     for (const [nomPiece, idCapteur] of Object.entries(capteursMaison)) {
-        if (!GLOBAL_HOUSE_CONFIG[nomPiece]) continue; 
-
         const statusEl = document.getElementById('status-' + idCapteur);
+        if(!statusEl) continue;
+        
         statusEl.textContent = "📡 Ping...";
         statusEl.style.color = "#f39c12";
 
         try {
-            // APPEL AU SERVEUR MAKE (À remplacer par un appel unique plus tard)
             const url = 'https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd?capteur_id=' + idCapteur;
             const response = await fetch(url);
             if (!response.ok) throw new Error("Erreur Serveur");
@@ -393,14 +391,11 @@ async function synchroniserTouteLaMaison() {
             const data = await response.json();
             
             if (data.temperature) {
-                // On sauvegarde la donnée en mémoire
                 DONNEES_HABITAT[nomPiece] = { ta: parseFloat(data.temperature), rh: parseFloat(data.humidity) };
-                
-                // On met à jour l'affichage de Fanger pour cette tuile
                 mettreAJourTuile(nomPiece);
                 
                 const now = new Date();
-                statusEl.textContent = "Actuel (" + now.getHours() + "h" + now.getMinutes() + ")";
+                statusEl.textContent = "Actuel (" + now.getHours() + "h" + (now.getMinutes()<10?'0':'') + now.getMinutes() + ")";
                 statusEl.style.color = "#27ae60";
             }
         } catch (error) {
@@ -414,7 +409,7 @@ async function synchroniserTouteLaMaison() {
 }
 
 // ============================================================
-// 5. ENVOI DES DONNÉES VERS PAGE 2 (Le Diagnostic Expert)
+// 5. ENVOI DES DONNÉES VERS PAGE 2
 // ============================================================
 function voirRecommandations(nomPiece) {
     if (!DONNEES_HABITAT[nomPiece]) {
@@ -423,24 +418,32 @@ function voirRecommandations(nomPiece) {
     }
 
     const data = DONNEES_HABITAT[nomPiece];
-    const zone = GLOBAL_HOUSE_CONFIG[nomPiece];
-    const config = getBaseCloAndMet(nomPiece);
-    const tr = calculateMeanRadiantTemp(zone, data.ta);
+    const zoneConfig = getZoneConfigByName(nomPiece);
+    
+    if (!zoneConfig) {
+        alert("⚠️ Cette pièce n'a pas été configurée dans l'Espace Expert. Le diagnostic est impossible.");
+        return;
+    }
+
+    // Le traducteur à l'envers : on retrouve la clé "zone_1" pour la Page 2
+    const zoneKey = Object.keys(GLOBAL_HOUSE_CONFIG).find(key => GLOBAL_HOUSE_CONFIG[key].name === nomPiece);
+
+    const configMet = getBaseCloAndMet(zoneConfig);
+    const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
     const opTemp = (data.ta + tr) / 2;
     const pmv = document.getElementById('pmv-' + capteursMaison[nomPiece]).textContent;
 
-    // Sauvegarde contextuelle avant voyage vers Page 2
-    sessionStorage.setItem('currentZoneId', nomPiece);
-    sessionStorage.setItem('roomType', zone.usages[0] || 'living'); 
+    sessionStorage.setItem('currentZoneId', zoneKey); 
+    sessionStorage.setItem('roomType', zoneConfig.usages[0] || 'living'); 
     
     let insulationLvl = 'medium';
-    if(zone.insulation === 'low') insulationLvl = 'low';
-    else if(zone.insulation === 'ite_recent' || zone.insulation === 'iti_recent') insulationLvl = 'high';
+    if(zoneConfig.insulation === 'low') insulationLvl = 'low';
+    else if(zoneConfig.insulation === 'ite_recent' || zoneConfig.insulation === 'iti_recent') insulationLvl = 'high';
     
     sessionStorage.setItem('buildingInsulation', insulationLvl);
     sessionStorage.setItem('calculatedOperativeTemp', opTemp.toFixed(1));
     sessionStorage.setItem('calculatedPMV', pmv);
-    sessionStorage.setItem('calculatedClo', config.totalClo.toFixed(1));
+    sessionStorage.setItem('calculatedClo', configMet.totalClo.toFixed(1));
     
     sessionStorage.setItem('indoorAirTemp', data.ta);
     sessionStorage.setItem('indoorHumidity', data.rh);
@@ -453,6 +456,5 @@ function voirRecommandations(nomPiece) {
     sessionStorage.setItem('sunshineStatus', sunshineStatus);
     sessionStorage.setItem('outdoorWind', outdoorWind);
 
-    // En route vers l'audit !
     window.location.href = 'page2.html';
 }
