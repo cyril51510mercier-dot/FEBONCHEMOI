@@ -290,45 +290,72 @@ function updateClothingDisplay() {
     if (cloSpan) cloSpan.textContent = config.totalClo.toFixed(1);
 }
 
+// --- DEBUT DU BLOC METEO A REMPLACER ---
 document.getElementById('getWeatherButton').addEventListener('click', () => {
     const city = document.getElementById('location').value.trim();
     if (!city) { alert("Veuillez entrer une ville."); return; }
-    fetchWeather(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=fr`);
+    
+    const btn = document.getElementById('getWeatherButton');
+    const originalText = btn.textContent;
+    const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=fr`;
+    fetchWeather(url, btn, originalText);
 });
 
 document.getElementById('geoLocateButton').addEventListener('click', () => {
+    const btn = document.getElementById('geoLocateButton');
+    const originalText = btn.textContent;
+
     if ("geolocation" in navigator) {
+        btn.textContent = "⏳...";
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                const lat = position.coords.latitude, lon = position.coords.longitude;
-                fetchWeather(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=fr`);
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=fr`;
+                fetchWeather(url, btn, originalText);
             },
-            (error) => alert("📍 Impossible d'accéder à la position.")
+            (error) => {
+                alert("📍 Le navigateur bloque l'accès au GPS. Tapez la ville manuellement.");
+                btn.textContent = originalText;
+            }
         );
     }
 });
 
-function fetchWeather(url) {
-    const btn = document.getElementById('getWeatherButton');
-    btn.textContent = "⏳...";
+function fetchWeather(url, btnElement, originalBtnText) {
+    if(btnElement) btnElement.textContent = "⏳...";
+    
     fetch(url)
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error("Erreur API");
+            return res.json();
+        })
         .then(data => {
             outdoorTemp = data.main.temp;
             outdoorHumidity = data.main.humidity;
             outdoorPressure = data.main.pressure;
             outdoorWind = (data.wind.speed * 3.6); 
             sunshineStatus = data.weather[0].main;
+            
             sessionStorage.setItem('sunriseTime', data.sys.sunrise * 1000);
             sessionStorage.setItem('sunsetTime', data.sys.sunset * 1000);
             document.getElementById('location').value = data.name;
             
-            btn.textContent = "✅"; setTimeout(() => btn.textContent = "🔍 Chercher", 2000);
+            if(btnElement) {
+                btnElement.textContent = "✅"; 
+                setTimeout(() => btnElement.textContent = originalBtnText, 2000);
+            }
+            
             updateClothingDisplay();
-            recalculerToutLeDashboard(); // ⬅️ On actualise toutes les tuiles avec la nouvelle météo
+            recalculerToutLeDashboard(); 
         })
-        .catch(err => { alert("Erreur Météo."); btn.textContent = "🔍 Chercher"; });
+        .catch(err => { 
+            console.error("Erreur détaillée :", err);
+            alert("❌ Erreur : Ville introuvable ou problème de connexion."); 
+            if(btnElement) btnElement.textContent = originalBtnText; 
+        });
 }
+// --- FIN DU BLOC METEO ---
 
 // ============================================================
 // 4. LECTURE DES CAPTEURS (Stratégie 1 en préparation)
