@@ -46,21 +46,30 @@ window.addEventListener('load', () => {
 });
 
 // Génération visuelle des tuiles HTML pour chaque pièce
+// Génération visuelle des tuiles HTML pour chaque pièce
 function initialiserDashboard() {
     const grid = document.getElementById('dashboard-grid');
     if (!grid) return;
     grid.innerHTML = ''; 
 
+    // On boucle sur toutes les pièces du dictionnaire domotique
     for (const [nomPiece, idCapteur] of Object.entries(capteursMaison)) {
-        // On ne crée une tuile que si la pièce a été configurée par l'expert
-        if (!GLOBAL_HOUSE_CONFIG[nomPiece]) continue;
-
+        
         const tuile = document.createElement('div');
         tuile.style.cssText = 'background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: transform 0.2s;';
         
+        // Vérifie si la configuration expert existe pour afficher le bon badge
+        const isConfigured = GLOBAL_HOUSE_CONFIG[nomPiece];
+        const badgeExpert = isConfigured 
+            ? `<span style="font-size: 0.7em; color: #27ae60; background: #e9f7ef; padding: 2px 6px; border-radius: 4px;">⚙️ Config. OK</span>`
+            : `<span style="font-size: 0.7em; color: #e74c3c; background: #fdedec; padding: 2px 6px; border-radius: 4px;">⚠️ Manque Config. Expert</span>`;
+
         tuile.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
-                <h3 style="margin: 0; font-size: 1.2em; color: #2c3e50;">${nomPiece}</h3>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.2em; color: #2c3e50;">${nomPiece}</h3>
+                    <div style="margin-top: 4px;">${badgeExpert}</div>
+                </div>
                 <span id="status-${idCapteur}" style="font-size: 0.75em; color: #7f8c8d; background: #f1f2f6; padding: 3px 8px; border-radius: 10px;">En attente</span>
             </div>
             
