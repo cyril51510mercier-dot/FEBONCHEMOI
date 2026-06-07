@@ -371,37 +371,46 @@ function fetchWeather(url, btnElement, originalBtnText) {
 // ============================================================
 // 4. LECTURE DES CAPTEURS
 // ============================================================
+// ============================================================
+// 4. LECTURE DES CAPTEURS (Version "Super-Scan" Économique)
+// ============================================================
 async function synchroniserTouteLaMaison() {
     const btn = document.getElementById('btn-sync-all');
-    btn.innerHTML = "⏳ Scan des capteurs en cours...";
+    btn.innerHTML = "⏳ Scan Global en cours...";
     btn.style.backgroundColor = "#9b59b6";
 
-    for (const [nomPiece, idCapteur] of Object.entries(capteursMaison)) {
-        const statusEl = document.getElementById('status-' + idCapteur);
-        if(!statusEl) continue;
+    try {
+        // APPEL UNIQUE À MAKE (Plus de ?capteur_id=...)
+        const url = 'https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd';
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Erreur Serveur");
         
-        statusEl.textContent = "📡 Ping...";
-        statusEl.style.color = "#f39c12";
-
-        try {
-            const url = 'https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd?capteur_id=' + idCapteur;
-            const response = await fetch(url);
-            if (!response.ok) throw new Error("Erreur Serveur");
+        // On reçoit un objet contenant TOUTES les pièces d'un coup
+        const dataPack = await response.json();
+        
+        // On boucle sur les données reçues
+        for (const [idCapteur, valeurs] of Object.entries(dataPack)) {
+            // Trouver le nom de la pièce à partir de l'ID (on inverse capteursMaison)
+            const nomPiece = Object.keys(capteursMaison).find(key => capteursMaison[key] === idCapteur);
             
-            const data = await response.json();
-            
-            if (data.temperature) {
-                DONNEES_HABITAT[nomPiece] = { ta: parseFloat(data.temperature), rh: parseFloat(data.humidity) };
+            if (nomPiece) {
+                // Sauvegarde
+                DONNEES_HABITAT[nomPiece] = { ta: parseFloat(valeurs.temp), rh: parseFloat(valeurs.hum) };
+                
+                // Mise à jour visuelle
                 mettreAJourTuile(nomPiece);
                 
-                const now = new Date();
-                statusEl.textContent = "Actuel (" + now.getHours() + "h" + (now.getMinutes()<10?'0':'') + now.getMinutes() + ")";
-                statusEl.style.color = "#27ae60";
+                const statusEl = document.getElementById('status-' + idCapteur);
+                if(statusEl) {
+                    const now = new Date();
+                    statusEl.textContent = "Actuel (" + now.getHours() + "h" + (now.getMinutes()<10?'0':'') + now.getMinutes() + ")";
+                    statusEl.style.color = "#27ae60";
+                }
             }
-        } catch (error) {
-            statusEl.textContent = "❌ Hors Ligne";
-            statusEl.style.color = "#e74c3c";
         }
+    } catch (error) {
+        console.error("Erreur Bulk Scan:", error);
+        alert("❌ Erreur lors du scan global. Vérifiez votre scénario Make.");
     }
 
     btn.innerHTML = "⚡ Actualiser toutes les pièces";
