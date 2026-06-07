@@ -3,25 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fébonchémoi - Mesures Habitant</title>
+    <title>Fébonchémoi - Tableau de Bord Global</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Fébonchémoi - Mesures Rapides</h1>
-
-    <div class="section" style="background-color: #f8f9fa; border-left: 5px solid #2ecc71;">
-        <h2>1. Quelle zone souhaitez-vous analyser ?</h2>
-        <select id="zoneSelect" style="width: 100%; padding: 10px; font-size: 1.1em; border-radius: 5px;">
-            <option value="">-- Chargement des zones expertes --</option>
-        </select>
-        <p style="font-size: 0.85em; color: #666; margin-top: 5px;">
-            ℹ️ Les caractéristiques des murs et vitrages de cette zone seront calculées automatiquement d'après la configuration de l'expert.
-        </p>
-    </div>
+    <h1>Fébonchémoi - Suivi de l'Habitat</h1>
 
     <div class="section">
-        <h2>2. Environnement & Météo</h2>
-        
+        <h2>🌍 Environnement Extérieur</h2>
         <div>
             <label for="location">Ville (Manuelle ou Automatique) :</label>
             <div style="display: flex; gap: 10px; margin-bottom: 10px;">
@@ -30,51 +19,10 @@
                 <button id="geoLocateButton" style="background-color: #3498db; color: white; border: none; border-radius: 4px; padding: 10px 15px; cursor: pointer; font-weight: bold;">📍 Me localiser</button>
             </div>
         </div>
-
-        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
-            <h3 style="margin-top: 0;">📍 Importation des données Capteur</h3>
-            
-            <!-- Le menu déroulant pour choisir la pièce -->
-            <label for="select-piece"><strong>Sélectionnez la zone à diagnostiquer :</strong></label>
-            <select id="select-piece" style="padding: 8px; margin-left: 10px; border-radius: 4px;">
-                <option value="Cuisine">Cuisine</option>
-                <option value="Chambre parents">Chambre parents</option>
-                <option value="Chambre Orso">Chambre Orso</option>
-                <option value="Garage">Garage</option>
-                <option value="Entrée">Entrée</option>
-                <option value="Cave">Cave</option>
-                <option value="Chambre Ysée">Chambre Ysée</option>
-                <option value="Extérieur - Jardin">Extérieur - Jardin</option>
-                <option value="Salle de bain - Haut">Salle de bain - Haut</option>
-                <option value="Extérieur - Rue">Extérieur - Rue</option>
-                <option value="Salon" selected>Salon</option>
-                <option value="Salle de bain - Bas">Salle de bain - Bas</option>
-            </select>
-
-            <br><br>
-
-            <!-- Le bouton unique qui va lancer la fonction universelle -->
-            <button type="button" id="btn-sonoff" onclick="lancerSonoffIntelligent()" style="background-color: #3498db; color: white; border: none; padding: 12px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 16px;">
-                🔵 Importer Température & Humidité
-            </button>
-        </div>
-        
-        <div style="margin-top: 15px;">
-            <label for="airTemp">Température de l'air ambiant (°C) :</label>
-            <div style="display: flex; gap: 10px;">
-                <input type="number" id="indoorAirTemp" placeholder="Ex: 20">
-                <button type="button" id="btnNetatmo" onclick="lancerNetatmo()" style="background-color: #e67e22; color: white; border: none; border-radius: 4px; padding: 10px 15px; cursor: pointer; font-weight: bold;">🟠 Lire Netatmo</button>
-            </div>
-        </div>
-
-        <div style="margin-top: 15px;">
-            <label for="relativeHumidity">Humidité Relative (%) :</label>
-            <input type="number" id="indoorAirHumidity" placeholder="Ex: 50">
-        </div>
     </div>
 
     <div class="section">
-        <h2>3. Vêtements (Votre isolation)</h2>
+        <h2>👕 Votre isolation (Globale)</h2>
         <div id="cloVisualizer">
             Isolation actuelle : <span id="currentCloValue">1.0</span> Clo 
             <br><small id="cloTypeText">Tenue normale</small>
@@ -85,21 +33,21 @@
         </div>
     </div>
 
-    <div class="section" style="background-color: #e8f4f8;">
-        <h2>Résultats de Confort</h2>
-        <p>Température Opérative Calculée : <strong><span id="operativeTempValue">--</span> °C</strong></p>
-        <p><em>(Prend en compte le rayonnement des murs évalué par l'IA)</em></p>
-        <p><strong>PMV : <span id="pmvValue">--</span></strong></p>
-        <div id="comfortIndicator">
-            <p><span id="comfortStatusText">En attente de données...</span></p>
-        </div>
+    <div class="section" style="background-color: #f8f9fa; border-top: 5px solid #8e44ad;">
+        <h2 style="margin-top: 0;">🎛️ Radiographie de l'Habitat</h2>
+        <p style="font-size: 0.9em; color: #666; margin-bottom: 20px;">
+            Vue d'ensemble du confort thermique et de la qualité de l'air.
+        </p>
+
+        <button id="btn-sync-all" onclick="synchroniserTouteLaMaison()" style="width: 100%; padding: 15px; font-size: 1.1em; background-color: #8e44ad; color: white; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 20px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            ⚡ Actualiser toutes les pièces
+        </button>
+
+        <div id="dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+            </div>
     </div>
 
-    <div class="section">
-        <button id="viewRecommendationsButton" style="width: 100%; padding: 15px; font-size: 1.2em; background-color: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer;">Voir l'Analyse et les Recommandations →</button>
-    </div>
-
-    <center style="margin-bottom: 20px;">
+    <center style="margin-top: 30px; margin-bottom: 20px;">
         <a href="setup.html" style="color: #95a5a6; text-decoration: none; font-size: 0.9em;">⚙️ Accès Expert (Paramétrage des zones)</a>
     </center>
 
