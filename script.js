@@ -368,10 +368,6 @@ function fetchWeather(url, btnElement, originalBtnText) {
         });
 }
 
-// ============================================================
-// 4. LECTURE DES CAPTEURS
-// ============================================================
-// ============================================================
 // 4. LECTURE DES CAPTEURS (Version "Super-Scan" Économique)
 // ============================================================
 async function synchroniserTouteLaMaison() {
@@ -380,31 +376,43 @@ async function synchroniserTouteLaMaison() {
     btn.style.backgroundColor = "#9b59b6";
 
     try {
-        // APPEL UNIQUE À MAKE (Plus de ?capteur_id=...)
+        // APPEL UNIQUE À MAKE (Plus besoin d'ID dans l'URL)
         const url = 'https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd';
         const response = await fetch(url);
         if (!response.ok) throw new Error("Erreur Serveur");
         
-        // On reçoit un objet contenant TOUTES les pièces d'un coup
+        // On reçoit un TABLEAU (Array) contenant TOUTES les pièces
         const dataPack = await response.json();
         
-        // On boucle sur les données reçues
-        for (const [idCapteur, valeurs] of Object.entries(dataPack)) {
-            // Trouver le nom de la pièce à partir de l'ID (on inverse capteursMaison)
+        // On boucle sur chaque capteur du tableau
+        for (const capteur of dataPack) {
+            const idCapteur = capteur.id;
+            
+            // Trouver le nom de la pièce à partir de l'ID (on inverse l'objet capteursMaison)
             const nomPiece = Object.keys(capteursMaison).find(key => capteursMaison[key] === idCapteur);
             
             if (nomPiece) {
-                // Sauvegarde
-                DONNEES_HABITAT[nomPiece] = { ta: parseFloat(valeurs.temp), rh: parseFloat(valeurs.hum) };
-                
-                // Mise à jour visuelle
-                mettreAJourTuile(nomPiece);
-                
-                const statusEl = document.getElementById('status-' + idCapteur);
-                if(statusEl) {
-                    const now = new Date();
-                    statusEl.textContent = "Actuel (" + now.getHours() + "h" + (now.getMinutes()<10?'0':'') + now.getMinutes() + ")";
-                    statusEl.style.color = "#27ae60";
+                // Sécurité : On vérifie que le capteur a bien renvoyé des valeurs (pas de 'null')
+                if (capteur.temperature !== null && capteur.humidity !== null) {
+                    
+                    // Sauvegarde (On utilise bien "temperature" et "humidity" tels que définis dans Make)
+                    DONNEES_HABITAT[nomPiece] = { 
+                        ta: parseFloat(capteur.temperature), 
+                        rh: parseFloat(capteur.humidity) 
+                    };
+                    
+                    // Mise à jour visuelle de la tuile HTML
+                    mettreAJourTuile(nomPiece);
+                    
+                    // Mise à jour de l'heure d'actualisation
+                    const statusEl = document.getElementById('status-' + idCapteur);
+                    if(statusEl) {
+                        const now = new Date();
+                        statusEl.textContent = "Actuel (" + now.getHours() + "h" + (now.getMinutes()<10?'0':'') + now.getMinutes() + ")";
+                        statusEl.style.color = "#27ae60";
+                    }
+                } else {
+                    console.warn(`⚠️ Données manquantes pour la pièce : ${nomPiece} (Capteur injoignable ?)`);
                 }
             }
         }
@@ -413,6 +421,7 @@ async function synchroniserTouteLaMaison() {
         alert("❌ Erreur lors du scan global. Vérifiez votre scénario Make.");
     }
 
+    // Restauration du bouton une fois le scan terminé
     btn.innerHTML = "⚡ Actualiser toutes les pièces";
     btn.style.backgroundColor = "#8e44ad";
 }
