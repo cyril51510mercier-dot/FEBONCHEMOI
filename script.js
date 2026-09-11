@@ -1,12 +1,7 @@
 // ============================================================
-// VARIABLES GLOBALES
+// SOLSTICE - VARIABLES GLOBALES
 // ============================================================
-let outdoorTemp = 15;        
-let outdoorHumidity = 50;
-let outdoorPressure = 1013;
-let outdoorWind = 0;         
-let sunshineStatus = 'Clouds';
-
+let outdoorTemp = 15, outdoorHumidity = 50, outdoorPressure = 1013, outdoorWind = 0, sunshineStatus = 'Clouds';
 let manualCloAdjustment = 0; 
 const apiKey = '4ec1eb2b0cc90a4b18a79008b17581a8'; 
 let GLOBAL_HOUSE_CONFIG = {};
@@ -27,11 +22,9 @@ const capteursMaison = {
     "Salle de bain - Bas": "a70def7d-7071-4950-99d1-3a16e9759eee"
 };
 
-// --- NOUVEAU HELPER (Le Traducteur Domotique <-> Expert) ---
 function getZoneConfigByName(roomName) {
     return Object.values(GLOBAL_HOUSE_CONFIG).find(z => z.name === roomName);
 }
-// -----------------------------------------------------------
 
 // ============================================================
 // 1. INITIALISATION DU DASHBOARD
@@ -42,7 +35,7 @@ window.addEventListener('load', () => {
         GLOBAL_HOUSE_CONFIG = JSON.parse(savedConfig);
         initialiserDashboard();
     } else {
-        alert("⚠️ Aucune zone n'a été paramétrée par l'expert.\nVeuillez d'abord créer vos pièces dans l'espace Expert.");
+        alert("⚠️ Modélisation requise.\nVeuillez d'abord paramétrer l'habitat dans l'espace Expert.");
         window.location.href = 'setup.html';
         return;
     }
@@ -55,20 +48,18 @@ function initialiserDashboard() {
     grid.innerHTML = ''; 
 
     for (const [nomPiece, idCapteur] of Object.entries(capteursMaison)) {
-        
         const tuile = document.createElement('div');
         tuile.style.cssText = 'background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: transform 0.2s;';
         
-        // C'est ICI que l'on vérifie si la pièce a été bien configurée par l'expert
         const configExpert = getZoneConfigByName(nomPiece);
         const badgeExpert = configExpert 
-            ? `<span style="font-size: 0.7em; color: #27ae60; background: #e9f7ef; padding: 2px 6px; border-radius: 4px;">⚙️ Config. OK</span>`
-            : `<span style="font-size: 0.7em; color: #e74c3c; background: #fdedec; padding: 2px 6px; border-radius: 4px;">⚠️ Manque Config. Expert</span>`;
+            ? `<span style="font-size: 0.7em; color: var(--eco); background: #e9f7ef; padding: 2px 6px; border-radius: 4px;">Modèle Actif</span>`
+            : `<span style="font-size: 0.7em; color: var(--hot); background: #fdedec; padding: 2px 6px; border-radius: 4px;">Non paramétré</span>`;
 
         tuile.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
                 <div>
-                    <h3 style="margin: 0; font-size: 1.2em; color: #2c3e50;">${nomPiece}</h3>
+                    <h3 style="margin: 0; font-size: 1.2em; color: var(--primary);">${nomPiece}</h3>
                     <div style="margin-top: 4px;">${badgeExpert}</div>
                 </div>
                 <span id="status-${idCapteur}" style="font-size: 0.75em; color: #7f8c8d; background: #f1f2f6; padding: 3px 8px; border-radius: 10px;">En attente</span>
@@ -77,22 +68,22 @@ function initialiserDashboard() {
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
                 <div style="text-align: center; flex: 1;">
                     <div style="font-size: 0.85em; color: #95a5a6; text-transform: uppercase;">Temp.</div>
-                    <div id="temp-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: #34495e; margin-top: 5px;">--°C</div>
+                    <div id="temp-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary); margin-top: 5px;">--°C</div>
                 </div>
                 <div style="text-align: center; flex: 1; border-left: 1px solid #eee;">
                     <div style="font-size: 0.85em; color: #95a5a6; text-transform: uppercase;">Humidité</div>
-                    <div id="hum-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: #34495e; margin-top: 5px;">--%</div>
+                    <div id="hum-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary); margin-top: 5px;">--%</div>
                 </div>
             </div>
             
-            <div id="pmv-box-${idCapteur}" style="text-align: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px; transition: background 0.3s;">
-                <div style="font-size: 0.85em; color: #7f8c8d; margin-bottom: 5px;">Indice PMV (Confort)</div>
+            <div id="pmv-box-${idCapteur}" style="text-align: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+                <div style="font-size: 0.85em; color: #7f8c8d; margin-bottom: 5px;">Indice PMV</div>
                 <div id="pmv-${idCapteur}" style="font-size: 1.3em; font-weight: bold; color: #bdc3c7;">--</div>
                 <div id="pmv-text-${idCapteur}" style="font-size: 0.8em; margin-top: 5px; color: #7f8c8d;">--</div>
             </div>
             
-            <button onclick="voirRecommandations('${nomPiece}')" style="width: 100%; padding: 12px; background-color: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1em;">
-                🔍 Analyser cette pièce
+            <button onclick="voirRecommandations('${nomPiece}')" style="width: 100%; padding: 12px; background-color: var(--secondary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                🔍 Lancer le diagnostic
             </button>
         `;
         grid.appendChild(tuile);
@@ -102,115 +93,36 @@ function initialiserDashboard() {
 function restoreSessionData() {
     const loc = sessionStorage.getItem('location');
     if (loc) document.getElementById('location').value = loc;
-
     if (sessionStorage.getItem('outdoorTemp')) {
         outdoorTemp = parseFloat(sessionStorage.getItem('outdoorTemp'));
         outdoorHumidity = parseFloat(sessionStorage.getItem('outdoorHumidity'));
-        outdoorPressure = parseFloat(sessionStorage.getItem('outdoorPressure'));
-        outdoorWind = parseFloat(sessionStorage.getItem('outdoorWind'));
         sunshineStatus = sessionStorage.getItem('sunshineStatus');
     }
-
-    if (sessionStorage.getItem('manualCloAdjustment')) {
-        manualCloAdjustment = parseFloat(sessionStorage.getItem('manualCloAdjustment'));
-    }
+    if (sessionStorage.getItem('manualCloAdjustment')) manualCloAdjustment = parseFloat(sessionStorage.getItem('manualCloAdjustment'));
     updateClothingDisplay();
 }
 
 // ============================================================
-// 2. MOTEUR PHYSIQUE ET CALCULS
+// 2. MOTEUR PHYSIQUE SOLSTICE
 // ============================================================
-function getBaseCloAndMet(zoneConfig) {
+function getBaseCloAndMet() {
     let met = 1.0; 
     let baseClo = 1.0; 
-
     if (outdoorTemp > 25) baseClo = 0.5; 
     else if (outdoorTemp < 15) baseClo = 1.2; 
-
-    if (zoneConfig) {
-        const usages = zoneConfig.usages || [];
-        if (usages.includes('gym') || usages.includes('kitchen')) met = 1.6; 
-        else if (usages.includes('office')) met = 1.2; 
-        else if (usages.includes('bedroom')) {
-            met = 0.8; 
-            const currentMonth = new Date().getMonth(); 
-            if (currentMonth === 11 || currentMonth === 0 || currentMonth === 1) baseClo = 2.5; 
-            else if (currentMonth >= 5 && currentMonth <= 7) baseClo = 0.8; 
-            else baseClo = 1.5; 
-        }
-    }
     return { met: met, totalClo: Math.max(0.1, Math.min(4.0, baseClo + manualCloAdjustment)) };
 }
 
 function calculateMeanRadiantTemp(zone, t_air) {
-    if (!zone || !zone.adj) return t_air;
+    if (!zone) return t_air;
     const insulation = zone.insulation || 'iti_recent'; 
-    let U_wall = 0.3, U_roof = 0.2, U_floor = 0.3;
+    let U_wall = 0.3;
+    if (insulation === 'low') U_wall = 2.5; 
+    else if (insulation.includes('old')) U_wall = 0.8;
 
-    if (insulation === 'iti_recent') { U_wall = 0.25; } 
-    else if (insulation === 'ite_recent') { U_wall = 0.25; } 
-    else if (insulation === 'iti_old') { U_wall = 0.8; U_roof = 0.5; U_floor = 0.8; } 
-    else if (insulation === 'ite_old') { U_wall = 0.8; U_roof = 0.5; U_floor = 0.8; } 
-    else if (insulation === 'low') { U_wall = 2.5; U_roof = 2.0; U_floor = 2.0; }
-
-    const hi = 8.0; 
-    const area = parseFloat(zone.area) || 16;
-    const h = parseFloat(zone.height) || 2.5;
-    const side = Math.sqrt(area);
-    const wallArea = side * h; 
-    const floorArea = area;
-
-    let totalArea = 0;
-    let sumAreaTemp = 0;
-
-    function getSurfaceTemp(adjacency, U) {
-        if (adjacency === 'heated') return t_air; 
-        let t_ext_adj = outdoorTemp;
-        if (adjacency === 'unheated') t_ext_adj = (t_air + outdoorTemp) / 2; 
-        return t_air - (U / hi) * (t_air - t_ext_adj);
-    }
-
-    const wallsAdj = [zone.adj.wall1, zone.adj.wall2, zone.adj.wall3, zone.adj.wall4];
-    wallsAdj.forEach(adj => {
-        sumAreaTemp += (getSurfaceTemp(adj, U_wall) * wallArea);
-        totalArea += wallArea;
-    });
-
-    let U_floor_actual = (zone.floorType === 'heavy') ? 1.5 : 0.8;
-    sumAreaTemp += (getSurfaceTemp(zone.adj.ceiling, U_roof) * floorArea);
-    totalArea += floorArea;
-    sumAreaTemp += (getSurfaceTemp(zone.adj.floor, U_floor_actual) * floorArea);
-    totalArea += floorArea;
-    
-    if (zone.windows && zone.windows.length > 0) {
-        const now = new Date().getTime();
-        const sunrise = parseInt(sessionStorage.getItem('sunriseTime')) || now - 1000;
-        const sunset = parseInt(sessionStorage.getItem('sunsetTime')) || now + 1000;
-        const isDaytime = (now > sunrise && now < sunset);
-        const isSunny = sunshineStatus.toLowerCase().includes('clear');
-
-        zone.windows.forEach(win => {
-            const wArea = parseFloat(win.area) || 2;
-            let U_win = 1.5; 
-            if (win.glass === 'single') U_win = 5.8; 
-            if (win.glass === 'triple') U_win = 0.8; 
-            if (win.glass === 'double_recent') U_win = 1.1;
-
-            let t_win = getSurfaceTemp('outside', U_win);
-
-            if (isDaytime && isSunny && win.mask !== 'heavy') {
-                let solarBoost = 0; 
-                if (win.orient === 'S') solarBoost = 4.0; 
-                else if (win.orient === 'SE' || win.orient === 'SW') solarBoost = 2.5;
-                else if (win.orient === 'E' || win.orient === 'W') solarBoost = 1.0;
-                if (win.mask === 'partial') solarBoost *= 0.5;
-                t_win += solarBoost; 
-            }
-            sumAreaTemp -= (getSurfaceTemp('outside', U_wall) * wArea);
-            sumAreaTemp += (t_win * wArea);
-        });
-    }
-    return sumAreaTemp / totalArea;
+    // Calcul simplifié de la température radiante basé sur l'isolation et la temp extérieure
+    let t_radiante = t_air - (U_wall * 0.1 * (t_air - outdoorTemp));
+    return t_radiante;
 }
 
 function calculatePMV(ta, tr, vel, rh, met, clo) {
@@ -246,11 +158,12 @@ function mettreAJourTuile(nomPiece) {
         return;
     }
 
+    // Impact des nouveaux équipements sur la vitesse de l'air
     let vel = 0.1; 
-    if (zoneConfig.windows && zoneConfig.windows.some(w => w.glass === 'single') && outdoorWind > 20) vel = 0.25;
+    if (zoneConfig.fanSys === 'plafond' || zoneConfig.fanSys === 'mobile') vel = 0.5; // Brassage augmente le confort d'été
 
     const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
-    const configMet = getBaseCloAndMet(zoneConfig);
+    const configMet = getBaseCloAndMet();
     let pmv = calculatePMV(data.ta, tr, vel, data.rh, configMet.met, configMet.totalClo);
     pmv = Math.max(-3, Math.min(3, pmv)); 
 
@@ -264,215 +177,102 @@ function mettreAJourTuile(nomPiece) {
     pmvVal.textContent = pmv.toFixed(2);
 
     if (pmv < -0.5) { 
-        pmvBox.style.backgroundColor = "#e8f4f8"; 
-        pmvVal.style.color = "#3498db"; 
+        pmvBox.style.backgroundColor = "#ebf5fb"; 
+        pmvVal.style.color = "var(--cold)"; 
         pmvText.textContent = "Sensation Fraîche 🥶";
     } else if (pmv > 0.5) { 
         pmvBox.style.backgroundColor = "#fdedec"; 
-        pmvVal.style.color = "#e74c3c"; 
+        pmvVal.style.color = "var(--hot)"; 
         pmvText.textContent = "Sensation Chaude 🥵";
     } else { 
         pmvBox.style.backgroundColor = "#e9f7ef"; 
-        pmvVal.style.color = "#27ae60"; 
+        pmvVal.style.color = "var(--eco)"; 
         pmvText.textContent = "Zone Neutre (Confort) ✅";
     }
 }
 
-function recalculerToutLeDashboard() {
-    for (const nomPiece in DONNEES_HABITAT) {
-        mettreAJourTuile(nomPiece);
-    }
-}
+function recalculerToutLeDashboard() { for (const nomPiece in DONNEES_HABITAT) { mettreAJourTuile(nomPiece); } }
 
-// ============================================================
-// 3. VÊTEMENTS ET MÉTÉO
-// ============================================================
-function adjustClothing(amount) { 
-    manualCloAdjustment += amount; 
-    updateClothingDisplay();
-    recalculerToutLeDashboard(); 
-}
-function resetClothing() { 
-    manualCloAdjustment = 0; 
-    updateClothingDisplay();
-    recalculerToutLeDashboard(); 
-}
-function updateClothingDisplay() {
-    const config = getBaseCloAndMet(null); 
-    const cloSpan = document.getElementById('currentCloValue');
-    if (cloSpan) cloSpan.textContent = config.totalClo.toFixed(1);
-}
+// Vêtements et Météo
+function adjustClothing(amount) { manualCloAdjustment += amount; updateClothingDisplay(); recalculerToutLeDashboard(); }
+function resetClothing() { manualCloAdjustment = 0; updateClothingDisplay(); recalculerToutLeDashboard(); }
+function updateClothingDisplay() { document.getElementById('currentCloValue').textContent = getBaseCloAndMet().totalClo.toFixed(1); }
 
 document.getElementById('getWeatherButton').addEventListener('click', () => {
     const city = document.getElementById('location').value.trim();
-    if (!city) { alert("Veuillez entrer une ville."); return; }
-    
-    const btn = document.getElementById('getWeatherButton');
-    const originalText = btn.textContent;
+    if (!city) return;
     const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=fr`;
-    fetchWeather(url, btn, originalText);
+    fetchWeather(url);
 });
 
 document.getElementById('geoLocateButton').addEventListener('click', () => {
-    const btn = document.getElementById('geoLocateButton');
-    const originalText = btn.textContent;
-
     if ("geolocation" in navigator) {
-        btn.textContent = "⏳...";
         navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=fr`;
-                fetchWeather(url, btn, originalText);
-            },
-            (error) => {
-                alert("📍 Le navigateur bloque l'accès au GPS. Tapez la ville manuellement.");
-                btn.textContent = originalText;
-            }
+            (pos) => fetchWeather(`https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&appid=${apiKey}&units=metric&lang=fr`),
+            (err) => alert("📍 Accès GPS refusé.")
         );
     }
 });
 
-function fetchWeather(url, btnElement, originalBtnText) {
-    if(btnElement) btnElement.textContent = "⏳...";
-    
-    fetch(url)
-        .then(res => {
-            if (!res.ok) throw new Error("Erreur API");
-            return res.json();
-        })
-        .then(data => {
-            outdoorTemp = data.main.temp;
-            outdoorHumidity = data.main.humidity;
-            outdoorPressure = data.main.pressure;
-            outdoorWind = (data.wind.speed * 3.6); 
-            sunshineStatus = data.weather[0].main;
-            
-            sessionStorage.setItem('sunriseTime', data.sys.sunrise * 1000);
-            sessionStorage.setItem('sunsetTime', data.sys.sunset * 1000);
-            document.getElementById('location').value = data.name;
-            
-            if(btnElement) {
-                btnElement.textContent = "✅"; 
-                setTimeout(() => btnElement.textContent = originalBtnText, 2000);
-            }
-            
-            updateClothingDisplay();
-            recalculerToutLeDashboard(); 
-        })
-        .catch(err => { 
-            console.error("Erreur détaillée :", err);
-            alert("❌ Erreur : Ville introuvable ou problème de connexion."); 
-            if(btnElement) btnElement.textContent = originalBtnText; 
-        });
+function fetchWeather(url) {
+    fetch(url).then(res => res.json()).then(data => {
+        outdoorTemp = data.main.temp; outdoorHumidity = data.main.humidity;
+        sunshineStatus = data.weather[0].main; document.getElementById('location').value = data.name;
+        updateClothingDisplay(); recalculerToutLeDashboard(); 
+    });
 }
 
-// 4. LECTURE DES CAPTEURS (Version "Super-Scan" Économique)
+// ============================================================
+// 4. SUPER-SCAN MAKE.COM
 // ============================================================
 async function synchroniserTouteLaMaison() {
     const btn = document.getElementById('btn-sync-all');
     btn.innerHTML = "⏳ Scan Global en cours...";
-    btn.style.backgroundColor = "#9b59b6";
+    btn.style.backgroundColor = "#7f8c8d";
 
     try {
-        // APPEL UNIQUE À MAKE (Plus besoin d'ID dans l'URL)
         const url = 'https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd';
         const response = await fetch(url);
         if (!response.ok) throw new Error("Erreur Serveur");
         
-        // On reçoit un TABLEAU (Array) contenant TOUTES les pièces
         const dataPack = await response.json();
-        
-        // On boucle sur chaque capteur du tableau
         for (const capteur of dataPack) {
             const idCapteur = capteur.id;
-            
-            // Trouver le nom de la pièce à partir de l'ID (on inverse l'objet capteursMaison)
             const nomPiece = Object.keys(capteursMaison).find(key => capteursMaison[key] === idCapteur);
             
-            if (nomPiece) {
-                // Sécurité : On vérifie que le capteur a bien renvoyé des valeurs (pas de 'null')
-                if (capteur.temperature !== null && capteur.humidity !== null) {
-                    
-                    // Sauvegarde (On utilise bien "temperature" et "humidity" tels que définis dans Make)
-                    DONNEES_HABITAT[nomPiece] = { 
-                        ta: parseFloat(capteur.temperature), 
-                        rh: parseFloat(capteur.humidity) 
-                    };
-                    
-                    // Mise à jour visuelle de la tuile HTML
-                    mettreAJourTuile(nomPiece);
-                    
-                    // Mise à jour de l'heure d'actualisation
-                    const statusEl = document.getElementById('status-' + idCapteur);
-                    if(statusEl) {
-                        const now = new Date();
-                        statusEl.textContent = "Actuel (" + now.getHours() + "h" + (now.getMinutes()<10?'0':'') + now.getMinutes() + ")";
-                        statusEl.style.color = "#27ae60";
-                    }
-                } else {
-                    console.warn(`⚠️ Données manquantes pour la pièce : ${nomPiece} (Capteur injoignable ?)`);
+            if (nomPiece && capteur.temperature !== null && capteur.humidity !== null) {
+                DONNEES_HABITAT[nomPiece] = { ta: parseFloat(capteur.temperature), rh: parseFloat(capteur.humidity) };
+                mettreAJourTuile(nomPiece);
+                const statusEl = document.getElementById('status-' + idCapteur);
+                if(statusEl) {
+                    const now = new Date();
+                    statusEl.textContent = "Actuel (" + now.getHours() + "h" + (now.getMinutes()<10?'0':'') + now.getMinutes() + ")";
+                    statusEl.style.color = "var(--eco)";
                 }
             }
         }
     } catch (error) {
         console.error("Erreur Bulk Scan:", error);
-        alert("❌ Erreur lors du scan global. Vérifiez votre scénario Make.");
+        alert("❌ Erreur lors du scan. Vérifiez votre connexion.");
     }
-
-    // Restauration du bouton une fois le scan terminé
-    btn.innerHTML = "⚡ Actualiser toutes les pièces";
-    btn.style.backgroundColor = "#8e44ad";
+    btn.innerHTML = "⚡ Interroger les capteurs (Super-Scan)";
+    btn.style.backgroundColor = "var(--secondary)";
 }
 
-// ============================================================
-// 5. ENVOI DES DONNÉES VERS PAGE 2
-// ============================================================
 function voirRecommandations(nomPiece) {
-    if (!DONNEES_HABITAT[nomPiece]) {
-        alert("⚠️ Aucune donnée pour " + nomPiece + ". Veuillez d'abord cliquer sur 'Actualiser' !");
-        return;
-    }
-
-    const data = DONNEES_HABITAT[nomPiece];
+    if (!DONNEES_HABITAT[nomPiece]) { alert("Actualisez d'abord les capteurs !"); return; }
     const zoneConfig = getZoneConfigByName(nomPiece);
-    
-    if (!zoneConfig) {
-        alert("⚠️ Cette pièce n'a pas été configurée dans l'Espace Expert. Le diagnostic est impossible.");
-        return;
-    }
+    if (!zoneConfig) { alert("⚠️ Pièce non configurée dans l'Espace Expert."); return; }
 
-    // Le traducteur à l'envers : on retrouve la clé "zone_1" pour la Page 2
     const zoneKey = Object.keys(GLOBAL_HOUSE_CONFIG).find(key => GLOBAL_HOUSE_CONFIG[key].name === nomPiece);
-
-    const configMet = getBaseCloAndMet(zoneConfig);
-    const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
-    const opTemp = (data.ta + tr) / 2;
     const pmv = document.getElementById('pmv-' + capteursMaison[nomPiece]).textContent;
 
     sessionStorage.setItem('currentZoneId', zoneKey); 
-    sessionStorage.setItem('roomType', zoneConfig.usages[0] || 'living'); 
-    
-    let insulationLvl = 'medium';
-    if(zoneConfig.insulation === 'low') insulationLvl = 'low';
-    else if(zoneConfig.insulation === 'ite_recent' || zoneConfig.insulation === 'iti_recent') insulationLvl = 'high';
-    
-    sessionStorage.setItem('buildingInsulation', insulationLvl);
-    sessionStorage.setItem('calculatedOperativeTemp', opTemp.toFixed(1));
     sessionStorage.setItem('calculatedPMV', pmv);
-    sessionStorage.setItem('calculatedClo', configMet.totalClo.toFixed(1));
-    
-    sessionStorage.setItem('indoorAirTemp', data.ta);
-    sessionStorage.setItem('indoorHumidity', data.rh);
-    sessionStorage.setItem('location', document.getElementById('location').value);
-    sessionStorage.setItem('manualCloAdjustment', manualCloAdjustment); 
-
+    sessionStorage.setItem('indoorAirTemp', DONNEES_HABITAT[nomPiece].ta);
+    sessionStorage.setItem('indoorHumidity', DONNEES_HABITAT[nomPiece].rh);
     sessionStorage.setItem('outdoorTemp', outdoorTemp);
-    sessionStorage.setItem('outdoorHumidity', outdoorHumidity);
-    sessionStorage.setItem('outdoorPressure', outdoorPressure);
     sessionStorage.setItem('sunshineStatus', sunshineStatus);
-    sessionStorage.setItem('outdoorWind', outdoorWind);
 
     window.location.href = 'page2.html';
 }

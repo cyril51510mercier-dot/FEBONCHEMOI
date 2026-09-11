@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fébonchémoi - Diagnostic & Coach</title>
+    <title>Solstice - Diagnostic & Coach</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>📊 Diagnostic & Actions</h1>
+    <h1>📊 Diagnostic Solstice</h1>
+    <p class="subtitle">Intelligence Artificielle Thermique</p>
 
     <div class="summary-card">
         <div class="stat-box">
@@ -15,20 +16,8 @@
             <div class="stat-label">Votre PMV</div>
         </div>
         <div class="stat-box">
-            <div class="stat-value" id="disp-top">--</div>
-            <div class="stat-label">T° Opérative</div>
-        </div>
-        <div class="stat-box">
             <div class="stat-value" id="disp-rh">--</div>
             <div class="stat-label">Humidité Int.</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-value" id="disp-clo">--</div>
-            <div class="stat-label">Isol. Vêtements (Clo)</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-value" id="disp-insul">--</div>
-            <div class="stat-label">Isol. Maison</div>
         </div>
         <div class="stat-box">
             <div class="stat-value" id="disp-room">--</div>
@@ -36,39 +25,34 @@
         </div>
     </div>
 
-    <h2 style="margin-top: 30px;">💡 Les recommandations du Coach</h2>
-    <div id="recommendations-container">
-        </div>
+    <h2 style="margin-top: 30px;">💡 Recommandations Opérationnelles</h2>
+    <div id="recommendations-container"></div>
 
-    <div class="section" style="margin-top: 30px; border-top: 4px solid #34495e;">
-        <h3 style="color: #2c3e50; margin-top: 0;">📅 Historique de cette zone</h3>
+    <div class="section" style="margin-top: 30px; border-top: 4px solid var(--primary);">
+        <h3 style="color: var(--primary); margin-top: 0;">📅 Historique Télémétrique (Futur ML)</h3>
         
         <div style="overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 0.9em; text-align: left;">
                 <thead>
                     <tr style="background-color: #ecf0f1; border-bottom: 2px solid #bdc3c7;">
                         <th style="padding: 10px;">Date</th>
-                        <th style="padding: 10px;">T° Air</th>
-                        <th style="padding: 10px;">T° Ext</th>
+                        <th style="padding: 10px;">T° Inté.</th>
+                        <th style="padding: 10px;">T° Exté.</th>
                         <th style="padding: 10px;">PMV</th>
                     </tr>
                 </thead>
                 <tbody id="historyTableBody">
-                    </tbody>
+                </tbody>
             </table>
         </div>
 
-        <button onclick="refreshNetatmoPage2()" id="btnRefreshNetatmo" style="width: 100%; background-color: #e67e22; color: white; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 10px;">
-    🔄 Rafraîchir la T° (Netatmo)
-</button>
-
-        <button id="saveHistoryBtn" style="width: 100%; background-color: #3498db; color: white; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer;">
-            💾 Enregistrer le bilan d'aujourd'hui
+        <button id="saveHistoryBtn" style="width: 100%; background-color: var(--primary); color: white; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer;">
+            💾 Enregistrer la mesure (Apprentissage)
         </button>
     </div>
 
     <center style="margin-top: 30px; margin-bottom: 30px;">
-        <a href="index.html" class="btn-back" style="color: #7f8c8d; text-decoration: none; font-weight: bold;">← Retour aux mesures</a>
+        <a href="page1.html">← Retour au Tableau de Bord</a>
     </center>
 
     <script src="page2_script.js"></script>
