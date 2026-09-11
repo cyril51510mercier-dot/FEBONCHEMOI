@@ -29,6 +29,22 @@ window.addEventListener('load', () => {
     if (savedConfig) { GLOBAL_HOUSE_CONFIG = JSON.parse(savedConfig); initialiserDashboard(); } 
     else { alert("Veuillez paramétrer l'habitat dans l'espace Expert."); window.location.href = 'setup.html'; return; }
     restoreSessionData();
+// RESTAURATION DU CACHE SUPER-SCAN AU CHARGEMENT DE LA PAGE
+    const cachedHabitat = sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
+    if (cachedHabitat) {
+        DONNEES_HABITAT = JSON.parse(cachedHabitat);
+        recalculerToutLeDashboard();
+        // Mettre à jour visuellement les statuts pour indiquer des données en mémoire
+        for (const [nomPiece, idCapteur] of Object.entries(capteursMaison)) {
+            if (DONNEES_HABITAT[nomPiece]) {
+                const statusEl = document.getElementById('status-' + idCapteur);
+                if (statusEl) {
+                    statusEl.textContent = "En mémoire";
+                    statusEl.style.color = "var(--eco)";
+                }
+            }
+        }
+    }
 });
 
 function initialiserDashboard() {
@@ -275,6 +291,10 @@ async function synchroniserTouteLaMaison() {
                 }
             }
         }
+
+        // SAUVEGARDE DES DONNÉES DU SUPER-SCAN DANS LA SESSION
+        sessionStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(DONNEES_HABITAT));
+        
     } catch (error) { console.error("Erreur Bulk Scan:", error); alert("❌ Erreur lors du scan."); }
     btn.innerHTML = "⚡ Interroger les capteurs (Super-Scan)";
     btn.style.backgroundColor = "var(--secondary)";
