@@ -22,69 +22,39 @@ const capteursMaison = {
     "Salle de bain - Bas": "a70def7d-7071-4950-99d1-3a16e9759eee"
 };
 
-function getZoneConfigByName(roomName) {
-    return Object.values(GLOBAL_HOUSE_CONFIG).find(z => z.name === roomName);
-}
+function getZoneConfigByName(roomName) { return Object.values(GLOBAL_HOUSE_CONFIG).find(z => z.name === roomName); }
 
-// ============================================================
-// 1. INITIALISATION DU DASHBOARD
-// ============================================================
 window.addEventListener('load', () => {
     const savedConfig = localStorage.getItem('HOUSE_CONFIG');
-    if (savedConfig) {
-        GLOBAL_HOUSE_CONFIG = JSON.parse(savedConfig);
-        initialiserDashboard();
-    } else {
-        alert("⚠️ Modélisation requise.\nVeuillez d'abord paramétrer l'habitat dans l'espace Expert.");
-        window.location.href = 'setup.html';
-        return;
-    }
+    if (savedConfig) { GLOBAL_HOUSE_CONFIG = JSON.parse(savedConfig); initialiserDashboard(); } 
+    else { alert("Veuillez paramétrer l'habitat dans l'espace Expert."); window.location.href = 'setup.html'; return; }
     restoreSessionData();
 });
 
 function initialiserDashboard() {
     const grid = document.getElementById('dashboard-grid');
-    if (!grid) return;
-    grid.innerHTML = ''; 
+    if (!grid) return; grid.innerHTML = ''; 
 
     for (const [nomPiece, idCapteur] of Object.entries(capteursMaison)) {
         const tuile = document.createElement('div');
-        tuile.style.cssText = 'background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: transform 0.2s;';
-        
-        const configExpert = getZoneConfigByName(nomPiece);
-        const badgeExpert = configExpert 
-            ? `<span style="font-size: 0.7em; color: var(--eco); background: #e9f7ef; padding: 2px 6px; border-radius: 4px;">Modèle Actif</span>`
-            : `<span style="font-size: 0.7em; color: var(--hot); background: #fdedec; padding: 2px 6px; border-radius: 4px;">Non paramétré</span>`;
+        tuile.style.cssText = 'background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);';
+        const badgeExpert = getZoneConfigByName(nomPiece) ? `<span style="font-size: 0.7em; color: var(--eco); background: #e9f7ef; padding: 2px 6px; border-radius: 4px;">Modèle Actif</span>` : `<span style="font-size: 0.7em; color: var(--hot); background: #fdedec; padding: 2px 6px; border-radius: 4px;">Non paramétré</span>`;
 
         tuile.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
-                <div>
-                    <h3 style="margin: 0; font-size: 1.2em; color: var(--primary);">${nomPiece}</h3>
-                    <div style="margin-top: 4px;">${badgeExpert}</div>
-                </div>
+                <div><h3 style="margin: 0; font-size: 1.2em; color: var(--primary);">${nomPiece}</h3><div style="margin-top: 4px;">${badgeExpert}</div></div>
                 <span id="status-${idCapteur}" style="font-size: 0.75em; color: #7f8c8d; background: #f1f2f6; padding: 3px 8px; border-radius: 10px;">En attente</span>
             </div>
-            
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                <div style="text-align: center; flex: 1;">
-                    <div style="font-size: 0.85em; color: #95a5a6; text-transform: uppercase;">Temp.</div>
-                    <div id="temp-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary); margin-top: 5px;">--°C</div>
-                </div>
-                <div style="text-align: center; flex: 1; border-left: 1px solid #eee;">
-                    <div style="font-size: 0.85em; color: #95a5a6; text-transform: uppercase;">Humidité</div>
-                    <div id="hum-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary); margin-top: 5px;">--%</div>
-                </div>
+                <div style="text-align: center; flex: 1;"><div style="font-size: 0.85em; color: #95a5a6;">Temp.</div><div id="temp-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary);">--°C</div></div>
+                <div style="text-align: center; flex: 1; border-left: 1px solid #eee;"><div style="font-size: 0.85em; color: #95a5a6;">Humidité</div><div id="hum-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary);">--%</div></div>
             </div>
-            
             <div id="pmv-box-${idCapteur}" style="text-align: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
-                <div style="font-size: 0.85em; color: #7f8c8d; margin-bottom: 5px;">Indice PMV</div>
+                <div style="font-size: 0.85em; color: #7f8c8d;">Indice PMV</div>
                 <div id="pmv-${idCapteur}" style="font-size: 1.3em; font-weight: bold; color: #bdc3c7;">--</div>
                 <div id="pmv-text-${idCapteur}" style="font-size: 0.8em; margin-top: 5px; color: #7f8c8d;">--</div>
             </div>
-            
-            <button onclick="voirRecommandations('${nomPiece}')" style="width: 100%; padding: 12px; background-color: var(--secondary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
-                🔍 Lancer le diagnostic
-            </button>
+            <button onclick="voirRecommandations('${nomPiece}')" style="width: 100%; padding: 12px; background-color: var(--secondary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🔍 Lancer le diagnostic</button>
         `;
         grid.appendChild(tuile);
     }
@@ -102,27 +72,89 @@ function restoreSessionData() {
     updateClothingDisplay();
 }
 
-// ============================================================
-// 2. MOTEUR PHYSIQUE SOLSTICE
-// ============================================================
-function getBaseCloAndMet() {
-    let met = 1.0; 
-    let baseClo = 1.0; 
-    if (outdoorTemp > 25) baseClo = 0.5; 
-    else if (outdoorTemp < 15) baseClo = 1.2; 
+// --- CALCULS PHYSIQUES (BEM RESTAURÉ + NOUVEAUTÉS) ---
+function getBaseCloAndMet(zoneConfig) {
+    let met = 1.0, baseClo = 1.0; 
+    if (outdoorTemp > 25) baseClo = 0.5; else if (outdoorTemp < 15) baseClo = 1.2; 
+    
+    if (zoneConfig && zoneConfig.usages) {
+        if (zoneConfig.usages.includes('kitchen')) met = 1.6; 
+        else if (zoneConfig.usages.includes('office')) met = 1.2; 
+        else if (zoneConfig.usages.includes('bedroom')) {
+            met = 0.8; 
+            const currentMonth = new Date().getMonth(); 
+            if (currentMonth === 11 || currentMonth === 0 || currentMonth === 1) baseClo = 2.5; 
+            else if (currentMonth >= 5 && currentMonth <= 7) baseClo = 0.8; else baseClo = 1.5; 
+        }
+    }
     return { met: met, totalClo: Math.max(0.1, Math.min(4.0, baseClo + manualCloAdjustment)) };
 }
 
 function calculateMeanRadiantTemp(zone, t_air) {
-    if (!zone) return t_air;
+    if (!zone || !zone.adj) return t_air;
     const insulation = zone.insulation || 'iti_recent'; 
-    let U_wall = 0.3;
-    if (insulation === 'low') U_wall = 2.5; 
-    else if (insulation.includes('old')) U_wall = 0.8;
+    let U_wall = 0.3, U_roof = 0.2, U_floor = 0.3;
 
-    // Calcul simplifié de la température radiante basé sur l'isolation et la temp extérieure
-    let t_radiante = t_air - (U_wall * 0.1 * (t_air - outdoorTemp));
-    return t_radiante;
+    if (insulation === 'iti_recent' || insulation === 'ite_recent') { U_wall = 0.25; } 
+    else if (insulation === 'iti_old' || insulation === 'ite_old') { U_wall = 0.8; U_roof = 0.5; U_floor = 0.8; } 
+    else if (insulation === 'low') { U_wall = 2.5; U_roof = 2.0; U_floor = 2.0; }
+
+    const hi = 8.0; 
+    const area = parseFloat(zone.area) || 16;
+    const h = parseFloat(zone.height) || 2.5;
+    const side = Math.sqrt(area);
+    const wallArea = side * h; 
+    const floorArea = area;
+
+    let totalArea = 0;
+    let sumAreaTemp = 0;
+
+    function getSurfaceTemp(adjacency, U) {
+        if (adjacency === 'heated') return t_air; 
+        let t_ext_adj = outdoorTemp;
+        if (adjacency === 'unheated') t_ext_adj = (t_air + outdoorTemp) / 2; 
+        return t_air - (U / hi) * (t_air - t_ext_adj);
+    }
+
+    const wallsAdj = [zone.adj.wall1, zone.adj.wall2, zone.adj.wall3, zone.adj.wall4];
+    wallsAdj.forEach(adj => {
+        sumAreaTemp += (getSurfaceTemp(adj, U_wall) * wallArea);
+        totalArea += wallArea;
+    });
+
+    sumAreaTemp += (getSurfaceTemp(zone.adj.ceiling, U_roof) * floorArea);
+    sumAreaTemp += (getSurfaceTemp(zone.adj.floor, U_floor) * floorArea);
+    totalArea += floorArea * 2;
+    
+    if (zone.windows && zone.windows.length > 0) {
+        const isSunny = sunshineStatus.toLowerCase().includes('clear');
+        zone.windows.forEach(win => {
+            const wArea = parseFloat(win.area) || 2;
+            let U_win = 1.5; 
+            if (win.glass === 'single') U_win = 5.8; 
+            if (win.glass === 'triple') U_win = 0.8; 
+            if (win.glass === 'double_recent') U_win = 1.1;
+
+            let t_win = getSurfaceTemp('outside', U_win);
+
+            if (isSunny && win.mask !== 'heavy') {
+                let solarBoost = 0; 
+                if (win.orient === 'S') solarBoost = 4.0; 
+                else if (win.orient === 'SE' || win.orient === 'SW') solarBoost = 2.5;
+                else if (win.orient === 'E' || win.orient === 'W') solarBoost = 1.0;
+                
+                if (win.mask === 'partial') solarBoost *= 0.5;
+                
+                // INTEGRATION NOUVEAUTÉ : INCLINAISON
+                if (win.tilt === 'inclinee' || win.tilt === 'horizontale') solarBoost *= 1.5;
+
+                t_win += solarBoost; 
+            }
+            sumAreaTemp -= (getSurfaceTemp('outside', U_wall) * wArea);
+            sumAreaTemp += (t_win * wArea);
+        });
+    }
+    return sumAreaTemp / totalArea;
 }
 
 function calculatePMV(ta, tr, vel, rh, met, clo) {
@@ -158,12 +190,15 @@ function mettreAJourTuile(nomPiece) {
         return;
     }
 
-    // Impact des nouveaux équipements sur la vitesse de l'air
     let vel = 0.1; 
-    if (zoneConfig.fanSys === 'plafond' || zoneConfig.fanSys === 'mobile') vel = 0.5; // Brassage augmente le confort d'été
+    if (zoneConfig.windows && zoneConfig.windows.some(w => w.glass === 'single') && outdoorWind > 20) vel = 0.25;
+    
+    // INTEGRATION NOUVEAUTÉ : VENTILATION ACTIVE
+    if (zoneConfig.fanSys === 'plafond') vel = 0.6;
+    if (zoneConfig.fanSys === 'mobile') vel = 0.4;
 
     const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
-    const configMet = getBaseCloAndMet();
+    const configMet = getBaseCloAndMet(zoneConfig);
     let pmv = calculatePMV(data.ta, tr, vel, data.rh, configMet.met, configMet.totalClo);
     pmv = Math.max(-3, Math.min(3, pmv)); 
 
@@ -177,32 +212,24 @@ function mettreAJourTuile(nomPiece) {
     pmvVal.textContent = pmv.toFixed(2);
 
     if (pmv < -0.5) { 
-        pmvBox.style.backgroundColor = "#ebf5fb"; 
-        pmvVal.style.color = "var(--cold)"; 
-        pmvText.textContent = "Sensation Fraîche 🥶";
+        pmvBox.style.backgroundColor = "#ebf5fb"; pmvVal.style.color = "var(--cold)"; pmvText.textContent = "Sensation Fraîche 🥶";
     } else if (pmv > 0.5) { 
-        pmvBox.style.backgroundColor = "#fdedec"; 
-        pmvVal.style.color = "var(--hot)"; 
-        pmvText.textContent = "Sensation Chaude 🥵";
+        pmvBox.style.backgroundColor = "#fdedec"; pmvVal.style.color = "var(--hot)"; pmvText.textContent = "Sensation Chaude 🥵";
     } else { 
-        pmvBox.style.backgroundColor = "#e9f7ef"; 
-        pmvVal.style.color = "var(--eco)"; 
-        pmvText.textContent = "Zone Neutre (Confort) ✅";
+        pmvBox.style.backgroundColor = "#e9f7ef"; pmvVal.style.color = "var(--eco)"; pmvText.textContent = "Zone Neutre (Confort) ✅";
     }
 }
 
 function recalculerToutLeDashboard() { for (const nomPiece in DONNEES_HABITAT) { mettreAJourTuile(nomPiece); } }
 
-// Vêtements et Météo
 function adjustClothing(amount) { manualCloAdjustment += amount; updateClothingDisplay(); recalculerToutLeDashboard(); }
 function resetClothing() { manualCloAdjustment = 0; updateClothingDisplay(); recalculerToutLeDashboard(); }
-function updateClothingDisplay() { document.getElementById('currentCloValue').textContent = getBaseCloAndMet().totalClo.toFixed(1); }
+function updateClothingDisplay() { document.getElementById('currentCloValue').textContent = getBaseCloAndMet(null).totalClo.toFixed(1); }
 
 document.getElementById('getWeatherButton').addEventListener('click', () => {
     const city = document.getElementById('location').value.trim();
     if (!city) return;
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=fr`;
-    fetchWeather(url);
+    fetchWeather(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=fr`);
 });
 
 document.getElementById('geoLocateButton').addEventListener('click', () => {
@@ -217,22 +244,19 @@ document.getElementById('geoLocateButton').addEventListener('click', () => {
 function fetchWeather(url) {
     fetch(url).then(res => res.json()).then(data => {
         outdoorTemp = data.main.temp; outdoorHumidity = data.main.humidity;
+        outdoorWind = (data.wind.speed * 3.6); 
         sunshineStatus = data.weather[0].main; document.getElementById('location').value = data.name;
         updateClothingDisplay(); recalculerToutLeDashboard(); 
     });
 }
 
-// ============================================================
-// 4. SUPER-SCAN MAKE.COM
-// ============================================================
 async function synchroniserTouteLaMaison() {
     const btn = document.getElementById('btn-sync-all');
     btn.innerHTML = "⏳ Scan Global en cours...";
     btn.style.backgroundColor = "#7f8c8d";
 
     try {
-        const url = 'https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd';
-        const response = await fetch(url);
+        const response = await fetch('https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd');
         if (!response.ok) throw new Error("Erreur Serveur");
         
         const dataPack = await response.json();
@@ -251,10 +275,7 @@ async function synchroniserTouteLaMaison() {
                 }
             }
         }
-    } catch (error) {
-        console.error("Erreur Bulk Scan:", error);
-        alert("❌ Erreur lors du scan. Vérifiez votre connexion.");
-    }
+    } catch (error) { console.error("Erreur Bulk Scan:", error); alert("❌ Erreur lors du scan."); }
     btn.innerHTML = "⚡ Interroger les capteurs (Super-Scan)";
     btn.style.backgroundColor = "var(--secondary)";
 }
