@@ -8,7 +8,6 @@
 </head>
 <body>
 
-    <!-- Header Principal -->
     <header class="app-header">
         <div class="header-brand">
             <h1>☀️ SOLSTICE</h1>
@@ -21,7 +20,7 @@
 
     <main class="dashboard-container">
         
-        <!-- Section 1 : Environnement Extérieur & Clo -->
+        <!-- Section 1 : Conditions Extérieures & Clo -->
         <section class="card-section environment-bar">
             
             <div class="env-block">
@@ -31,9 +30,8 @@
                     <button id="getWeatherButton" class="btn-secondary" title="Rechercher">🔍</button> 
                     <button id="geoLocateButton" class="btn-secondary">📍 Géolocaliser</button>
                 </div>
-                <div id="weatherSummary" class="weather-summary">
-                    <!-- Statut météo injecté dynamiquement -->
-                    <span class="muted-text">Chargement météo...</span>
+                <div id="weatherSummary" class="weather-summary" style="margin-top: 8px; font-size: 0.9em;">
+                    <span class="muted-text">⏳ Initialisation météo...</span>
                 </div>
             </div>
 
@@ -50,16 +48,30 @@
 
         </section>
 
-        <!-- Section 2 : Radiographie des Pièces -->
+        <!-- Section 2 : Radiographie et Sélecteur de Pièces -->
         <section class="card-section hab-radiography">
-            <div class="section-header">
+            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                 <div>
                     <h2>🎛️ Radiographie de l'Habitat</h2>
-                    <p class="section-desc">Données capteurs consolidées et indicateurs de confort en temps réel.</p>
+                    <p class="section-desc">Sélectionne les pièces à analyser et lance le Super-Scan.</p>
                 </div>
                 <button id="btn-sync-all" class="btn-primary" onclick="synchroniserTouteLaMaison()">
                     ⚡ Interroger les capteurs (Super-Scan)
                 </button>
+            </div>
+
+            <!-- Barre de sélection des pièces -->
+            <div id="room-selector-container" class="room-selector-bar" style="background: var(--slate-50); padding: 12px 16px; border-radius: 8px; margin: 15px 0; border: 1px solid var(--border-color);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <strong style="font-size: 0.85em; color: var(--slate-800);">Pièces à afficher et scanner :</strong>
+                    <div>
+                        <button class="btn-secondary" style="font-size: 0.75em; padding: 2px 8px;" onclick="toggleAllRooms(true)">Tout cocher</button>
+                        <button class="btn-secondary" style="font-size: 0.75em; padding: 2px 8px;" onclick="toggleAllRooms(false)">Tout décocher</button>
+                    </div>
+                </div>
+                <div id="room-checkboxes" style="display: flex; flex-wrap: wrap; gap: 10px 15px; font-size: 0.85em;">
+                    <!-- Les checkboxes seront générées par script.js -->
+                </div>
             </div>
 
             <!-- Grille Dynamique des Pièces -->
