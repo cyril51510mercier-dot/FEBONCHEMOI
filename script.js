@@ -38,7 +38,7 @@ window.addEventListener('load', () => {
     if (savedSelection) {
         SELECTION_PIECES = JSON.parse(savedSelection);
     } else {
-        SELECTION_PIECES = ["Cuisine", "Salon", "Chambre parents"];
+        SELECTION_PIECES = ["Cuisine"];
         localStorage.setItem('SOLSTICE_SELECTION_PIECES', JSON.stringify(SELECTION_PIECES));
     }
 
@@ -67,9 +67,6 @@ window.addEventListener('load', () => {
     }
 });
 
-/**
- * GÉNÉRATEUR DES CASES À COCHER (Affichage garanti)
- */
 function genererSelecteurPieces() {
     const container = document.getElementById('room-checkboxes');
     if (!container) return;
@@ -118,9 +115,6 @@ function toggleAllRooms(selectState) {
     recalculerToutLeDashboard();
 }
 
-/**
- * INITIALISATION DE LA GRILLE (Seulement les pièces sélectionnées)
- */
 function initialiserDashboard() {
     const grid = document.getElementById('dashboard-grid');
     if (!grid) return; 
@@ -347,57 +341,68 @@ function calculateAirVelocity(zoneConfig) {
 }
 
 /**
- * SOLVEUR PMV ISO 7730 CORRIGÉ (Résolution de l'erreur -3.00)
+ * MOTEUR PMV STANDARD (ISO 7730 / FANGER) - RÉSOLU
  */
 function calculatePMV(ta, tr, vel, rh, met, clo) {
-    if (ta === undefined || ta === null || isNaN(ta)) return -99;
+    if (ta === undefined || ta === null || isNaN(ta)) return 0;
 
-    const M = met * 58.15; 
+    const M = met * 58.15; // W/m²
     const W = 0; 
-    const Icl = 0.155 * clo; 
+    const Icl = 0.155 * clo; // m²K/W
     const fcl = (clo <= 0.5) ? (1.0 + 0.2 * clo) : (1.05 + 0.1 * clo);
     
-    // Pression de vapeur partielle de l'air ambiant (Pa)
+    // Pression de vapeur d'eau (Pa)
     const pa = rh * 10 * Math.exp(16.6536 - 4030.183 / (ta + 235));
 
-    const hcFree = (t) => 2.38 * Math.pow(Math.abs(t - ta), 0.25);
-    const hcForced = 12.1 * Math.sqrt(Math.max(vel, 0.001));
-
-    // Iteration ISO 7730 standard pour la température de vêtement Tcl
-    let tcl = (ta + tr) / 2;
+    let tcl = ta; // Initialisation Tcl °C
+    
+    // Résolution itérative de la température de surface du vêtement Tcl
     for (let i = 0; i < 30; i++) {
-        const hc = Math.max(hcFree(tcl), hcForced);
-        const radTerm = 3.96e-8 * fcl * (Math.pow(tcl + 273.15, 4) - Math.pow(tr + 273.15, 4));
-        const convTerm = fcl * hc * (tcl - ta);
+        const hcFree = 2.38 * Math.pow(Math.abs(tcl - ta), 0.25);
+        const hcForced = 12.1 * Math.sqrt(Math.max(vel, 0.001));
+        const hc = Math.max(hcFree, hcForced);
         
-        const tclNext = 35.7 - 0.028 * (M - W) - Icl * (radTerm + convTerm);
+        // Coeff. d'échange radiatif linéarisé hr (W/m²K)
+        const hr = 3.96e-8 * fcl * (Math.pow(tcl + 273.15, 2) + Math.pow(tr + 273.15, 2)) * (tcl + tr + 546.3);
+        
+        const top = (35.7 - 0.028 * (M - W)) / Icl + fcl * hr * tr + fcl * hc * ta;
+        const bottom = 1 / Icl + fcl * hr + fcl * hc;
+        const tclNext = top / bottom;
+        
         if (Math.abs(tclNext - tcl) < 0.001) {
             tcl = tclNext;
             break;
         }
-        tcl = 0.8 * tcl + 0.2 * tclNext; 
+        tcl = 0.5 * tcl + 0.5 * tclNext;
     }
 
-    const hcFinal = Math.max(hcFree(tcl), hcForced);
+    const hcFree = 2.38 * Math.pow(Math.abs(tcl - ta), 0.25);
+    const hcForced = 12.1 * Math.sqrt(Math.max(vel, 0.001));
+    const hc = Math.max(hcFree, hcForced);
+
+    // Composantes des échanges thermiques corporels (W/m²)
     const pVapeurPeau = 3.05 * 0.001 * (5733 - 6.99 * (M - W) - pa);
     const pSueur = (M - W > 58.15) ? 0.42 * ((M - W) - 58.15) : 0;
     const pRespLatente = 1.7e-5 * M * (5867 - pa);
     const pRespSensible = 0.0014 * M * (34 - ta);
     const pRayonnement = 3.96e-8 * fcl * (Math.pow(tcl + 273.15, 4) - Math.pow(tr + 273.15, 4));
-    const pConvection = fcl * hcFinal * (tcl - ta);
+    const pConvection = fcl * hc * (tcl - ta);
 
     const L = (M - W) - pVapeurPeau - pSueur - pRespLatente - pRespSensible - pRayonnement - pConvection;
-    return (0.303 * Math.exp(-0.036 * M) + 0.028) * L;
+    const ts = 0.303 * Math.exp(-0.036 * M) + 0.028;
+
+    let pmv = ts * L;
+    return Math.max(-3, Math.min(3, pmv));
 }
 
 /**
- * HUMIDITÉ ABSOLUE CORRIGÉE (Facteur 2.167 au lieu de 216.7 pour Pa)
+ * HUMIDITÉ ABSOLUE (Pression saturante en hPa)
  */
 function calculateAbsoluteHumidity(ta, rh) {
     if (ta === undefined || rh === undefined || isNaN(ta) || isNaN(rh)) return 0;
-    const pSat = 611.2 * Math.exp((17.67 * ta) / (ta + 243.5)); // Pa
-    const pv = pSat * (rh / 100); // Pa
-    const ah = (2.167 * pv) / (ta + 273.15); // g/m³
+    const pSat_hPa = 6.112 * Math.exp((17.67 * ta) / (ta + 243.5)); // hPa
+    const pv_hPa = pSat_hPa * (rh / 100); // hPa
+    const ah = (216.7 * pv_hPa) / (ta + 273.15); // g/m³
     return parseFloat(ah.toFixed(1));
 }
 
@@ -437,9 +442,6 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     return { deperditionskWh: parseFloat(deperditionskWh.toFixed(1)) };
 }
 
-/**
- * MISE À JOUR DE LA TUILE
- */
 function mettreAJourTuile(nomPiece) {
     if (!SELECTION_PIECES.includes(nomPiece)) return;
 
@@ -462,7 +464,8 @@ function mettreAJourTuile(nomPiece) {
         ceilingMat: 'concrete',
         ceilingInsulation: 'iti_recent',
         floorMat: 'concrete',
-        floorInsulation: 'low'
+        floorInsulation: 'low',
+        usages: ['kitchen']
     };
 
     const vel = calculateAirVelocity(zoneConfig);
@@ -474,7 +477,6 @@ function mettreAJourTuile(nomPiece) {
     const energyBalance = calculateDailyThermalBalance(zoneConfig, data.ta);
 
     let pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
-    pmv = Math.max(-3, Math.min(3, pmv)); 
 
     const ahEl = document.getElementById('ah-' + idCapteur);
     const dryingEl = document.getElementById('drying-' + idCapteur);
@@ -542,7 +544,7 @@ function updateClothingDisplay() {
 }
 
 // ============================================================
-// METEO ET RENDER STATUT SANS TEXTE BLOQUÉ
+// FLUX MÉTÉO SANS BLOCAGE
 // ============================================================
 
 document.getElementById('getWeatherButton')?.addEventListener('click', () => {
