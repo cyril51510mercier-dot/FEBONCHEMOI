@@ -7,7 +7,7 @@ let manualCloAdjustment = 0;
 const apiKey = '4ec1eb2b0cc90a4b18a79008b17581a8'; 
 let GLOBAL_HOUSE_CONFIG = {};
 let DONNEES_HABITAT = {}; 
-let SELECTION_PIECES = []; // Liste des pièces sélectionnées
+let SELECTION_PIECES = []; 
 
 const capteursMaison = {
     "Cuisine": "98e2d34a-769f-4296-93ed-6083772e703e",
@@ -29,40 +29,39 @@ function getZoneConfigByName(roomName) {
 }
 
 window.addEventListener('load', () => {
-    // 1. Charger la configuration expert
+    // 1. Charger la configuration expert si elle existe
     const savedConfig = localStorage.getItem('HOUSE_CONFIG');
     if (savedConfig) { 
         GLOBAL_HOUSE_CONFIG = JSON.parse(savedConfig); 
     }
 
-    // 2. Restaurer les pièces sélectionnées (par défaut : toutes les pièces)
+    // 2. Récupérer la sélection des pièces (par défaut : Cuisine, Salon, Chambre parents)
     const savedSelection = localStorage.getItem('SOLSTICE_SELECTION_PIECES');
     if (savedSelection) {
         SELECTION_PIECES = JSON.parse(savedSelection);
     } else {
-        SELECTION_PIECES = Object.keys(capteursMaison);
+        SELECTION_PIECES = ["Cuisine", "Salon", "Chambre parents"];
+        localStorage.setItem('SOLSTICE_SELECTION_PIECES', JSON.stringify(SELECTION_PIECES));
     }
 
-    // 3. Initialiser les composants d'interface
+    // 3. Générer les checkboxes et le Dashboard
     genererSelecteurPieces();
     initialiserDashboard(); 
     restoreSessionData();
 
-    // 4. Charger la météo si non mise en mémoire
+    // 4. Charger la météo de Reims ou de la ville mémorisée
     const savedLoc = localStorage.getItem('location') || 'Reims';
-    if (!localStorage.getItem('outdoorTemp')) {
-        fetchWeather(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(savedLoc)}&appid=${apiKey}&units=metric&lang=fr`);
-    } else {
-        updateWeatherUI();
-    }
+    if (document.getElementById('location')) document.getElementById('location').value = savedLoc;
+    fetchWeather(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(savedLoc)}&appid=${apiKey}&units=metric&lang=fr`);
 
-    // 5. Restauration des données capteurs mises en mémoire
+    // 5. Restauration des données capteurs en mémoire
     const cachedHabitat = localStorage.getItem('SOLSTICE_DONNEES_HABITAT') || sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
     if (cachedHabitat) {
         DONNEES_HABITAT = JSON.parse(cachedHabitat);
         recalculerToutLeDashboard();
-        for (const [nomPiece, idCapteur] of Object.entries(capteursMaison)) {
-            if (DONNEES_HABITAT[nomPiece] && SELECTION_PIECES.includes(nomPiece)) {
+        for (const nomPiece of SELECTION_PIECES) {
+            const idCapteur = capteursMaison[nomPiece];
+            if (DONNEES_HABITAT[nomPiece] && idCapteur) {
                 const statusEl = document.getElementById('status-' + idCapteur);
                 if (statusEl) {
                     statusEl.textContent = "En mémoire";
@@ -74,7 +73,7 @@ window.addEventListener('load', () => {
 });
 
 /**
- * GÉNÉRATEUR ET GESTIONNAIRE DE SÉLECTION DES PIÈCES
+ * GÉNÉRATEUR ET GESTIONNAIRE DES CASES À COCHER
  */
 function genererSelecteurPieces() {
     const container = document.getElementById('room-checkboxes');
@@ -84,10 +83,10 @@ function genererSelecteurPieces() {
     Object.keys(capteursMaison).forEach(nomPiece => {
         const isChecked = SELECTION_PIECES.includes(nomPiece);
         const label = document.createElement('label');
-        label.style.cssText = 'display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none;';
+        label.style.cssText = 'display: flex; align-items: center; gap: 6px; cursor: pointer; background: white; padding: 4px 10px; border-radius: 6px; border: 1px solid #CBD5E1;';
         label.innerHTML = `
             <input type="checkbox" value="${nomPiece}" ${isChecked ? 'checked' : ''} onchange="onRoomSelectionChange(this)">
-            ${nomPiece}
+            <span>${nomPiece}</span>
         `;
         container.appendChild(label);
     });
@@ -113,7 +112,7 @@ function toggleAllRooms(selectState) {
 }
 
 /**
- * INITIALISATION ET RENDU DE LA GRILLE (Filtre les pièces sélectionnées)
+ * GENERATION DU DASHBOARD (UNIKEMENT POUR LES PIÈCES COCHÉES)
  */
 function initialiserDashboard() {
     const grid = document.getElementById('dashboard-grid');
@@ -121,7 +120,7 @@ function initialiserDashboard() {
     grid.innerHTML = ''; 
 
     if (SELECTION_PIECES.length === 0) {
-        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--slate-600);">⚠️ Aucune pièce sélectionnée dans la barre ci-dessus.</div>`;
+        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--slate-600);">⚠️ Aucune pièce sélectionnée. Cochez des pièces ci-dessus pour les afficher.</div>`;
         return;
     }
 
@@ -190,16 +189,12 @@ function initialiserDashboard() {
 }
 
 function restoreSessionData() {
-    const loc = localStorage.getItem('location') || sessionStorage.getItem('location');
-    if (loc && document.getElementById('location')) document.getElementById('location').value = loc;
-    
     if (localStorage.getItem('outdoorTemp')) {
         outdoorTemp = parseFloat(localStorage.getItem('outdoorTemp'));
         outdoorHumidity = parseFloat(localStorage.getItem('outdoorHumidity'));
         outdoorWind = parseFloat(localStorage.getItem('outdoorWind') || 0);
         sunshineStatus = localStorage.getItem('sunshineStatus') || 'Clouds';
     }
-    
     if (localStorage.getItem('manualCloAdjustment')) {
         manualCloAdjustment = parseFloat(localStorage.getItem('manualCloAdjustment'));
     }
@@ -216,12 +211,8 @@ function extractAdjacency(adjValue) {
 }
 
 function getUValueParoi(typeParoi, materiau, isolation) {
-    const mapInsulationR = {
-        'ite_recent': 3.8, 'iti_recent': 3.2, 'ite_old': 1.8, 'iti_old': 1.4, 'low': 0.6, 'none': 0.0
-    };
-    const mapLambda = {
-        'cinderblock': 1.3, 'brick': 0.45, 'concrete': 1.7, 'stone': 2.3, 'wood': 0.13, 'leger': 0.15, 'lourd': 1.8
-    };
+    const mapInsulationR = { 'ite_recent': 3.8, 'iti_recent': 3.2, 'ite_old': 1.8, 'iti_old': 1.4, 'low': 0.6, 'none': 0.0 };
+    const mapLambda = { 'cinderblock': 1.3, 'brick': 0.45, 'concrete': 1.7, 'stone': 2.3, 'wood': 0.13, 'leger': 0.15, 'lourd': 1.8 };
 
     const rIns = mapInsulationR[isolation] ?? 2.0;
     const lambda = mapLambda[materiau] ?? 1.0;
@@ -231,8 +222,7 @@ function getUValueParoi(typeParoi, materiau, isolation) {
     if (typeParoi === 'ceiling') rSurface = 0.14;
     if (typeParoi === 'floor') rSurface = 0.21;
 
-    const rBrut = epaisseurMetre / lambda;
-    return 1 / (rSurface + rBrut + rIns);
+    return 1 / (rSurface + (epaisseurMetre / lambda) + rIns);
 }
 
 function getBaseCloAndMet(zoneConfig) {
@@ -396,8 +386,8 @@ function calculateDryingPotential(ta, rh, vel = 0.1) {
     const pSat = 611.2 * Math.exp((17.67 * ta) / (ta + 243.5)); 
     const vpd = (pSat * (1 - rh / 100)) / 1000; 
 
-    let status = "Mauvais";
-    let score = 1; 
+    let status = "Moyen";
+    let score = 2; 
 
     if (vpd < 0.4) { status = "Très Mauvais"; score = 1; }
     else if (vpd < 0.8) { status = "Moyen"; score = 2; }
@@ -408,7 +398,6 @@ function calculateDryingPotential(ta, rh, vel = 0.1) {
 }
 
 function calculateDailyThermalBalance(zoneConfig, ta) {
-    // Config par défaut si non renseignée dans l'espace pro
     const area = parseFloat(zoneConfig?.area) || 15;
     const h = parseFloat(zoneConfig?.height) || 2.5;
     const volume = area * h;
@@ -430,7 +419,7 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
 }
 
 /**
- * CALCUL ET MISE À JOUR DE LA TUILE (Infaillible même sans config pro)
+ * CALCUL ET MISE À JOUR INFAILLIBLE DE LA TUILE (FORCE LE CALCUL MÊME SANS CONFIG EXPERT)
  */
 function mettreAJourTuile(nomPiece) {
     if (!SELECTION_PIECES.includes(nomPiece)) return;
@@ -439,17 +428,27 @@ function mettreAJourTuile(nomPiece) {
     const idCapteur = capteursMaison[nomPiece];
     if (!data || !idCapteur) return; 
 
-    // Données brutes
+    // 1. Affichage des données de base
     const tempEl = document.getElementById('temp-' + idCapteur);
     const humEl = document.getElementById('hum-' + idCapteur);
 
     if (tempEl) tempEl.textContent = data.ta.toFixed(1) + " °C";
     if (humEl) humEl.textContent = data.rh.toFixed(0) + " %";
 
-    // Configuration de la pièce ou fallback
-    const zoneConfig = getZoneConfigByName(nomPiece) || { area: 15, height: 2.5 };
+    // 2. Configuration : On utilise un fallback par défaut pour NE PAS BLOQUER les calculs
+    const zoneConfig = getZoneConfigByName(nomPiece) || {
+        name: nomPiece,
+        area: 15,
+        height: 2.5,
+        wallMat: 'cinderblock',
+        insulation: 'iti_recent',
+        ceilingMat: 'concrete',
+        ceilingInsulation: 'iti_recent',
+        floorMat: 'concrete',
+        floorInsulation: 'low'
+    };
 
-    // Moteurs de calcul
+    // 3. Modèles thermiques et aérauliques
     const vel = calculateAirVelocity(zoneConfig);
     const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
     const { met, totalClo } = getBaseCloAndMet(zoneConfig);
@@ -461,7 +460,7 @@ function mettreAJourTuile(nomPiece) {
     let pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
     pmv = Math.max(-3, Math.min(3, pmv)); 
 
-    // Injection dans le DOM
+    // 4. Injection garantie des résultats calculés dans le DOM
     const ahEl = document.getElementById('ah-' + idCapteur);
     const dryingEl = document.getElementById('drying-' + idCapteur);
     const energyEl = document.getElementById('energy-' + idCapteur);
@@ -474,7 +473,7 @@ function mettreAJourTuile(nomPiece) {
     }
     if (energyEl) energyEl.textContent = energyBalance.deperditionskWh.toFixed(1) + " kWh/j";
 
-    // Pavé PMV
+    // 5. Pavé PMV
     const pmvBox = document.getElementById('pmv-box-' + idCapteur);
     const pmvVal = document.getElementById('pmv-' + idCapteur);
     const pmvText = document.getElementById('pmv-text-' + idCapteur);
@@ -592,19 +591,20 @@ function updateWeatherUI(loading = false, error = false, errorMsg = "") {
         return;
     }
     if (error) {
-        summaryEl.innerHTML = `<span style="color: var(--status-danger, #EF4444); font-weight: bold;">❌ ${errorMsg || "Échec météo"}</span>`;
+        summaryEl.innerHTML = `<span style="color: var(--status-danger, #EF4444); font-weight: bold;">❌ ${errorMsg || "Météo indisponible"}</span>`;
         return;
     }
 
+    // Remplace complètement le contenu et efface tout texte d'attente
     summaryEl.innerHTML = `
-        <span style="color: var(--slate-800); font-weight: 600;">
+        <span style="color: var(--slate-800, #1E293B); font-weight: 600;">
             🌡️ ${outdoorTemp.toFixed(1)} °C &nbsp;|&nbsp; 💧 ${outdoorHumidity}% HR &nbsp;|&nbsp; 💨 ${outdoorWind.toFixed(0)} km/h (${sunshineStatus})
         </span>
     `;
 }
 
 /**
- * SUPER SCAN (Interroge uniquement les capteurs des pièces sélectionnées)
+ * SUPER SCAN MAKE.COM
  */
 async function synchroniserTouteLaMaison() {
     if (SELECTION_PIECES.length === 0) {
@@ -627,7 +627,6 @@ async function synchroniserTouteLaMaison() {
             const idCapteur = capteur.id;
             const nomPiece = Object.keys(capteursMaison).find(key => capteursMaison[key] === idCapteur);
             
-            // Met à jour et calcule uniquement si la pièce est sélectionnée
             if (nomPiece && capteur.temperature !== null && capteur.humidity !== null) {
                 DONNEES_HABITAT[nomPiece] = { 
                     ta: parseFloat(capteur.temperature), 
@@ -647,7 +646,7 @@ async function synchroniserTouteLaMaison() {
             }
         }
 
-        // Sauvegarde persistante des relevés
+        // Sauvegarde persistante des mesures
         localStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(DONNEES_HABITAT));
         sessionStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(DONNEES_HABITAT));
         
