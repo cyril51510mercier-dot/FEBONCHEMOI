@@ -3,50 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solstice - Tableau de Bord</title>
+    <title>Solstice - Tableau de Bord Thermal</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>☀️ SOLSTICE</h1>
-    <p class="subtitle">Suivi de l'Habitat</p>
 
-    <div class="section">
-        <h2>🌍 Environnement Extérieur</h2>
-        <div>
-            <label for="location">Ville (Manuelle ou Automatique) :</label>
-            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                <input type="text" id="location" placeholder="Ex: Reims" style="flex-grow: 1; margin-bottom: 0;">
-                <button id="getWeatherButton">🔍</button> 
-                <button id="geoLocateButton">📍 Localiser</button>
-            </div>
+    <!-- Header Principal -->
+    <header class="app-header">
+        <div class="header-brand">
+            <h1>☀️ SOLSTICE</h1>
+            <p class="subtitle">Diagnostic & Suivi Thera-Aéraulique de l'Habitat</p>
         </div>
-    </div>
-
-    <div class="section">
-        <h2>👕 Votre isolation corporelle (Clo)</h2>
-        <div id="cloVisualizer">
-            Isolation actuelle : <span id="currentCloValue" style="font-weight:bold; color:var(--secondary);">1.0</span> Clo 
-            <br><br>
-            <button onclick="adjustClothing(-0.2)">👕 Enlever une couche</button>
-            <button onclick="adjustClothing(0.2)">🧥 Ajouter une couche</button>
-            <button onclick="resetClothing()">Réinitialiser</button>
+        <div class="header-actions">
+            <a href="setup.html" class="btn-secondary link-setup">⚙️ Config. BEM</a>
         </div>
-    </div>
+    </header>
 
-    <div class="section" style="border-top: 5px solid var(--primary);">
-        <h2 style="margin-top: 0;">🎛️ Radiographie de l'Habitat</h2>
+    <main class="dashboard-container">
         
-        <button id="btn-sync-all" onclick="synchroniserTouteLaMaison()">
-            ⚡ Interroger les capteurs (Super-Scan)
-        </button>
+        <!-- Section 1 : Environnement Extérieur & Clo -->
+        <section class="card-section environment-bar">
+            
+            <div class="env-block">
+                <h2>🌍 Conditions Extérieures</h2>
+                <div class="location-picker">
+                    <input type="text" id="location" placeholder="Ex: Reims" aria-label="Ville">
+                    <button id="getWeatherButton" class="btn-secondary" title="Rechercher">🔍</button> 
+                    <button id="geoLocateButton" class="btn-secondary">📍 Géolocaliser</button>
+                </div>
+                <div id="weatherSummary" class="weather-summary">
+                    <!-- Statut météo injecté dynamiquement -->
+                    <span class="muted-text">Chargement météo...</span>
+                </div>
+            </div>
 
-        <div id="dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
-        </div>
-    </div>
+            <div class="env-divider"></div>
 
-    <center style="margin-top: 30px; margin-bottom: 20px;">
-        <a href="setup.html" style="color: #95a5a6; font-size: 0.9em;">⚙️ Accès Professionnel (Paramétrage BEM)</a>
-    </center>
+            <div class="env-block">
+                <h2>👕 Isolation Corporelle (<span id="currentCloValue">1.0</span> Clo)</h2>
+                <div id="cloVisualizer" class="clo-controls">
+                    <button class="btn-secondary" onclick="adjustClothing(-0.2)">👕 Enlever (-0.2)</button>
+                    <button class="btn-secondary" onclick="adjustClothing(0.2)">🧥 Ajouter (+0.2)</button>
+                    <button class="btn-secondary btn-icon" onclick="resetClothing()" title="Réinitialiser">🔄</button>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Section 2 : Radiographie des Pièces -->
+        <section class="card-section hab-radiography">
+            <div class="section-header">
+                <div>
+                    <h2>🎛️ Radiographie de l'Habitat</h2>
+                    <p class="section-desc">Données capteurs consolidées et indicateurs de confort en temps réel.</p>
+                </div>
+                <button id="btn-sync-all" class="btn-primary" onclick="synchroniserTouteLaMaison()">
+                    ⚡ Interroger les capteurs (Super-Scan)
+                </button>
+            </div>
+
+            <!-- Grille Dynamique des Pièces -->
+            <div id="dashboard-grid" class="dashboard-grid">
+                <!-- Les tuiles de pièces sont injectées par script.js -->
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="app-footer">
+        <p>Solstice Engine v2.4 • Modélisation ISO 7730 / ASHRAE 55</p>
+    </footer>
 
     <script src="script.js" defer></script>
 </body>
