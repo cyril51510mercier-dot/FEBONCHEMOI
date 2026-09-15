@@ -30,7 +30,6 @@
                     <button id="getWeatherButton" class="btn-secondary" title="Rechercher">🔍</button> 
                     <button id="geoLocateButton" class="btn-secondary">📍 Géolocaliser</button>
                 </div>
-                <!-- Zone d'affichage météo nettoyée -->
                 <div id="weatherSummary" class="weather-summary" style="margin-top: 10px; font-size: 0.9em; min-height: 24px;"></div>
             </div>
 
@@ -68,9 +67,7 @@
                         <button class="btn-secondary" style="font-size: 0.75em; padding: 4px 8px;" onclick="toggleAllRooms(false)">Tout décocher</button>
                     </div>
                 </div>
-                <div id="room-checkboxes" style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.9em;">
-                    <!-- Les cases à cocher sont injectées ici par script.js -->
-                </div>
+                <div id="room-checkboxes" style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.9em;"></div>
             </div>
 
             <!-- Grille Dynamique des Pièces Cochées -->
@@ -80,9 +77,10 @@
     </main>
 
     <footer class="app-footer">
-        <p>Solstice Engine v2.4 • Modélisation ISO 7730 / ASHRAE 55</p>
+        <p>Solstice Engine v2.5 • Modélisation ISO 7730 / ASHRAE 55</p>
     </footer>
 
-    <script src="script.js" defer></script>
+    <!-- Force le rechargement du cache navigateur avec v=2.5 -->
+    <script src="script.js?v=2.5" defer></script>
 </body>
 </html>
