@@ -49,41 +49,80 @@ window.addEventListener('load', () => {
                 const statusEl = document.getElementById('status-' + idCapteur);
                 if (statusEl) {
                     statusEl.textContent = "En mémoire";
-                    statusEl.style.color = "var(--eco)";
+                    statusEl.style.color = "var(--status-success, #10B981)";
                 }
             }
         }
     }
 });
 
+/**
+ * 1. RENDU DE LA GRILLE DU TABLEAU DE BORD (HTML + CSS Modernisé)
+ */
 function initialiserDashboard() {
     const grid = document.getElementById('dashboard-grid');
     if (!grid) return; 
     grid.innerHTML = ''; 
 
     for (const [nomPiece, idCapteur] of Object.entries(capteursMaison)) {
-        const tuile = document.createElement('div');
-        tuile.style.cssText = 'background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);';
+        const tuile = document.createElement('article');
+        tuile.className = 'room-tile';
+        tuile.setAttribute('data-zone-id', idCapteur);
+
         const configActive = getZoneConfigByName(nomPiece);
         const badgeExpert = configActive 
-            ? `<span style="font-size: 0.7em; color: var(--eco); background: #e9f7ef; padding: 2px 6px; border-radius: 4px;">Modèle Actif</span>` 
-            : `<span style="font-size: 0.7em; color: var(--hot); background: #fdedec; padding: 2px 6px; border-radius: 4px;">Non paramétré</span>`;
+            ? `<span class="badge badge-success">Modèle Actif</span>` 
+            : `<span class="badge badge-danger">Non paramétré</span>`;
 
         tuile.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
-                <div><h3 style="margin: 0; font-size: 1.2em; color: var(--primary);">${nomPiece}</h3><div style="margin-top: 4px;">${badgeExpert}</div></div>
-                <span id="status-${idCapteur}" style="font-size: 0.75em; color: #7f8c8d; background: #f1f2f6; padding: 3px 8px; border-radius: 10px;">En attente</span>
+            <div class="tile-header">
+                <div>
+                    <h3>${nomPiece}</h3>
+                    <div style="margin-top: 4px;">${badgeExpert}</div>
+                </div>
+                <span id="status-${idCapteur}" class="badge" style="background: var(--slate-100); color: var(--slate-600);">En attente</span>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                <div style="text-align: center; flex: 1;"><div style="font-size: 0.85em; color: #95a5a6;">Temp.</div><div id="temp-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary);">--°C</div></div>
-                <div style="text-align: center; flex: 1; border-left: 1px solid #eee;"><div style="font-size: 0.85em; color: #95a5a6;">Humidité</div><div id="hum-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary);">--%</div></div>
+
+            <!-- Mesures Principales -->
+            <div class="tile-metrics-primary">
+                <div class="metric">
+                    <span class="metric-label">Température</span>
+                    <span id="temp-${idCapteur}" class="metric-value">-- °C</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Humidité Rel.</span>
+                    <span id="hum-${idCapteur}" class="metric-value">-- %</span>
+                </div>
             </div>
-            <div id="pmv-box-${idCapteur}" style="text-align: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
-                <div style="font-size: 0.85em; color: #7f8c8d;">Indice PMV</div>
-                <div id="pmv-${idCapteur}" style="font-size: 1.3em; font-weight: bold; color: #bdc3c7;">--</div>
-                <div id="pmv-text-${idCapteur}" style="font-size: 0.8em; margin-top: 5px; color: #7f8c8d;">--</div>
+
+            <!-- Pavé Synthèse Confort PMV -->
+            <div id="pmv-box-${idCapteur}" style="text-align: center; margin-bottom: 14px; padding: 12px; background: var(--slate-50); border: 1px solid var(--border-color); border-radius: 8px;">
+                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Indice PMV</div>
+                <div id="pmv-${idCapteur}" style="font-size: 1.5rem; font-weight: 800; color: var(--slate-800);">--</div>
+                <div id="pmv-text-${idCapteur}" style="font-size: 0.8rem; font-weight: 600; margin-top: 2px; color: var(--text-muted);">En attente de calcul...</div>
             </div>
-            <button onclick="voirRecommandations('${nomPiece}')" style="width: 100%; padding: 12px; background-color: var(--secondary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🔍 Lancer le diagnostic</button>
+
+            <!-- Données Moteur Physical BEM -->
+            <div class="tile-metrics-secondary">
+                <div class="sub-metric">
+                    <span>Humidité Absolue :</span>
+                    <strong id="ah-${idCapteur}">-- g/m³</strong>
+                </div>
+                <div class="sub-metric">
+                    <span>Potentiel Séchage :</span>
+                    <strong id="drying-${idCapteur}">--</strong>
+                </div>
+                <div class="sub-metric">
+                    <span>Déperditions (Est.) :</span>
+                    <strong id="energy-${idCapteur}">-- kWh/j</strong>
+                </div>
+            </div>
+
+            <div class="tile-actions">
+                <button class="btn-primary btn-block" onclick="voirRecommandations('${nomPiece}')">
+                    🔍 Lancer le diagnostic
+                </button>
+            </div>
         `;
         grid.appendChild(tuile);
     }
@@ -111,7 +150,6 @@ function extractAdjacency(adjValue) {
 }
 
 function getUValueParoi(typeParoi, materiau, isolation) {
-    // Resistances thermiques d'isolation R_ins (m2.K/W)
     const mapInsulationR = {
         'ite_recent': 3.8,
         'iti_recent': 3.2,
@@ -121,7 +159,6 @@ function getUValueParoi(typeParoi, materiau, isolation) {
         'none': 0.0
     };
 
-    // Conductivity lambda (W/m.K) du materiau porteur
     const mapLambda = {
         'cinderblock': 1.3,
         'brick': 0.45,
@@ -134,12 +171,11 @@ function getUValueParoi(typeParoi, materiau, isolation) {
 
     const rIns = mapInsulationR[isolation] ?? 2.0;
     const lambda = mapLambda[materiau] ?? 1.0;
-    const epaisseurMetre = 0.20; // Epaisseur moyenne par defaut
+    const epaisseurMetre = 0.20;
 
-    // Resistances d'echange superficiel (Rsi + Rse) selon orientation du flux
-    let rSurface = 0.17; // Vertical (murs)
-    if (typeParoi === 'ceiling') rSurface = 0.14; // Flux ascendant
-    if (typeParoi === 'floor') rSurface = 0.21;   // Flux descendant
+    let rSurface = 0.17;
+    if (typeParoi === 'ceiling') rSurface = 0.14;
+    if (typeParoi === 'floor') rSurface = 0.21;
 
     const rBrut = epaisseurMetre / lambda;
     const rTotal = rSurface + rBrut + rIns;
@@ -148,10 +184,9 @@ function getUValueParoi(typeParoi, materiau, isolation) {
 }
 
 function getBaseCloAndMet(zoneConfig) {
-    let met = 1.2; // Activite sedentaire de base (metabolic equivalent)
+    let met = 1.2; 
     let baseClo = 1.0; 
 
-    // Ajustement saisonnier de l'habillement selon la temperature exterieure
     if (outdoorTemp >= 26) baseClo = 0.4;
     else if (outdoorTemp >= 20) baseClo = 0.6;
     else if (outdoorTemp >= 15) baseClo = 0.85;
@@ -164,7 +199,7 @@ function getBaseCloAndMet(zoneConfig) {
         else if (zoneConfig.usages.includes('bedroom')) {
             met = 0.9;
             const currentMonth = new Date().getMonth();
-            if ([11, 0, 1].includes(currentMonth)) baseClo = 2.0; // Couette hiver
+            if ([11, 0, 1].includes(currentMonth)) baseClo = 2.0;
             else if ([5, 6, 7].includes(currentMonth)) baseClo = 0.5;
             else baseClo = 1.2;
         }
@@ -191,7 +226,7 @@ function calculateMeanRadiantTemp(zone, t_air) {
     const uCeiling = getUValueParoi('ceiling', zone.ceilingMat, zone.ceilingInsulation);
     const uFloor = getUValueParoi('floor', zone.floorMat, zone.floorInsulation);
 
-    const hi = 7.7; // Coefficient d'echange convectif/radiatif interieur moyen (W/m2.K)
+    const hi = 7.7; 
 
     function getSurfaceTemp(adjRaw, U) {
         const adj = extractAdjacency(adjRaw);
@@ -199,16 +234,14 @@ function calculateMeanRadiantTemp(zone, t_air) {
         
         let tExtEquivalent = outdoorTemp;
         if (adj === 'unheated') tExtEquivalent = (t_air + outdoorTemp) / 2;
-        if (adj === 'ground') tExtEquivalent = 12.0; // Temperature moyenne du sol en profondeur
+        if (adj === 'ground') tExtEquivalent = 12.0; 
 
-        // Calcul de la temperature de surface de paroi int. : T_surf = T_air - (U/hi)*(T_air - T_ext)
         return t_air - (U / hi) * (t_air - tExtEquivalent);
     }
 
     let totalArea = 0;
     let sumAreaTemp = 0;
 
-    // 1. Murs verticaux (4 faces)
     const wallsAdj = [
         zone.adj?.wall1, 
         zone.adj?.wall2, 
@@ -222,7 +255,6 @@ function calculateMeanRadiantTemp(zone, t_air) {
         totalArea += wallArea;
     });
 
-    // 2. Plafond et Plancher
     const tCeiling = getSurfaceTemp(zone.adj?.ceiling, uCeiling);
     sumAreaTemp += (tCeiling * floorArea);
 
@@ -231,7 +263,6 @@ function calculateMeanRadiantTemp(zone, t_air) {
 
     totalArea += (floorArea * 2);
 
-    // 3. Traitement des surfaces vitrees et apports solaires
     if (Array.isArray(zone.windows) && zone.windows.length > 0) {
         const isSunny = sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun');
 
@@ -239,7 +270,6 @@ function calculateMeanRadiantTemp(zone, t_air) {
             const wArea = parseFloat(win.area) || 0;
             if (wArea <= 0) return;
 
-            // Proprietes thermiques des vitrages
             const glassProps = {
                 'single': { U: 5.7, g: 0.85 },
                 'double_old': { U: 2.8, g: 0.75 },
@@ -250,32 +280,26 @@ function calculateMeanRadiantTemp(zone, t_air) {
             const spec = glassProps[win.glass] || glassProps['double_recent'];
             let tWin = getSurfaceTemp('outside', spec.U);
 
-            // Attenuation par masque solaire
             const maskFactor = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 }[win.mask] ?? 1.0;
-
-            // Attenuation par protection / fermeture
             const shutterFactor = {
                 'aucun': 1.0,
                 'store_banne': 0.25,
                 'store_interieur': 0.75,
                 'rideau_interieur': 0.80,
-                'roulant_pvc': 0.10, // Suppose ferme ou partiel sous fort soleil
+                'roulant_pvc': 0.10,
                 'roulant_metal': 0.15,
                 'battant_bois': 0.10,
                 'persienne': 0.30
             }[win.shutter] ?? 1.0;
 
             if (isSunny && maskFactor > 0.1) {
-                // Facteur d'orientation solaire
                 const orientFactor = { 'S': 3.5, 'SE': 2.8, 'SW': 2.8, 'E': 1.8, 'W': 1.8, 'N': 0.4 }[win.orient] ?? 1.0;
-                // Facteur d'inclinaison
                 const tiltFactor = { 'verticale': 1.0, 'inclinee': 1.3, 'horizontale': 1.5 }[win.tilt] ?? 1.0;
 
                 const deltaTSolaire = (spec.g * orientFactor * tiltFactor * maskFactor * shutterFactor * 5.0);
                 tWin += deltaTSolaire;
             }
 
-            // Correction de la moyenne : retrait de la surface opaque correspondante puis ajout de la baie
             sumAreaTemp -= (getSurfaceTemp('outside', uWall) * wArea);
             sumAreaTemp += (tWin * wArea);
         });
@@ -289,26 +313,23 @@ function calculateMeanRadiantTemp(zone, t_air) {
 // ============================================================
 
 function calculateAirVelocity(zoneConfig) {
-    let vel = 0.08; // Vitesse d'air naturelle de base en intérieur (m/s)
+    let vel = 0.08; 
 
     if (!zoneConfig) return vel;
 
-    // 1. Equipements de brassage actif
     const fanSys = zoneConfig.equipment?.fanSystem;
     if (fanSys === 'plafond') vel += 0.65;
     else if (fanSys === 'mobile') vel += 0.35;
 
-    // 2. Infiltrations et VMC
     const vmcSys = zoneConfig.equipment?.vmcSystem;
     if (vmcSys === 'double_flux' || vmcSys === 'hygro_b') vel += 0.04;
 
-    // 3. Effet de courant d'air / permeabilite aux vents forts
     if (outdoorWind > 25 && Array.isArray(zoneConfig.windows)) {
         const hasPermeableWindow = zoneConfig.windows.some(w => w.glass === 'single' || w.vent === 'oscillante');
         if (hasPermeableWindow) vel += 0.12;
     }
 
-    return Math.min(1.5, vel); // Plafond physique d'inconfort
+    return Math.min(1.5, vel); 
 }
 
 // ============================================================
@@ -318,18 +339,16 @@ function calculateAirVelocity(zoneConfig) {
 function calculatePMV(ta, tr, vel, rh, met, clo) {
     if (ta === undefined || ta === null || isNaN(ta)) return -99;
 
-    const M = met * 58.15; // W/m2
-    const W = 0; // Travail mecanique extérieur
-    const Icl = 0.155 * clo; // m2.K/W
+    const M = met * 58.15; 
+    const W = 0; 
+    const Icl = 0.155 * clo; 
     const fcl = (clo <= 0.5) ? (1.0 + 0.2 * clo) : (1.05 + 0.1 * clo);
 
-    // Pression de vapeur d'air ambiant (Pa)
     const pa = rh * 10 * Math.exp(16.6536 - 4030.183 / (ta + 235));
 
     const hcFree = (t) => 2.38 * Math.pow(Math.abs(t - ta), 0.25);
     const hcForced = 12.1 * Math.sqrt(Math.max(vel, 0.001));
 
-    // Iteration de convergence pour trouver la temperature de surface du vetement (Tcl)
     let tcl = (ta + tr) / 2;
     for (let i = 0; i < 30; i++) {
         const hc = Math.max(hcFree(tcl), hcForced);
@@ -344,7 +363,6 @@ function calculatePMV(ta, tr, vel, rh, met, clo) {
 
     const hcFinal = Math.max(hcFree(tcl), hcForced);
 
-    // Bilan des pertes thermiques corporelles (W/m2)
     const pVapeurPeau = 3.05 * 0.001 * (5733 - 6.99 * (M - W) - pa);
     const pSueur = (M - W > 58.15) ? 0.42 * ((M - W) - 58.15) : 0;
     const pRespLatente = 1.7e-5 * M * (5867 - pa);
@@ -364,11 +382,8 @@ function calculatePMV(ta, tr, vel, rh, met, clo) {
 function calculateAbsoluteHumidity(ta, rh) {
     if (ta === undefined || rh === undefined || isNaN(ta) || isNaN(rh)) return 0;
     
-    // Pression de vapeur saturante (Pa)
     const pSat = 611.2 * Math.exp((17.67 * ta) / (ta + 243.5));
-    // Pression de vapeur partielle (Pa)
     const pv = pSat * (rh / 100);
-    // Humidité absolue (g/m³)
     const ah = (216.7 * pv) / (ta + 273.15);
     
     return parseFloat(ah.toFixed(2));
@@ -383,14 +398,13 @@ function estimateThermalInertia(nomPiece, previousTemp, previousTimestampMs) {
 
     const nowMs = Date.now();
     const dtHours = (nowMs - previousTimestampMs) / (1000 * 3600);
-    if (dtHours < 0.25) return { status: "Données insuffisantes", coeff: 0 }; // Minimum 15 min d'écart
+    if (dtHours < 0.25) return { status: "Données insuffisantes", coeff: 0 }; 
 
     const deltaTint = Math.abs(currentData.ta - previousTemp);
     const deltaText = Math.abs(currentData.ta - outdoorTemp);
 
     if (deltaText < 1.0) return { status: "Écart T_int/T_ext trop faible", coeff: 0 };
 
-    // Vitesse de dérive thermique normalisée (h^-1)
     const alphaDerive = (deltaTint / dtHours) / deltaText;
 
     let inertieCat = "Moyenne";
@@ -412,26 +426,25 @@ function estimateThermalInertia(nomPiece, previousTemp, previousTimestampMs) {
 // POTENTIEL DE SÉCHAGE DU LINGE (VPD & Drying Index)
 // ============================================================
 function calculateDryingPotential(ta, rh, vel = 0.1) {
-    const pSat = 611.2 * Math.exp((17.67 * ta) / (ta + 243.5)); // Pa
-    const vpd = (pSat * (1 - rh / 100)) / 1000; // kPa
+    const pSat = 611.2 * Math.exp((17.67 * ta) / (ta + 243.5)); 
+    const vpd = (pSat * (1 - rh / 100)) / 1000; 
 
-    // Index composite intégrant la vitesse d'air
     const dryingIndex = vpd * (1 + 0.5 * vel);
 
     let status = "Très Léthargique";
-    let score = 1; // sur 5
+    let score = 1; 
 
     if (vpd < 0.4) {
-        status = "Très Mauvais (Risque d'odeurs / moisissures)";
+        status = "Très Mauvais (Moisissures)";
         score = 1;
     } else if (vpd < 0.8) {
-        status = "Moyen (Séchage lent)";
+        status = "Moyen (Lent)";
         score = 2;
     } else if (vpd < 1.3) {
-        status = "Bon (Séchage optimal)";
+        status = "Bon (Optimal)";
         score = 4;
     } else {
-        status = "Excellent (Séchage très rapide)";
+        status = "Excellent (Rapide)";
         score = 5;
     }
 
@@ -456,29 +469,24 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const wallArea = side * h;
     const floorArea = area;
 
-    // 1. Calcul des coefficients U des parois
     const uWall = getUValueParoi('wall', zoneConfig.wallMat, zoneConfig.insulation);
     const uCeiling = getUValueParoi('ceiling', zoneConfig.ceilingMat, zoneConfig.ceilingInsulation);
     const uFloor = getUValueParoi('floor', zoneConfig.floorMat, zoneConfig.floorInsulation);
 
-    // Déperditions surfaciques H_surfacique (W/K)
     let hSurfacique = (uWall * wallArea * 4) + (uCeiling * floorArea) + (uFloor * floorArea);
 
-    // 2. Déperditions par renouvellement d'air VMC (W/K)
-    let ach = 0.5; // Taux de renouvellement volumique par défaut (vol/h)
+    let ach = 0.5; 
     const vmc = zoneConfig.equipment?.vmcSystem;
-    if (vmc === 'double_flux') ach = 0.15; // Récupération de chaleur ~70-80%
+    if (vmc === 'double_flux') ach = 0.15; 
     else if (vmc === 'hygro_b') ach = 0.35;
     else if (vmc === 'aucun') ach = 0.8;
 
     const hVentilation = 0.34 * (volume * ach);
     const hTotal = hSurfacique + hVentilation;
 
-    // Déperditions thermiques journalières (kWh/j)
     const deltaT = Math.max(0, ta - outdoorTemp);
     const deperditionskWh = (hTotal * deltaT * 24) / 1000;
 
-    // 3. Gains solaires passifs journaliers (kWh/j)
     let gainsSolaireskWh = 0;
     const isSunny = sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun');
 
@@ -491,9 +499,8 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
             const maskFactor = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 }[win.mask] ?? 1.0;
             const shutterFactor = { 'aucun': 1.0, 'store_interieur': 0.7, 'roulant_pvc': 0.2 }[win.shutter] ?? 1.0;
 
-            // Irradiation moyenne journalière selon orientation (kWh/m²/jour)
             let iSolar = { 'S': 3.2, 'SE': 2.5, 'SW': 2.5, 'E': 1.8, 'W': 1.8, 'N': 0.6 }[win.orient] ?? 1.5;
-            if (!isSunny) iSolar *= 0.3; // Réduction sous ciel couvert
+            if (!isSunny) iSolar *= 0.3; 
 
             gainsSolaireskWh += (wArea * gFactor * maskFactor * shutterFactor * iSolar);
         });
@@ -509,41 +516,51 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     };
 }
 
-// ============================================================
-// MISE À JOUR ET RENDU DU DASHBOARD
-// ============================================================
-
+/**
+ * 2. MISE À JOUR DYNAMIQUE D'UNE TUILE (Injection dans le DOM)
+ */
 function mettreAJourTuile(nomPiece) {
     const data = DONNEES_HABITAT[nomPiece];
     const idCapteur = capteursMaison[nomPiece];
     if (!data || !idCapteur) return; 
 
+    // Données brutes capteurs
     const tempEl = document.getElementById('temp-' + idCapteur);
     const humEl = document.getElementById('hum-' + idCapteur);
 
-    if (tempEl) tempEl.textContent = data.ta.toFixed(1) + "°C";
-    if (humEl) humEl.textContent = data.rh.toFixed(1) + "%";
+    if (tempEl) tempEl.textContent = data.ta.toFixed(1) + " °C";
+    if (humEl) humEl.textContent = data.rh.toFixed(0) + " %";
 
     const zoneConfig = getZoneConfigByName(nomPiece);
     if (!zoneConfig) return;
 
-    // Extrait de l'intégration dans mettreAJourTuile :
-const ah = calculateAbsoluteHumidity(data.ta, data.rh);
-const vel = calculateAirVelocity(zoneConfig);
-const drying = calculateDryingPotential(data.ta, data.rh, vel);
-const energyBalance = calculateDailyThermalBalance(zoneConfig, data.ta);
-
-// Exemple d'injection dans l'élément HTML de la tuile :
-console.log(`[${nomPiece}] AH: ${ah} g/m³ | Séchage: ${drying.status} | Déperditions: ${energyBalance.deperditionskWh} kWh/j`);
-
-    // Calculs thermiques avances
+    // Calculs Thermiques et Aérauliques
     const vel = calculateAirVelocity(zoneConfig);
     const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
     const { met, totalClo } = getBaseCloAndMet(zoneConfig);
 
+    // Calculs des indicateurs dérivés
+    const ah = calculateAbsoluteHumidity(data.ta, data.rh);
+    const drying = calculateDryingPotential(data.ta, data.rh, vel);
+    const energyBalance = calculateDailyThermalBalance(zoneConfig, data.ta);
+
     let pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
     pmv = Math.max(-3, Math.min(3, pmv)); 
 
+    // Injection dans le DOM
+    const ahEl = document.getElementById('ah-' + idCapteur);
+    const dryingEl = document.getElementById('drying-' + idCapteur);
+    const energyEl = document.getElementById('energy-' + idCapteur);
+
+    if (ahEl) ahEl.textContent = ah.toFixed(1) + " g/m³";
+    if (dryingEl) {
+        dryingEl.textContent = drying.status;
+        dryingEl.style.color = drying.score >= 4 ? "var(--status-success, #10B981)" : 
+                               (drying.score === 2 ? "var(--status-warning, #F59E0B)" : "var(--status-danger, #EF4444)");
+    }
+    if (energyEl) energyEl.textContent = energyBalance.deperditionskWh.toFixed(1) + " kWh/j";
+
+    // Pavé PMV et Badging visuel
     const pmvBox = document.getElementById('pmv-box-' + idCapteur);
     const pmvVal = document.getElementById('pmv-' + idCapteur);
     const pmvText = document.getElementById('pmv-text-' + idCapteur);
@@ -552,24 +569,29 @@ console.log(`[${nomPiece}] AH: ${ah} g/m³ | Séchage: ${drying.status} | Déper
 
     if (pmvBox && pmvVal && pmvText) {
         if (pmv < -0.75) { 
-            pmvBox.style.backgroundColor = "#ebf5fb"; 
-            pmvVal.style.color = "var(--cold, #2980b9)"; 
+            pmvBox.style.backgroundColor = "#E0F2FE"; 
+            pmvBox.style.borderColor = "#BAE6FD";
+            pmvVal.style.color = "#0369A1"; 
             pmvText.textContent = "Sensation Froide 🥶";
         } else if (pmv < -0.2) {
-            pmvBox.style.backgroundColor = "#f0f8ff"; 
-            pmvVal.style.color = "#3498db"; 
+            pmvBox.style.backgroundColor = "#F0F9FF"; 
+            pmvBox.style.borderColor = "#E0F2FE";
+            pmvVal.style.color = "#0284C7"; 
             pmvText.textContent = "Légèrement Frais 🌬️";
         } else if (pmv > 0.75) { 
-            pmvBox.style.backgroundColor = "#fdedec"; 
-            pmvVal.style.color = "var(--hot, #c0392b)"; 
+            pmvBox.style.backgroundColor = "#FEE2E2"; 
+            pmvBox.style.borderColor = "#FCA5A5";
+            pmvVal.style.color = "#B91C1C"; 
             pmvText.textContent = "Sensation Chaude 🥵";
         } else if (pmv > 0.2) {
-            pmvBox.style.backgroundColor = "#fef5e7"; 
-            pmvVal.style.color = "#e67e22"; 
+            pmvBox.style.backgroundColor = "#FEF3C7"; 
+            pmvBox.style.borderColor = "#FDE68A";
+            pmvVal.style.color = "#B45309"; 
             pmvText.textContent = "Légèrement Chaud ☀️";
         } else { 
-            pmvBox.style.backgroundColor = "#e9f7ef"; 
-            pmvVal.style.color = "var(--eco, #27ae60)"; 
+            pmvBox.style.backgroundColor = "#D1FAE5"; 
+            pmvBox.style.borderColor = "#A7F3D0";
+            pmvVal.style.color = "#047857"; 
             pmvText.textContent = "Zone Neutre (Confort) ✅";
         }
     }
@@ -583,12 +605,14 @@ function recalculerToutLeDashboard() {
 
 function adjustClothing(amount) { 
     manualCloAdjustment += amount; 
+    sessionStorage.setItem('manualCloAdjustment', manualCloAdjustment);
     updateClothingDisplay(); 
     recalculerToutLeDashboard(); 
 }
 
 function resetClothing() { 
     manualCloAdjustment = 0; 
+    sessionStorage.setItem('manualCloAdjustment', 0);
     updateClothingDisplay(); 
     recalculerToutLeDashboard(); 
 }
@@ -625,11 +649,16 @@ function fetchWeather(url) {
         .then(data => {
             outdoorTemp = data.main.temp; 
             outdoorHumidity = data.main.humidity;
-            outdoorWind = (data.wind.speed * 3.6); // M/s vers km/h
+            outdoorWind = (data.wind.speed * 3.6); 
             sunshineStatus = data.weather[0].main; 
             
             const locInput = document.getElementById('location');
             if (locInput) locInput.value = data.name;
+
+            sessionStorage.setItem('location', data.name);
+            sessionStorage.setItem('outdoorTemp', outdoorTemp);
+            sessionStorage.setItem('outdoorHumidity', outdoorHumidity);
+            sessionStorage.setItem('sunshineStatus', sunshineStatus);
 
             updateClothingDisplay(); 
             recalculerToutLeDashboard(); 
@@ -641,7 +670,7 @@ async function synchroniserTouteLaMaison() {
     const btn = document.getElementById('btn-sync-all');
     if (btn) {
         btn.innerHTML = "⏳ Scan Global en cours...";
-        btn.style.backgroundColor = "#7f8c8d";
+        btn.style.backgroundColor = "var(--slate-600, #475569)";
     }
 
     try {
@@ -664,7 +693,7 @@ async function synchroniserTouteLaMaison() {
                 if (statusEl) {
                     const now = new Date();
                     statusEl.textContent = "Actuel (" + now.getHours() + "h" + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes() + ")";
-                    statusEl.style.color = "var(--eco)";
+                    statusEl.style.color = "var(--status-success, #10B981)";
                 }
             }
         }
@@ -678,7 +707,7 @@ async function synchroniserTouteLaMaison() {
 
     if (btn) {
         btn.innerHTML = "⚡ Interroger les capteurs (Super-Scan)";
-        btn.style.backgroundColor = "var(--secondary)";
+        btn.style.backgroundColor = "var(--terracotta-500, #D96B43)";
     }
 }
 
