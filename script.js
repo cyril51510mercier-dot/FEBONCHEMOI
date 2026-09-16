@@ -600,6 +600,120 @@ function updateClothingDisplay() {
 }
 
 // ============================================================
+// INDICATEURS GLOBAUX DE L'HABITAT (PONDÉRATION VOLUMIQUE)
+// ============================================================
+function calculateGlobalHabitatMetrics() {
+    let totalVolume = 0;
+    let weightedTemp = 0;
+    let weightedRH = 0;
+    let weightedAH = 0;
+    let weightedPMV = 0;
+
+    let totalDeperditions = 0;
+    let totalGainsSolaires = 0;
+    let totalBilanNet = 0;
+
+    for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
+        if (!data || isNaN(data.ta) || isNaN(data.rh)) continue;
+
+        const zoneConfig = getZoneConfigByName(nomPiece) || { area: 15, height: 2.5 };
+        const area = parseFloat(zoneConfig.area) || 15;
+        const height = parseFloat(zoneConfig.height) || 2.5;
+        const volume = area * height;
+
+        // Calculs unitaires par pièce
+        const ah = calculateAbsoluteHumidity(data.ta, data.rh);
+        const vel = calculateAirVelocity(zoneConfig, nomPiece);
+        const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
+        const { met, totalClo } = getBaseCloAndMet(zoneConfig);
+        const pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
+        const energy = calculateDailyThermalBalance(zoneConfig, data.ta);
+
+        // Cumuls volumiques
+        totalVolume += volume;
+        weightedTemp += data.ta * volume;
+        weightedRH += data.rh * volume;
+        weightedAH += ah * volume;
+        weightedPMV += pmv * volume;
+
+        // Cumuls énergétiques
+        totalDeperditions += energy.deperditionskWh;
+        totalGainsSolaires += energy.gainsSolaireskWh;
+        totalBilanNet += energy.bilanNetkWh;
+    }
+
+    if (totalVolume === 0) return null;
+
+    return {
+        avgTemp: parseFloat((weightedTemp / totalVolume).toFixed(1)),
+        avgRH: parseFloat((weightedRH / totalVolume).toFixed(0)),
+        avgAH: parseFloat((weightedAH / totalVolume).toFixed(2)),
+        avgPMV: parseFloat((weightedPMV / totalVolume).toFixed(2)),
+        totalDeperditionskWh: parseFloat(totalDeperditions.toFixed(2)),
+        totalGainsSolaireskWh: parseFloat(totalGainsSolaires.toFixed(2)),
+        totalBilanNetkWh: parseFloat(totalBilanNet.toFixed(2)),
+        totalVolumeM3: parseFloat(totalVolume.toFixed(1))
+    };
+}
+
+// ============================================================
+// CALCUL DE LA CAPACITÉ ET CHARGE EN ÉNERGIE (STOCKAGE THERMIQUE)
+// ============================================================
+const PROPRIETES_MATERIAUX = {
+    'concrete':    { rho: 2300, cp: 1.0 }, // Béton / Dalle
+    'cinderblock': { rho: 1300, cp: 1.0 }, // Parpaing
+    'brick':       { rho: 1800, cp: 0.9 }, // Brique pleine
+    'stone':       { rho: 2400, cp: 0.8 }, // Pierre dense
+    'wood':        { rho: 500,  cp: 1.6 }, // Structure légère
+    'lourd':       { rho: 2200, cp: 1.0 }, // Plancher béton
+    'leger':       { rho: 400,  cp: 1.4 }  // Plancher bois/plâtre
+};
+
+function calculateZoneThermalStorage(zoneConfig, currentTa) {
+    if (!zoneConfig) return { cEffkWhPerK: 0 };
+
+    const area = parseFloat(zoneConfig.area) || 16;
+    const h = parseFloat(zoneConfig.height) || 2.5;
+    const side = Math.sqrt(area);
+    const wallArea = side * h;
+    const dEff = 0.08; // 8 cm d'épaisseur active pour le stockage journalier
+
+    let cEffKJPerK = 0; // Capacité en kJ/K
+
+    // 1. Plancher et Plafond (surfaces complètes)
+    const floorMat = PROPRIETES_MATERIAUX[zoneConfig.floorMat] || PROPRIETES_MATERIAUX['lourd'];
+    if (zoneConfig.floorInsulation !== 'iti_recent' && zoneConfig.floorInsulation !== 'iti_old') {
+        cEffKJPerK += (area * dEff) * floorMat.rho * floorMat.cp;
+    }
+
+    const ceilingMat = PROPRIETES_MATERIAUX[zoneConfig.ceilingMat] || PROPRIETES_MATERIAUX['leger'];
+    if (zoneConfig.ceilingInsulation !== 'iti_recent' && zoneConfig.ceilingInsulation !== 'iti_old') {
+        cEffKJPerK += (area * dEff) * ceilingMat.rho * ceilingMat.cp;
+    }
+
+    // 2. Murs verticaux (accessible seulement si ITE ou non isolé)
+    const wallMat = PROPRIETES_MATERIAUX[zoneConfig.wallMat] || PROPRIETES_MATERIAUX['cinderblock'];
+    const isITI = zoneConfig.insulation === 'iti_recent' || zoneConfig.insulation === 'iti_old';
+
+    if (!isITI) {
+        // Si ITE ou non isolé, la masse des 4 murs est accessible de l'intérieur
+        cEffKJPerK += (wallArea * 4 * dEff) * wallMat.rho * wallMat.cp;
+    }
+
+    // Conversion kJ/K -> kWh/K
+    const cEffkWhPerK = cEffKJPerK / 3600;
+
+    // Calcul du potentiel de stockage sur une plage de pré-charge de +/- 2°C
+    const deltaTPrecharge = 2.0;
+    const maxStorageCapacitykWh = cEffkWhPerK * deltaTPrecharge;
+
+    return {
+        cEffkWhPerK: parseFloat(cEffkWhPerK.toFixed(2)),
+        maxStorageCapacitykWh: parseFloat(maxStorageCapacitykWh.toFixed(2))
+    };
+}
+
+// ============================================================
 // FLUX MÉTÉO SANS BLOCAGE
 // ============================================================
 
