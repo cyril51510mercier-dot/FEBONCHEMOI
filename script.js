@@ -514,10 +514,10 @@ function calculateStructureReserve(tStruct, tAir, tConfort = 21.0) {
         fluxIcon = "🔥 Restitution";
     } else if (deltaFlux < -0.3) {
         fluxDirection = `La structure absorbe la chaleur (-${diffAbs} °C)`;
-        fluxIcon = "❄️ Imbibition";
+        fluxIcon = "❄️ Absorption";
     } else {
         fluxDirection = `Équilibre thermique air / parois`;
-        fluxIcon = "⚖️ Stabile";
+        fluxIcon = "⚖️ Stabilité";
     }
 
     let qualification = "Neutre";
@@ -548,46 +548,51 @@ window.SolsticeEngine = {
     
     // Registre des modificateurs d'état physique pour chaque action
     PHYSICAL_MODIFIERS: {
-        "fan_on": (state) => ({
-            ...state,
-            vel: Math.min(1.2, Math.max(state.vel + 0.60, 0.70))
-        }),
-        "shutter_close": (state) => ({
-            ...state,
-            tr: Math.min(state.tr, state.ta + 0.2)
-        }),
-        "anticipate_sun": (state) => ({
-            ...state,
-            tr: Math.min(state.tr, state.ta)
-        }),
-        "free_cooling": (state, envData) => ({
-            ...state,
-            ta: state.ta - 0.60 * (state.ta - envData.t_ext),
-            tr: state.tr - 0.30 * (state.tr - envData.t_ext)
-        }),
-        "vmc_boost": (state) => ({
-            ...state,
-            rh: Math.max(45, state.rh - 15)
-        }),
-        "open_win_humidity": (state) => ({
-            ...state,
-            rh: Math.max(50, state.rh - 10)
-        }),
-        "sun_heat": (state) => ({
-            ...state,
-            tr: state.tr + 2.2,
-            ta: state.ta + 0.5
-        }),
-        "floor_inertia": (state) => ({
-            ...state,
-            ta: state.ta + 0.8,
-            tr: state.tr + 1.0
-        }),
-        "bedroom_temp": (state) => ({
-            ...state,
-            ta: Math.max(17.5, state.ta - 1.5)
-        })
-    },
+    // Ventilateur : +0.25 m/s de vitesse d'air (au lieu de +0.60 m/s)
+    "fan_on": (state) => ({
+        ...state,
+        vel: Math.min(0.80, state.vel + 0.25)
+    }),
+    // Volets fermés : réduit la surchauffe radiante de 70% sans brusquer le modèle
+    "shutter_close": (state) => ({
+        ...state,
+        tr: state.ta + 0.3 * (state.tr - state.ta)
+    }),
+    "anticipate_sun": (state) => ({
+        ...state,
+        tr: state.ta + 0.2 * (state.tr - state.ta)
+    }),
+    // Free-cooling : rafraîchissement modéré instantané
+    "free_cooling": (state, envData) => ({
+        ...state,
+        ta: state.ta - 0.20 * Math.max(0, state.ta - envData.t_ext),
+        tr: state.tr - 0.15 * Math.max(0, state.tr - envData.t_ext)
+    }),
+    // Humidité : baisse mesurée de 6% HR
+    "vmc_boost": (state) => ({
+        ...state,
+        rh: Math.max(45, state.rh - 6)
+    }),
+    "open_win_humidity": (state) => ({
+        ...state,
+        rh: Math.max(48, state.rh - 4)
+    }),
+    // Chauffage solaire passif : +0.6°C radiant
+    "sun_heat": (state) => ({
+        ...state,
+        tr: state.tr + 0.6,
+        ta: state.ta + 0.2
+    }),
+    "floor_inertia": (state) => ({
+        ...state,
+        ta: state.ta + 0.3,
+        tr: state.tr + 0.4
+    }),
+    "bedroom_temp": (state) => ({
+        ...state,
+        ta: Math.max(17.5, state.ta - 0.5)
+    })
+}
 
     // Méthode de recalcul exact du PMV après application des modificateurs d'état
     evaluateSimulatedPMV(baseState, actionKeys, envData) {
@@ -812,10 +817,10 @@ function actualiserCockpitGlobal() {
             globalFluxEl.textContent = "🔥 Restitution";
             globalFluxEl.style.color = "#FDBA74";
         } else if (diffGlobal < -0.3) {
-            globalFluxEl.textContent = "❄️ Imbibition";
+            globalFluxEl.textContent = "❄️ Absorption";
             globalFluxEl.style.color = "#38BDF8";
         } else {
-            globalFluxEl.textContent = "⚖️ Stabile";
+            globalFluxEl.textContent = "⚖️ Stabilité";
             globalFluxEl.style.color = "#4ADE80";
         }
     }
