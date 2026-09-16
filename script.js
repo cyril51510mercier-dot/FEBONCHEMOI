@@ -536,6 +536,87 @@ function calculateStructureReserve(tStruct, tAir, tConfort = 21.0) {
 }
 
 // ============================================================
+// MOTEUR THERMODYNAMIQUE GLOBAL DE SIMULATION SOLSTICE
+// ============================================================
+
+window.SolsticeEngine = {
+    calculatePMV,
+    calculateMeanRadiantTemp,
+    calculateAirVelocity,
+    getBaseCloAndMet,
+    getZoneConfigByName,
+    
+    // Registre des modificateurs d'état physique pour chaque action
+    PHYSICAL_MODIFIERS: {
+        "fan_on": (state) => ({
+            ...state,
+            vel: Math.min(1.2, Math.max(state.vel + 0.60, 0.70))
+        }),
+        "shutter_close": (state) => ({
+            ...state,
+            tr: Math.min(state.tr, state.ta + 0.2)
+        }),
+        "anticipate_sun": (state) => ({
+            ...state,
+            tr: Math.min(state.tr, state.ta)
+        }),
+        "free_cooling": (state, envData) => ({
+            ...state,
+            ta: state.ta - 0.60 * (state.ta - envData.t_ext),
+            tr: state.tr - 0.30 * (state.tr - envData.t_ext)
+        }),
+        "vmc_boost": (state) => ({
+            ...state,
+            rh: Math.max(45, state.rh - 15)
+        }),
+        "open_win_humidity": (state) => ({
+            ...state,
+            rh: Math.max(50, state.rh - 10)
+        }),
+        "sun_heat": (state) => ({
+            ...state,
+            tr: state.tr + 2.2,
+            ta: state.ta + 0.5
+        }),
+        "floor_inertia": (state) => ({
+            ...state,
+            ta: state.ta + 0.8,
+            tr: state.tr + 1.0
+        }),
+        "bedroom_temp": (state) => ({
+            ...state,
+            ta: Math.max(17.5, state.ta - 1.5)
+        })
+    },
+
+    // Méthode de recalcul exact du PMV après application des modificateurs d'état
+    evaluateSimulatedPMV(baseState, actionKeys, envData) {
+        let simulatedState = { ...baseState };
+
+        actionKeys.forEach(key => {
+            const modifier = this.PHYSICAL_MODIFIERS[key];
+            if (modifier) {
+                simulatedState = modifier(simulatedState, envData);
+            }
+        });
+
+        const newPMV = this.calculatePMV(
+            simulatedState.ta,
+            simulatedState.tr,
+            simulatedState.vel,
+            simulatedState.rh,
+            simulatedState.met,
+            simulatedState.clo
+        );
+
+        return {
+            pmv: parseFloat(newPMV.toFixed(2)),
+            simulatedState
+        };
+    }
+};
+
+// ============================================================
 // INDICATEURS GLOBAUX DE L'HABITAT (PONDÉRATION VOLUMIQUE)
 // ============================================================
 function calculateGlobalHabitatMetrics() {
