@@ -324,20 +324,48 @@ function calculateMeanRadiantTemp(zone, t_air) {
     return sumAreaTemp / totalArea;
 }
 
-function calculateAirVelocity(zoneConfig) {
-    let vel = 0.08; 
-    if (!zoneConfig) return vel;
+// ============================================================
+// DÉTECTION EXTERNE ET VITESSE DE L'AIR
+// ============================================================
 
-    if (zoneConfig.equipment?.fanSystem === 'plafond') vel += 0.65;
-    else if (zoneConfig.equipment?.fanSystem === 'mobile') vel += 0.35;
+// Détermine si la pièce/capteur correspond à une zone extérieure
+function isOutdoorZone(nomPiece, zoneConfig) {
+    if (nomPiece && (nomPiece.toLowerCase().includes('extér') || nomPiece.toLowerCase().includes('exter'))) {
+        return true;
+    }
+    if (zoneConfig && Array.isArray(zoneConfig.usages) && zoneConfig.usages.includes('outdoor')) {
+        return true;
+    }
+    return false;
+}
 
-    if (['double_flux', 'hygro_b'].includes(zoneConfig.equipment?.vmcSystem)) vel += 0.04;
-
-    if (outdoorWind > 25 && Array.isArray(zoneConfig.windows)) {
-        if (zoneConfig.windows.some(w => w.glass === 'single' || w.vent === 'oscillante')) vel += 0.12;
+function calculateAirVelocity(zoneConfig, nomPiece = '') {
+    // Si la zone est extérieure, on applique la vitesse du vent météo (convertie de km/h en m/s)
+    if (isOutdoorZone(nomPiece, zoneConfig)) {
+        const windMetersPerSecond = outdoorWind / 3.6;
+        return Math.max(0.1, windMetersPerSecond); // Pas de plafonnement intérieur
     }
 
-    return Math.min(1.5, vel); 
+    let vel = 0.08; // Vitesse d'air naturelle de base en intérieur (m/s)
+
+    if (!zoneConfig) return vel;
+
+    // 1. Équipements de brassage actif
+    const fanSys = zoneConfig.equipment?.fanSystem;
+    if (fanSys === 'plafond') vel += 0.65;
+    else if (fanSys === 'mobile') vel += 0.35;
+
+    // 2. Infiltrations et VMC
+    const vmcSys = zoneConfig.equipment?.vmcSystem;
+    if (vmcSys === 'double_flux' || vmcSys === 'hygro_b') vel += 0.04;
+
+    // 3. Effet de courant d'air / perméabilité aux vents forts
+    if (outdoorWind > 25 && Array.isArray(zoneConfig.windows)) {
+        const hasPermeableWindow = zoneConfig.windows.some(w => w.glass === 'single' || w.vent === 'oscillante');
+        if (hasPermeableWindow) vel += 0.12;
+    }
+
+    return Math.min(1.5, vel); // Plafond physique de confort intérieur
 }
 
 /**
@@ -406,19 +434,40 @@ function calculateAbsoluteHumidity(ta, rh) {
     return parseFloat(ah.toFixed(1));
 }
 
+// ============================================================
+// POTENTIEL DE SÉCHAGE DU LINGE (VPD & Drying Index)
+// ============================================================
 function calculateDryingPotential(ta, rh, vel = 0.1) {
-    const pSat = 611.2 * Math.exp((17.67 * ta) / (ta + 243.5)); 
-    const vpd = (pSat * (1 - rh / 100)) / 1000; 
+    const pSat = 611.2 * Math.exp((17.67 * ta) / (ta + 243.5)); // Pa
+    const vpd = (pSat * (1 - rh / 100)) / 1000; // kPa
 
-    let status = "Moyen (Séchage lent)";
-    let score = 2; 
+    // Indice composite intégrant le renouvellement d'air (vent ou brassage)
+    const dryingIndex = vpd * (1 + 0.5 * vel);
 
-    if (vpd < 0.4) { status = "Très Mauvais (Moisissures)"; score = 1; }
-    else if (vpd < 0.8) { status = "Moyen (Séchage lent)"; score = 2; }
-    else if (vpd < 1.3) { status = "Bon (Optimal)"; score = 4; }
-    else { status = "Excellent (Très rapide)"; score = 5; }
+    let status = "Très Mauvais";
+    let score = 1;
 
-    return { vpdkPa: parseFloat(vpd.toFixed(3)), status, score };
+    // Évaluation sur l'indice dynamisé par la vitesse d'air
+    if (dryingIndex < 0.4) {
+        status = "Très Mauvais (Risque d'odeurs / moisissures)";
+        score = 1;
+    } else if (dryingIndex < 0.8) {
+        status = "Moyen (Séchage lent)";
+        score = 2;
+    } else if (dryingIndex < 1.3) {
+        status = "Bon (Séchage optimal)";
+        score = 4;
+    } else {
+        status = "Excellent (Séchage très rapide)";
+        score = 5;
+    }
+
+    return {
+        vpdkPa: parseFloat(vpd.toFixed(3)),
+        dryingIndex: parseFloat(dryingIndex.toFixed(3)),
+        status: status,
+        score: score
+    };
 }
 
 function calculateDailyThermalBalance(zoneConfig, ta) {
@@ -445,16 +494,19 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
 function mettreAJourTuile(nomPiece) {
     if (!SELECTION_PIECES.includes(nomPiece)) return;
 
+    // 1. Récupération des données du capteur
     const data = DONNEES_HABITAT[nomPiece];
     const idCapteur = capteursMaison[nomPiece];
-    if (!data || !idCapteur) return; 
+    if (!data || !idCapteur) return;
 
+    // 2. Mise à jour des éléments DOM de base
     const tempEl = document.getElementById('temp-' + idCapteur);
     const humEl = document.getElementById('hum-' + idCapteur);
 
     if (tempEl) tempEl.textContent = data.ta.toFixed(1) + " °C";
     if (humEl) humEl.textContent = data.rh.toFixed(0) + " %";
 
+    // 3. Récupération de la configuration d'expertise (ou fallback)
     const zoneConfig = getZoneConfigByName(nomPiece) || {
         name: nomPiece,
         area: 15,
@@ -468,13 +520,17 @@ function mettreAJourTuile(nomPiece) {
         usages: ['kitchen']
     };
 
-    const vel = calculateAirVelocity(zoneConfig);
+    // 4. Calculs des métriques physiques
+    const vel = calculateAirVelocity(zoneConfig, nomPiece);
     const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
     const { met, totalClo } = getBaseCloAndMet(zoneConfig);
 
     const ah = calculateAbsoluteHumidity(data.ta, data.rh);
     const drying = calculateDryingPotential(data.ta, data.rh, vel);
     const energyBalance = calculateDailyThermalBalance(zoneConfig, data.ta);
+
+    // ... suite de la fonction (affichage PMV, séchage et déperditions sur la tuile)
+}
 
     let pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
 
