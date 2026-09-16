@@ -3,24 +3,27 @@ document.addEventListener('DOMContentLoaded', function() {
         const savedConfig = localStorage.getItem('HOUSE_CONFIG');
         const houseConfig = savedConfig ? JSON.parse(savedConfig) : {};
         
-        const envData = {
-            pmv: parseFloat(sessionStorage.getItem('calculatedPMV')) || 0,
-            t_air_int: parseFloat(sessionStorage.getItem('indoorAirTemp')) || 20,
-            rh_int: parseFloat(sessionStorage.getItem('indoorHumidity')) || 50,
-            t_ext: parseFloat(sessionStorage.getItem('outdoorTemp')) || 15,
-            sun_status: sessionStorage.getItem('sunshineStatus') || 'Clouds',
+        // Récupération des données globales de l'habitat issues du scanner ou du cache
+        const donneesHabitatRaw = localStorage.getItem('SOLSTICE_DONNEES_HABITAT') || sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
+        const donneesHabitat = donneesHabitatRaw ? JSON.parse(donneesHabitatRaw) : {};
+
+        const envDataGlobal = {
+            t_ext: parseFloat(localStorage.getItem('outdoorTemp')) || parseFloat(sessionStorage.getItem('outdoorTemp')) || 15,
+            sun_status: localStorage.getItem('sunshineStatus') || sessionStorage.getItem('sunshineStatus') || 'Clouds',
         };
 
         let checkedActions = JSON.parse(localStorage.getItem('SOLSTICE_CHECKED_RECOS') || '{}');
-        let currentZoneId = sessionStorage.getItem('currentZoneId') || 'all';
+        let currentZoneId = sessionStorage.getItem('currentZoneId') || Object.keys(houseConfig)[0] || 'all';
 
         const zoneSelect = document.getElementById('zoneSelect');
         const containerImmediate = document.getElementById('container-immediate');
         const containerAnticipated = document.getElementById('container-anticipated');
+        const containerCompleted = document.getElementById('container-completed');
 
         function setupZoneSelector() {
             if (!zoneSelect) return;
-            zoneSelect.innerHTML = '<option value="all">🌐 Toutes les pièces</option>';
+            zoneSelect.innerHTML = '';
+            
             Object.keys(houseConfig).forEach(zId => {
                 const opt = document.createElement('option');
                 opt.value = zId;
@@ -28,25 +31,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (zId === currentZoneId) opt.selected = true;
                 zoneSelect.appendChild(opt);
             });
+            
+            const optAll = document.createElement('option');
+            optAll.value = 'all';
+            optAll.textContent = '🌐 Toutes les pièces';
+            if (currentZoneId === 'all') optAll.selected = true;
+            zoneSelect.appendChild(optAll);
         }
 
-        // Génération dynamique des recommandations selon le paramétrage expert
+        // Génération des conseils basée sur l'équipement de la pièce
         function generateRecommendations(zone, zoneId) {
             const recs = [];
-            const needsHeat = envData.pmv < -0.5;
-            const needsCooling = envData.pmv > 0.5;
-            const isSunny = envData.sun_status.toLowerCase().includes('clear');
             const zoneName = zone.name || zoneId;
+            const roomData = donneesHabitat[zoneName] || {
+                ta: parseFloat(sessionStorage.getItem('indoorAirTemp')) || 20,
+                rh: parseFloat(sessionStorage.getItem('indoorHumidity')) || 50
+            };
 
-            // --- 1. HUMIDITÉ (>70%) ---
-            if (envData.rh_int > 70) {
+            const engine = window.SolsticeEngine;
+            const tr = engine ? engine.calculateMeanRadiantTemp(zone, roomData.ta) : roomData.ta;
+            const vel = engine ? engine.calculateAirVelocity(zone, zoneName) : 0.08;
+            const { met, totalClo } = engine ? engine.getBaseCloAndMet(zone) : { met: 1.2, totalClo: 1.0 };
+            
+            const roomPmv = engine ? engine.calculatePMV(roomData.ta, tr, vel, roomData.rh, met, totalClo) : 0;
+
+            const needsHeat = roomPmv < -0.5;
+            const needsCooling = roomPmv > 0.5;
+            const isSunny = envDataGlobal.sun_status.toLowerCase().includes('clear') || envDataGlobal.sun_status.toLowerCase().includes('sun');
+
+            // --- HUMIDITÉ ---
+            if (roomData.rh > 70) {
                 if (zone.vmcSys === 'acceleree') {
                     recs.push({
                         id: `${zoneId}_vmc_boost`,
                         actionKey: 'vmc_boost',
                         zoneId, zoneName, timing: 'immediate', type: 'type-air',
                         title: 'Activer la VMC en mode accéléré',
-                        text: `L'humidité dépasse 70%. Passez la VMC en vitesse rapide dans ${zoneName}.`,
+                        text: `L'humidité atteint ${roomData.rh}%. Basculez la VMC en vitesse rapide.`,
                         impactWeight: 15
                     });
                 } else if (zone.windows && zone.windows.some(w => w.vent && w.vent !== 'fixe')) {
@@ -62,15 +83,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // --- 2. SURCHAUFFE (PMV > 0.5) ---
+            // --- SURCHAUFFE ---
             if (needsCooling) {
-                if (envData.t_ext < envData.t_air_int && zone.windows && zone.windows.some(w => w.vent !== 'fixe')) {
+                if (envDataGlobal.t_ext < roomData.ta && zone.windows && zone.windows.some(w => w.vent !== 'fixe')) {
                     recs.push({
                         id: `${zoneId}_free_cooling`,
                         actionKey: 'free_cooling',
                         zoneId, zoneName, timing: 'immediate', type: 'type-cool',
                         title: 'Ventilation traversante (Free-cooling)',
-                        text: `Il fait plus frais dehors (${envData.t_ext}°C). Ouvrez la fenêtre de ${zoneName} pour décharger la chaleur.`,
+                        text: `Il fait plus frais dehors (${envDataGlobal.t_ext}°C). Ouvrez la fenêtre pour décharger la chaleur.`,
                         impactWeight: 20
                     });
                 }
@@ -83,7 +104,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             actionKey: 'shutter_close',
                             zoneId, zoneName, timing: 'immediate', type: 'type-sun',
                             title: 'Fermer les occultations extérieures',
-                            text: `Baissez complètement les volets/stores de ${zoneName} pour stopper le rayonnement incident avant le vitrage.`,
+                            text: `Baissez complètement les volets/stores pour stopper le rayonnement incident avant le vitrage.`,
                             impactWeight: 25
                         });
                         recs.push({
@@ -91,7 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             actionKey: 'anticipate_sun',
                             zoneId, zoneName, timing: 'anticipated', type: 'type-sun',
                             title: 'Occultation préventive du matin',
-                            text: `Anticipez le pic thermique de l'après-midi : fermez les volets de ${zoneName} dès 10h demain.`,
+                            text: `Anticipez le pic thermique de l'après-midi : fermez les volets dès 10h demain.`,
                             impactWeight: 15
                         });
                     }
@@ -103,21 +124,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         actionKey: 'fan_on',
                         zoneId, zoneName, timing: 'immediate', type: 'type-eco',
                         title: `Activer le brassage d'air (${zone.fanSys})`,
-                        text: `Allumez votre ventilateur. La vitesse de l'air augmente les pertes convectives et la sudation sans climatisation.`,
+                        text: `Allumez votre ventilateur. L'augmentation contrôlée de la vitesse de l'air rafraîchit sans clim.`,
                         impactWeight: 18
                     });
                 }
             }
 
-            // --- 3. FROID / CHAUFFAGE (PMV < -0.5) ---
+            // --- FROID ---
             if (needsHeat) {
-                if (isSunny && envData.t_ext < envData.t_air_int) {
+                if (isSunny && envDataGlobal.t_ext < roomData.ta) {
                     recs.push({
                         id: `${zoneId}_sun_heat`,
                         actionKey: 'sun_heat',
                         zoneId, zoneName, timing: 'immediate', type: 'type-sun',
                         title: 'Ouvrir grand les protections solaires',
-                        text: `Laissez pénétrer les rayons du soleil dans ${zoneName} pour réchauffer les parois et l'air intérieur.`,
+                        text: `Laissez pénétrer les rayons du soleil pour réchauffer les parois de la pièce.`,
                         impactWeight: 20
                     });
                 }
@@ -128,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         actionKey: 'floor_inertia',
                         zoneId, zoneName, timing: 'anticipated', type: 'type-heat',
                         title: 'Anticiper l\'inertie du plancher chauffant',
-                        text: `Ajustez le thermostat 3 heures à l'avance pour laisser le temps au fluide de restituer sa chaleur.`,
+                        text: `Ajustez la consigne 3 heures à l'avance pour laisser la dalle restituer sa chaleur.`,
                         impactWeight: 15
                     });
                 }
@@ -139,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         actionKey: 'bedroom_temp',
                         zoneId, zoneName, timing: 'anticipated', type: 'type-eco',
                         title: 'Réduction de consigne nocturne',
-                        text: `Baissez le thermostat à 17°C/18°C 1h avant le coucher dans cette chambre.`,
+                        text: `Baissez le thermostat à 17°C/18°C 1h avant le coucher.`,
                         impactWeight: 10
                     });
                 }
@@ -150,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function getAllRecommendations() {
             let allRecs = [];
-            const selectedZone = zoneSelect ? zoneSelect.value : 'all';
+            const selectedZone = zoneSelect ? zoneSelect.value : currentZoneId;
 
             if (selectedZone === 'all') {
                 Object.keys(houseConfig).forEach(zId => {
@@ -162,24 +183,28 @@ document.addEventListener('DOMContentLoaded', function() {
             return allRecs;
         }
 
+        // Rendu de l'interface & décomposition en 3 zones (Immédiate, Anticipée, Effectuée)
         function render() {
             const recs = getAllRecommendations();
             if (containerImmediate) containerImmediate.innerHTML = '';
             if (containerAnticipated) containerAnticipated.innerHTML = '';
+            if (containerCompleted) containerCompleted.innerHTML = '';
 
-            const immediateList = recs.filter(r => r.timing === 'immediate');
-            const anticipatedList = recs.filter(r => r.timing === 'anticipated');
+            const immediatePending = recs.filter(r => r.timing === 'immediate' && !checkedActions[r.id]);
+            const anticipatedPending = recs.filter(r => r.timing === 'anticipated' && !checkedActions[r.id]);
+            const completedList = recs.filter(r => checkedActions[r.id]);
 
-            renderGroup(immediateList, containerImmediate);
-            renderGroup(anticipatedList, containerAnticipated);
+            renderGroup(immediatePending, containerImmediate, "Aucune action immédiate requise.");
+            renderGroup(anticipatedPending, containerAnticipated, "Aucune action anticipée requise.");
+            renderGroup(completedList, containerCompleted, "Aucune action réalisée pour le moment.");
 
             updateMetrics(recs);
         }
 
-        function renderGroup(list, container) {
+        function renderGroup(list, container, emptyText) {
             if (!container) return;
             if (list.length === 0) {
-                container.innerHTML = '<div style="color: var(--text-muted); font-style: italic;">Aucune action requise dans cette catégorie.</div>';
+                container.innerHTML = `<div style="color: var(--text-muted); font-style: italic; padding: 0.5rem 0;">${emptyText}</div>`;
                 return;
             }
 
@@ -195,13 +220,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     <div class="reco-body">
                         <div class="reco-header">
-                            <span class="reco-title">${rec.title}</span>
-                            <span class="room-badge">${rec.zoneName}</span>
+                            <span class="room-badge-bold">📍 ${rec.zoneName}</span>
+                            <span class="tag tag-weight">+${rec.impactWeight} pts</span>
                         </div>
+                        <div class="reco-title">${rec.title}</div>
                         <div class="reco-text">${rec.text}</div>
-                        <div class="reco-meta">
-                            <span class="tag tag-weight">+${rec.impactWeight} pts score</span>
-                        </div>
                     </div>
                 `;
                 container.appendChild(card);
@@ -225,7 +248,7 @@ document.addEventListener('DOMContentLoaded', function() {
             render();
         }
 
-        // Calcul exact de l'état thermique et simulation PMV ISO 7730
+        // Calcul du PMV ciblé par pièce et mise à jour de la jauge de progression
         function updateMetrics(allRecs) {
             let totalWeightPossible = 0;
             let earnedWeight = 0;
@@ -239,39 +262,52 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
-            // Score d'éco-performance sur 100
+            // Score d'éco-performance
             const score = totalWeightPossible > 0 ? Math.round((earnedWeight / totalWeightPossible) * 100) : 100;
             const scoreValEl = document.getElementById('scoreVal');
             const scoreBarEl = document.getElementById('scoreBar');
             if (scoreValEl) scoreValEl.textContent = `${score} / 100 pts`;
             if (scoreBarEl) scoreBarEl.style.width = `${score}%`;
 
-            // Récupération du moteur SolsticeEngine
             const engine = window.SolsticeEngine;
-            const selectedZoneId = zoneSelect ? zoneSelect.value : 'all';
-            const targetZoneConfig = houseConfig[selectedZoneId] || Object.values(houseConfig)[0] || null;
+            const selectedZoneId = zoneSelect ? zoneSelect.value : currentZoneId;
+            const roomTitleEl = document.getElementById('roomScoreTitle');
 
-            // Détermination de l'état thermodynamique initial
-            const baseTa = envData.t_air_int;
+            // Récupération ciblée des données thermiques de la pièce sélectionnée
+            let targetZoneConfig = houseConfig[selectedZoneId];
+            let roomName = targetZoneConfig ? targetZoneConfig.name : 'Pièce';
+            
+            if (roomTitleEl) {
+                roomTitleEl.textContent = selectedZoneId === 'all' 
+                    ? `Score d'Éco-Performance (Vue globale)` 
+                    : `Score d'Éco-Performance — ${roomName}`;
+            }
+
+            let roomData = donneesHabitat[roomName] || {
+                ta: parseFloat(sessionStorage.getItem('indoorAirTemp')) || 20,
+                rh: parseFloat(sessionStorage.getItem('indoorHumidity')) || 50
+            };
+
+            const baseTa = roomData.ta;
             const baseTr = engine ? engine.calculateMeanRadiantTemp(targetZoneConfig, baseTa) : baseTa;
-            const baseVel = engine ? engine.calculateAirVelocity(targetZoneConfig) : 0.08;
+            const baseVel = engine ? engine.calculateAirVelocity(targetZoneConfig, roomName) : 0.08;
             const { met, totalClo } = engine ? engine.getBaseCloAndMet(targetZoneConfig) : { met: 1.2, totalClo: 1.0 };
 
             const baseState = {
                 ta: baseTa,
                 tr: baseTr,
                 vel: baseVel,
-                rh: envData.rh_int,
+                rh: roomData.rh,
                 met,
                 clo: totalClo
             };
 
-            // PMV Initial
-            const pmvInit = engine ? engine.calculatePMV(baseTa, baseTr, baseVel, envData.rh_int, met, totalClo) : envData.pmv;
+            // PMV Mesuré ciblé
+            const pmvInit = engine ? engine.calculatePMV(baseTa, baseTr, baseVel, roomData.rh, met, totalClo) : 0;
             
-            // PMV Simulé via modificateurs physiques
+            // PMV Simulé calibré
             const simulation = engine 
-                ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envData)
+                ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal)
                 : { pmv: pmvInit };
 
             const dispInitEl = document.getElementById('disp-pmv-init');
