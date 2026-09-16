@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solstice - Plan d'Action & Recommandations</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container" style="max-width: 900px; margin: 0 auto;">
+
+    <!-- En-tête de page & Sélecteur -->
+    <header class="dashboard-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; background: var(--card-bg); padding: 1rem 1.5rem; border-radius: 10px; box-shadow: var(--shadow-sm);">
+        <div>
+            <h1 style="font-size: 1.5rem; margin: 0; text-align: left;">Plan d'Action Thermique</h1>
+            <p style="margin: 0.2rem 0 0 0; font-size: 0.85rem; color: #7f8c8d;">Recommandations et score d'éco-performance</p>
+        </div>
+        <div class="filter-group" style="display: flex; align-items: center; gap: 0.75rem;">
+            <label for="zoneSelect" style="margin: 0;"><strong>Pièce analysée :</strong></label>
+            <select id="zoneSelect" style="width: auto; margin: 0;"></select>
+        </div>
+    </header>
+
+    <!-- Feedback PMV & Eco-Score dédié à la pièce -->
+    <section class="feedback-panel" style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); box-shadow: var(--shadow-md); margin-bottom: 2rem;">
+        <div class="gauge-header" style="display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 0.5rem;">
+            <span id="roomScoreTitle">Score d'Éco-Performance</span>
+            <span id="scoreVal">0 / 100 pts</span>
+        </div>
+        <div class="progress-bg" style="width: 100%; height: 14px; background: #e2e8f0; border-radius: 7px; overflow: hidden; margin-bottom: 1rem;">
+            <div id="scoreBar" class="progress-fill" style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--secondary), var(--eco)); transition: width 0.3s ease;"></div>
+        </div>
+        <div class="pmv-status" style="display: flex; gap: 2rem; font-size: 0.95rem; color: #7f8c8d;">
+            <span>PMV Mesuré : <strong id="disp-pmv-init" style="color: var(--primary);">--</strong></span>
+            <span>PMV Simulé (après actions) : <strong id="disp-pmv-sim">--</strong></span>
+        </div>
+    </section>
+
+    <!-- Listes d'Actions à Réaliser -->
+    <section>
+        <h2 style="font-size: 1.15rem; font-weight: 700; margin-top: 1.5rem;">⚡ Actions Immédiates (Court terme)</h2>
+        <div id="container-immediate" class="reco-group"></div>
+    </section>
+
+    <section>
+        <h2 style="font-size: 1.15rem; font-weight: 700; margin-top: 1.5rem;">⏳ Actions Anticipées (Inertie & Prévention)</h2>
+        <div id="container-anticipated" class="reco-group"></div>
+    </section>
+
+    <!-- Zone dédiée aux Actions Effectuées -->
+    <section style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 1.25rem; border-radius: 12px; margin-top: 2rem;">
+        <h2 style="font-size: 1.15rem; font-weight: 700; margin-top: 0; color: var(--eco);">✅ Actions Effectuées</h2>
+        <div id="container-completed" class="reco-group"></div>
+    </section>
+
+    <footer style="margin-top: 40px; text-align: center; margin-bottom: 30px;">
+        <a href="index.html" style="display: inline-block; padding: 0.8rem 1.5rem; background: var(--primary); color: white; border-radius: 6px; text-decoration: none; font-weight: 600;">← Retour au Tableau de Bord</a>
+    </footer>
+
+</div>
+
+<!-- Ingestion du moteur unique et de la vue reco -->
+<script src="engine.js"></script>
+<script src="reco.js"></script>
+</body>
+</html>

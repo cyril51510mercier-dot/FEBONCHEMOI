@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solstice - Tableau de Bord Thermal</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="app-header">
+        <div class="header-brand">
+            <h1>☀️ SOLSTICE</h1>
+            <p class="subtitle">Diagnostic & Suivi Thera-Aéraulique de l'Habitat</p>
+        </div>
+        <div class="header-actions">
+            <a href="setup.html" class="btn-secondary link-setup">⚙️ Config. BEM</a>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+        
+        <!-- Section 1 : Conditions Extérieures & Clo Redessiné -->
+        <section class="card-section environment-bar" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; align-items: center;">
+            
+            <!-- Météo Extérieure -->
+            <div class="env-block">
+                <h2 style="font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-600);">🌍 Conditions Extérieures</h2>
+                <div class="location-picker" style="display: flex; gap: 8px; margin-top: 8px;">
+                    <input type="text" id="location" placeholder="Ex: Reims" aria-label="Ville" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <button id="getWeatherButton" class="btn-secondary" title="Rechercher">🔍</button> 
+                    <button id="geoLocateButton" class="btn-secondary">📍 Géolocaliser</button>
+                </div>
+                <div id="weatherSummary" class="weather-summary" style="margin-top: 10px; font-size: 0.9em; min-height: 24px;"></div>
+            </div>
+
+            <!-- Isolation Corporelle (Design Profilé) -->
+            <div class="env-block" style="background: var(--slate-50, #F8FAFC); padding: 14px 18px; border-radius: 10px; border: 1px solid var(--border-color, #E2E8F0);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h2 style="font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-600); margin: 0;">👕 Isolation Corporelle</h2>
+                    <span id="currentCloBadge" class="badge" style="background: var(--slate-900, #1E293B); color: #F8FAFC; font-size: 0.9rem; font-weight: 700; padding: 4px 10px;">
+                        <span id="currentCloValue">1.00</span> Clo
+                    </span>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="btn-secondary" style="flex: 1; font-weight: 600;" onclick="adjustClothing(-0.2)">➖ Enlever (-0.2)</button>
+                    <button class="btn-secondary" style="flex: 1; font-weight: 600;" onclick="adjustClothing(0.2)">➕ Ajouter (+0.2)</button>
+                    <button class="btn-secondary btn-icon" onclick="resetClothing()" title="Réinitialiser à la valeur saisonnière" style="padding: 8px 12px;">🔄</button>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Section 2 : Radiographie et Cockpit Global -->
+        <section class="card-section hab-radiography">
+            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                <div>
+                    <h2>🎛️ Radiographie de l'Habitat</h2>
+                    <p class="section-desc">Sélectionne les pièces à analyser et lance le Super-Scan.</p>
+                </div>
+                <button id="btn-sync-all" class="btn-primary" onclick="synchroniserTouteLaMaison()">
+                    ⚡ Interroger les capteurs (Super-Scan)
+                </button>
+            </div>
+
+            <!-- Cockpit Global de l'Habitat -->
+            <div id="global-habitat-cockpit" style="margin-top: 20px; background: var(--slate-900, #1E293B); border-radius: 12px; padding: 20px; color: white; box-shadow: var(--shadow-md);">
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--slate-800, #334155); padding-bottom: 12px; margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2rem;">🏛️</span>
+                        <h3 style="margin: 0; font-size: 1.05rem; color: #F8FAFC; font-weight: 700;">Synthèse Multi-Vectorielle de l'Habitat</h3>
+                    </div>
+                    <span id="global-volume-badge" class="badge" style="background: var(--slate-800); color: #94A3B8; font-weight: 600;">Volume : -- m³</span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px;">
+                    
+                    <div style="background: rgba(255,255,255,0.05); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; letter-spacing: 0.5px;">Microclimat (Volumique)</div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px;">
+                            <span style="font-size: 0.85rem; color: #CBD5E1;">T° Moyenne :</span>
+                            <strong id="global-avg-temp" style="font-size: 1.2rem; color: #F8FAFC;">-- °C</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
+                            <span style="font-size: 0.85rem; color: #CBD5E1;">Humidité Rel. :</span>
+                            <strong id="global-avg-rh" style="font-size: 1rem; color: #F8FAFC;">-- %</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
+                            <span style="font-size: 0.85rem; color: #CBD5E1;">Humidité Abs. :</span>
+                            <strong id="global-avg-ah" style="font-size: 1rem; color: #38BDF8;">-- g/m³</strong>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(255,255,255,0.05); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; letter-spacing: 0.5px;">Confort Corporel Global</div>
+                        <div style="text-align: center; margin-top: 8px;">
+                            <span id="global-pmv-val" style="font-size: 1.8rem; font-weight: 800; color: #F8FAFC; display: block; line-height: 1;">--</span>
+                            <span id="global-pmv-status" class="badge" style="margin-top: 8px; display: inline-block;">En attente</span>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(255,255,255,0.05); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; letter-spacing: 0.5px;">Bilan Énergétique (24h)</div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px;">
+                            <span style="font-size: 0.8rem; color: #CBD5E1;">Déperditions :</span>
+                            <strong id="global-dep" style="font-size: 0.95rem; color: #F87171;">-- kWh/j</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px;">
+                            <span style="font-size: 0.8rem; color: #CBD5E1;">Gains Solaires :</span>
+                            <strong id="global-gains" style="font-size: 0.95rem; color: #4ADE80;">-- kWh/j</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 6px;">
+                            <span style="font-size: 0.85rem; font-weight: 600; color: #F8FAFC;">Bilan Net :</span>
+                            <strong id="global-net" style="font-size: 1.05rem;">-- kWh/j</strong>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(255,255,255,0.05); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; letter-spacing: 0.5px;">Réserve Thermique des Parois</div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px;">
+                            <span style="font-size: 0.85rem; color: #CBD5E1;">T° Masse Parois :</span>
+                            <strong id="global-tstruct" style="font-size: 1.1rem; color: #FDBA74;">-- °C</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
+                            <span style="font-size: 0.85rem; color: #CBD5E1;">Charge Réserve :</span>
+                            <strong id="global-reserve-pct" style="font-size: 1.1rem; color: #FDBA74;">-- %</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
+                            <span style="font-size: 0.85rem; color: #CBD5E1;">Flux Air / Structure :</span>
+                            <strong id="global-flux-status" style="font-size: 0.85rem; color: #F8FAFC;">--</strong>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Sélecteur de Pièces -->
+            <div id="room-selector-container" style="background: var(--slate-50, #F8FAFC); padding: 14px; border-radius: 8px; margin: 20px 0 15px 0; border: 1px solid var(--border-color, #E2E8F0);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <strong style="font-size: 0.9em; color: var(--slate-800, #334155);">Pièces à afficher et scanner :</strong>
+                    <div>
+                        <button class="btn-secondary" style="font-size: 0.75em; padding: 4px 8px;" onclick="toggleAllRooms(true)">Tout cocher</button>
+                        <button class="btn-secondary" style="font-size: 0.75em; padding: 4px 8px;" onclick="toggleAllRooms(false)">Tout décocher</button>
+                    </div>
+                </div>
+                <div id="room-checkboxes" style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.9em;"></div>
+            </div>
+
+            <!-- NOUVEAU : Tableau de bord synthétique par pièce -->
+            <div style="overflow-x: auto; background: white; border-radius: 10px; border: 1px solid var(--border-color, #E2E8F0); box-shadow: var(--shadow-sm);">
+                <table id="dashboard-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+                    <thead>
+                        <tr style="background: var(--slate-100, #F1F5F9); border-bottom: 2px solid var(--border-color, #E2E8F0); color: var(--slate-700, #334155);">
+                            <th style="padding: 12px 14px;">Pièce / Zone</th>
+                            <th style="padding: 12px 10px; text-align: center;">Statut Capteur</th>
+                            <th style="padding: 12px 10px; text-align: right;">Température</th>
+                            <th style="padding: 12px 10px; text-align: right;">Humidité Rel.</th>
+                            <th style="padding: 12px 10px; text-align: right;">Humidité Abs.</th>
+                            <th style="padding: 12px 10px; text-align: center;">PMV (Confort)</th>
+                            <th style="padding: 12px 10px; text-align: right;">Déperditions</th>
+                            <th style="padding: 12px 10px; text-align: right;">T° Masse Parois</th>
+                            <th style="padding: 12px 10px; text-align: center;">Séchage Linge</th>
+                            <th style="padding: 12px 14px; text-align: center;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashboard-table-body">
+                        <!-- Généré dynamiquement via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
+
+    </main>
+
+    <footer class="app-footer">
+        <p>Solstice Engine v2.8 • Modélisation ISO 7730 / ASHRAE 55</p>
+    </footer>
+
+    <script src="script.js?v=2.8" defer></script>
+</body>
+</html>
