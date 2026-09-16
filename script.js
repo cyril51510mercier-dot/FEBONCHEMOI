@@ -727,6 +727,19 @@ function mettreAJourTuile(nomPiece) {
     const energyBalance = calculateDailyThermalBalance(zoneConfig, data.ta);
     const storage = calculateZoneThermalStorage(zoneConfig, data.ta);
 
+    // 1. Estimation de la température de structure
+const tStruct = updateStructureTemperature(nomPiece, data.ta);
+
+// 2. Calcul du niveau de réserve et du flux (consigne confort à 21 °C par défaut)
+const reserve = calculateStructureReserve(tStruct, data.ta, 21.0);
+
+// 3. Exemple d'utilisation dans la tuile HTML :
+// reserve.tStruct        -> Ex: "22.3 °C"
+// reserve.chargePercent  -> Ex: 72 %
+// reserve.qualification  -> Ex: "Modérément chaude"
+// reserve.fluxIcon       -> Ex: "🔥 Restitution"
+// reserve.fluxDirection  -> Ex: "La structure réchauffe l'air (+0.8 °C d'écart)"
+
     let pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
 
     const ahEl = document.getElementById('ah-' + idCapteur);
