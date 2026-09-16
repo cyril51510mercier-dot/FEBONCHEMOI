@@ -178,8 +178,12 @@ function initialiserDashboard() {
                     <strong id="energy-${idCapteur}">-- kWh/j</strong>
                 </div>
                 <div class="sub-metric">
-                    <span>Inertie C<sub>eff</sub> :</span>
-                    <strong id="storage-${idCapteur}">-- kWh/K</strong>
+                    <span>T° Structure (Filtre) :</span>
+                    <strong id="tstruct-${idCapteur}">-- °C</strong>
+                </div>
+                <div class="sub-metric">
+                    <span>Flux Paroi / Air :</span>
+                    <strong id="flux-${idCapteur}">--</strong>
                 </div>
             </div>
 
@@ -496,57 +500,6 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
 }
 
 // ============================================================
-// CALCUL DE LA CAPACITÉ ET CHARGE EN ÉNERGIE (STOCKAGE THERMIQUE)
-// ============================================================
-const PROPRIETES_MATERIAUX = {
-    'concrete':    { rho: 2300, cp: 1.0 },
-    'cinderblock': { rho: 1300, cp: 1.0 },
-    'brick':       { rho: 1800, cp: 0.9 },
-    'stone':       { rho: 2400, cp: 0.8 },
-    'wood':        { rho: 500,  cp: 1.6 },
-    'lourd':       { rho: 2200, cp: 1.0 },
-    'leger':       { rho: 400,  cp: 1.4 }
-};
-
-function calculateZoneThermalStorage(zoneConfig, currentTa) {
-    if (!zoneConfig) return { cEffkWhPerK: 0, maxStorageCapacitykWh: 0 };
-
-    const area = parseFloat(zoneConfig.area) || 16;
-    const h = parseFloat(zoneConfig.height) || 2.5;
-    const side = Math.sqrt(area);
-    const wallArea = side * h;
-    const dEff = 0.08; 
-
-    let cEffKJPerK = 0; 
-
-    const floorMat = PROPRIETES_MATERIAUX[zoneConfig.floorMat] || PROPRIETES_MATERIAUX['lourd'];
-    if (zoneConfig.floorInsulation !== 'iti_recent' && zoneConfig.floorInsulation !== 'iti_old') {
-        cEffKJPerK += (area * dEff) * floorMat.rho * floorMat.cp;
-    }
-
-    const ceilingMat = PROPRIETES_MATERIAUX[zoneConfig.ceilingMat] || PROPRIETES_MATERIAUX['leger'];
-    if (zoneConfig.ceilingInsulation !== 'iti_recent' && zoneConfig.ceilingInsulation !== 'iti_old') {
-        cEffKJPerK += (area * dEff) * ceilingMat.rho * ceilingMat.cp;
-    }
-
-    const wallMat = PROPRIETES_MATERIAUX[zoneConfig.wallMat] || PROPRIETES_MATERIAUX['cinderblock'];
-    const isITI = zoneConfig.insulation === 'iti_recent' || zoneConfig.insulation === 'iti_old';
-
-    if (!isITI) {
-        cEffKJPerK += (wallArea * 4 * dEff) * wallMat.rho * wallMat.cp;
-    }
-
-    const cEffkWhPerK = cEffKJPerK / 3600;
-    const deltaTPrecharge = 2.0;
-    const maxStorageCapacitykWh = cEffkWhPerK * deltaTPrecharge;
-
-    return {
-        cEffkWhPerK: parseFloat(cEffkWhPerK.toFixed(2)),
-        maxStorageCapacitykWh: parseFloat(maxStorageCapacitykWh.toFixed(2))
-    };
-}
-
-// ============================================================
 // MODÈLE D'INERTIE ET RÉSERVE THERMIQUE (LISSAGE PASSE-BAS)
 // ============================================================
 
@@ -559,7 +512,6 @@ function updateStructureTemperature(nomPiece, currentTa) {
     const now = Date.now();
 
     if (!lastDataRaw) {
-        // Initialisation : au premier lancement, T_struct = T_air
         const initialData = { tStruct: currentTa, lastTimestamp: now };
         localStorage.setItem(storageKey, JSON.stringify(initialData));
         return currentTa;
@@ -568,15 +520,10 @@ function updateStructureTemperature(nomPiece, currentTa) {
     const lastData = JSON.parse(lastDataRaw);
     const dtHours = (now - lastData.lastTimestamp) / (1000 * 3600);
 
-    // Evite les sauts d'échelle si le scan est instantané (< 1 min)
     if (dtHours < 0.016) return lastData.tStruct;
 
-    // Constante de temps tau = 18h (reponse dynamique de la maconnerie)
     const tau = 18.0;
-    // Coeff de lissage alpha = 1 - exp(-dt / tau)
     const alpha = 1 - Math.exp(-dtHours / tau);
-
-    // Equation du filtre passe-bas
     const newTstruct = lastData.tStruct + alpha * (currentTa - lastData.tStruct);
 
     localStorage.setItem(storageKey, JSON.stringify({
@@ -591,17 +538,11 @@ function updateStructureTemperature(nomPiece, currentTa) {
  * Calcule l'état de la réserve thermique et le sens du flux air/structure.
  */
 function calculateStructureReserve(tStruct, tAir, tConfort = 21.0) {
-    // Écart de la masse par rapport au point neutre de confort (ex: 21 °C)
     const deltaConfort = tStruct - tConfort;
 
-    // Échelle continue de 0 % à 100 % sur une plage de +/- 3 °C autour de la consigne :
-    // -3 °C -> 0 %   (Plein de fraîcheur)
-    //  0 °C -> 50 %  (Neutre)
-    // +3 °C -> 100 % (Plein de chaleur)
     const rawPercent = ((deltaConfort + 3.0) / 6.0) * 100;
     const chargePercent = Math.max(0, Math.min(100, Math.round(rawPercent)));
 
-    // Analyse du sens du flux thermique (T_struct vs T_air)
     const deltaFlux = tStruct - tAir;
     const diffAbs = Math.abs(deltaFlux).toFixed(1);
     
@@ -609,17 +550,16 @@ function calculateStructureReserve(tStruct, tAir, tConfort = 21.0) {
     let fluxIcon = "";
 
     if (deltaFlux > 0.3) {
-        fluxDirection = `La structure réchauffe l'air (+${diffAbs} °C d'écart)`;
+        fluxDirection = `La structure réchauffe l'air (+${diffAbs} °C)`;
         fluxIcon = "🔥 Restitution";
     } else if (deltaFlux < -0.3) {
-        fluxDirection = `La structure absorbe la chaleur de l'air (-${diffAbs} °C d'écart)`;
-        fluxIcon = "❄️ Absorption";
+        fluxDirection = `La structure absorbe la chaleur (-${diffAbs} °C)`;
+        fluxIcon = "❄️ Imbibition";
     } else {
         fluxDirection = `Équilibre thermique air / parois`;
-        fluxIcon = "⚖️ Stabilité";
+        fluxIcon = "⚖️ Stabile";
     }
 
-    // Qualification lisible par l'utilisateur
     let qualification = "Neutre";
     if (deltaConfort >= 1.5) qualification = "Fortement chargée en chaleur";
     else if (deltaConfort >= 0.5) qualification = "Modérément chaude";
@@ -644,6 +584,8 @@ function calculateGlobalHabitatMetrics() {
     let weightedRH = 0;
     let weightedAH = 0;
     let weightedPMV = 0;
+    let weightedTStruct = 0;
+    let weightedChargePct = 0;
 
     let totalDeperditions = 0;
     let totalGainsSolaires = 0;
@@ -664,11 +606,16 @@ function calculateGlobalHabitatMetrics() {
         const pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
         const energy = calculateDailyThermalBalance(zoneConfig, data.ta);
 
+        const tStruct = updateStructureTemperature(nomPiece, data.ta);
+        const reserve = calculateStructureReserve(tStruct, data.ta);
+
         totalVolume += volume;
         weightedTemp += data.ta * volume;
         weightedRH += data.rh * volume;
         weightedAH += ah * volume;
         weightedPMV += pmv * volume;
+        weightedTStruct += tStruct * volume;
+        weightedChargePct += reserve.chargePercent * volume;
 
         totalDeperditions += energy.deperditionskWh;
         totalGainsSolaires += energy.gainsSolaireskWh;
@@ -682,6 +629,8 @@ function calculateGlobalHabitatMetrics() {
         avgRH: parseFloat((weightedRH / totalVolume).toFixed(0)),
         avgAH: parseFloat((weightedAH / totalVolume).toFixed(2)),
         avgPMV: parseFloat((weightedPMV / totalVolume).toFixed(2)),
+        avgTStruct: parseFloat((weightedTStruct / totalVolume).toFixed(1)),
+        avgChargePct: Math.round(weightedChargePct / totalVolume),
         totalDeperditionskWh: parseFloat(totalDeperditions.toFixed(2)),
         totalGainsSolaireskWh: parseFloat(totalGainsSolaires.toFixed(2)),
         totalBilanNetkWh: parseFloat(totalBilanNet.toFixed(2)),
@@ -725,27 +674,17 @@ function mettreAJourTuile(nomPiece) {
     const ah = calculateAbsoluteHumidity(data.ta, data.rh);
     const drying = calculateDryingPotential(data.ta, data.rh, vel);
     const energyBalance = calculateDailyThermalBalance(zoneConfig, data.ta);
-    const storage = calculateZoneThermalStorage(zoneConfig, data.ta);
 
-    // 1. Estimation de la température de structure
-const tStruct = updateStructureTemperature(nomPiece, data.ta);
-
-// 2. Calcul du niveau de réserve et du flux (consigne confort à 21 °C par défaut)
-const reserve = calculateStructureReserve(tStruct, data.ta, 21.0);
-
-// 3. Exemple d'utilisation dans la tuile HTML :
-// reserve.tStruct        -> Ex: "22.3 °C"
-// reserve.chargePercent  -> Ex: 72 %
-// reserve.qualification  -> Ex: "Modérément chaude"
-// reserve.fluxIcon       -> Ex: "🔥 Restitution"
-// reserve.fluxDirection  -> Ex: "La structure réchauffe l'air (+0.8 °C d'écart)"
+    const tStruct = updateStructureTemperature(nomPiece, data.ta);
+    const reserve = calculateStructureReserve(tStruct, data.ta);
 
     let pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
 
     const ahEl = document.getElementById('ah-' + idCapteur);
     const dryingEl = document.getElementById('drying-' + idCapteur);
     const energyEl = document.getElementById('energy-' + idCapteur);
-    const storageEl = document.getElementById('storage-' + idCapteur);
+    const tStructEl = document.getElementById('tstruct-' + idCapteur);
+    const fluxEl = document.getElementById('flux-' + idCapteur);
 
     if (ahEl) ahEl.textContent = ah.toFixed(1) + " g/m³";
     if (dryingEl) {
@@ -754,7 +693,11 @@ const reserve = calculateStructureReserve(tStruct, data.ta, 21.0);
                                (drying.score === 2 ? "var(--status-warning, #F59E0B)" : "var(--status-danger, #EF4444)");
     }
     if (energyEl) energyEl.textContent = energyBalance.deperditionskWh.toFixed(1) + " kWh/j";
-    if (storageEl) storageEl.textContent = storage.cEffkWhPerK.toFixed(2) + " kWh/K";
+    if (tStructEl) tStructEl.textContent = tStruct.toFixed(1) + " °C";
+    if (fluxEl) {
+        fluxEl.textContent = `${reserve.fluxIcon} (${reserve.chargePercent}%)`;
+        fluxEl.title = `${reserve.fluxDirection} — ${reserve.qualification}`;
+    }
 
     const pmvBox = document.getElementById('pmv-box-' + idCapteur);
     const pmvVal = document.getElementById('pmv-' + idCapteur);
@@ -796,19 +739,10 @@ function actualiserCockpitGlobal() {
         if (document.getElementById('global-dep')) document.getElementById('global-dep').textContent = "-- kWh/j";
         if (document.getElementById('global-gains')) document.getElementById('global-gains').textContent = "-- kWh/j";
         if (document.getElementById('global-net')) document.getElementById('global-net').textContent = "-- kWh/j";
-        if (document.getElementById('global-ceff')) document.getElementById('global-ceff').textContent = "-- kWh/K";
-        if (document.getElementById('global-storage')) document.getElementById('global-storage').textContent = "-- kWh";
+        if (document.getElementById('global-tstruct')) document.getElementById('global-tstruct').textContent = "-- °C";
+        if (document.getElementById('global-reserve-pct')) document.getElementById('global-reserve-pct').textContent = "-- %";
+        if (document.getElementById('global-flux-status')) document.getElementById('global-flux-status').textContent = "--";
         return;
-    }
-
-    let totalCEff = 0;
-    let totalMaxStorage = 0;
-    for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
-        if (!data || isNaN(data.ta)) continue;
-        const zoneConfig = getZoneConfigByName(nomPiece) || { area: 15, height: 2.5 };
-        const storage = calculateZoneThermalStorage(zoneConfig, data.ta);
-        totalCEff += storage.cEffkWhPerK;
-        totalMaxStorage += storage.maxStorageCapacitykWh;
     }
 
     if (document.getElementById('global-volume-badge')) document.getElementById('global-volume-badge').textContent = `Volume : ${metrics.totalVolumeM3} m³`;
@@ -842,8 +776,23 @@ function actualiserCockpitGlobal() {
         netEl.style.color = metrics.totalBilanNetkWh >= 0 ? "#4ADE80" : "#F87171";
     }
 
-    if (document.getElementById('global-ceff')) document.getElementById('global-ceff').textContent = `${totalCEff.toFixed(2)} kWh/K`;
-    if (document.getElementById('global-storage')) document.getElementById('global-storage').textContent = `${totalMaxStorage.toFixed(2)} kWh`;
+    if (document.getElementById('global-tstruct')) document.getElementById('global-tstruct').textContent = `${metrics.avgTStruct} °C`;
+    if (document.getElementById('global-reserve-pct')) document.getElementById('global-reserve-pct').textContent = `${metrics.avgChargePct} %`;
+
+    const globalFluxEl = document.getElementById('global-flux-status');
+    if (globalFluxEl) {
+        const diffGlobal = metrics.avgTStruct - metrics.avgTemp;
+        if (diffGlobal > 0.3) {
+            globalFluxEl.textContent = "🔥 Restitution";
+            globalFluxEl.style.color = "#FDBA74";
+        } else if (diffGlobal < -0.3) {
+            globalFluxEl.textContent = "❄️ Imbibition";
+            globalFluxEl.style.color = "#38BDF8";
+        } else {
+            globalFluxEl.textContent = "⚖️ Stabile";
+            globalFluxEl.style.color = "#4ADE80";
+        }
+    }
 }
 
 function recalculerToutLeDashboard() { 
