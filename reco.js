@@ -8,22 +8,51 @@ document.addEventListener('DOMContentLoaded', function() {
         const envDataGlobal = store.getEnvData();
 
         let checkedActions = store.getCheckedRecos();
-        let currentZoneId = sessionStorage.getItem('currentZoneId') || Object.keys(houseConfig)[0] || 'all';
+        let currentZoneId = sessionStorage.getItem('currentZoneId') || 'all';
 
         const zoneSelect = document.getElementById('zoneSelect');
         const containerImmediate = document.getElementById('container-immediate');
         const containerAnticipated = document.getElementById('container-anticipated');
         const containerCompleted = document.getElementById('container-completed');
 
+        // Fusion des sources pour obtenir la liste exhaustive des pièces
+        function getAvailableZonesMap() {
+            const zonesMap = {};
+
+            // 1. Charger depuis HOUSE_CONFIG (mode BEM expert)
+            Object.keys(houseConfig).forEach(zId => {
+                zonesMap[zId] = houseConfig[zId].name || zId;
+            });
+
+            // 2. Fusionner avec les pièces issues des capteurs (SOLSTICE_DONNEES_HABITAT)
+            Object.keys(donneesHabitat).forEach(roomName => {
+                const zId = roomName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                if (!zonesMap[zId] && !Object.values(zonesMap).includes(roomName)) {
+                    zonesMap[zId] = roomName;
+                }
+            });
+
+            // 3. Cas de secours si aucune pièce n'est trouvée
+            if (Object.keys(zonesMap).length === 0) {
+                zonesMap['salon'] = 'Salon';
+            }
+
+            return zonesMap;
+        }
+
         function setupZoneSelector() {
             if (!zoneSelect) return;
             zoneSelect.innerHTML = '';
 
-            Object.keys(houseConfig).forEach(zId => {
+            const zonesMap = getAvailableZonesMap();
+
+            Object.keys(zonesMap).forEach(zId => {
                 const opt = document.createElement('option');
                 opt.value = zId;
-                opt.textContent = houseConfig[zId].name || `Zone ${zId}`;
-                if (zId === currentZoneId) opt.selected = true;
+                opt.textContent = `📍 ${zonesMap[zId]}`;
+                if (zId === currentZoneId || zonesMap[zId] === currentZoneId) {
+                    opt.selected = true;
+                }
                 zoneSelect.appendChild(opt);
             });
 
@@ -37,18 +66,22 @@ document.addEventListener('DOMContentLoaded', function() {
         function getAllRecommendations() {
             let allRecs = [];
             const selectedZone = zoneSelect ? zoneSelect.value : currentZoneId;
+            const zonesMap = getAvailableZonesMap();
 
             if (selectedZone === 'all') {
-                Object.keys(houseConfig).forEach(zId => {
-                    const zone = houseConfig[zId];
-                    const roomName = zone.name || zId;
+                Object.keys(zonesMap).forEach(zId => {
+                    const roomName = zonesMap[zId];
+                    const zone = houseConfig[zId] || { id: zId, name: roomName };
                     const roomData = donneesHabitat[roomName] || { ta: 20, rh: 50 };
                     allRecs = allRecs.concat(engine.generateRecommendations(zone, zId, roomData, envDataGlobal));
                 });
-            } else if (houseConfig[selectedZone]) {
-                const zone = houseConfig[selectedZone];
-                const roomName = zone.name || selectedZone;
-                const roomData = donneesHabitat[roomName] || { ta: 20, rh: 50 };
+            } else {
+                const roomName = zonesMap[selectedZone] || selectedZone;
+                const zone = houseConfig[selectedZone] || { id: selectedZone, name: roomName };
+                const roomData = donneesHabitat[roomName] || {
+                    ta: parseFloat(sessionStorage.getItem('indoorAirTemp')) || 20,
+                    rh: parseFloat(sessionStorage.getItem('indoorHumidity')) || 50
+                };
                 allRecs = engine.generateRecommendations(zone, selectedZone, roomData, envDataGlobal);
             }
             return allRecs;
@@ -83,7 +116,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const card = document.createElement('div');
                 card.className = `advice-card ${rec.type}`;
                 card.style.cssText = "display: flex; align-items: flex-start; gap: 1rem; cursor: pointer; margin-bottom: 10px;";
-                
                 card.onclick = (e) => toggleAction(rec.id, e);
 
                 card.innerHTML = `
@@ -139,18 +171,23 @@ document.addEventListener('DOMContentLoaded', function() {
             if (scoreValEl) scoreValEl.textContent = `${score} / 100 pts`;
             if (scoreBarEl) scoreBarEl.style.width = `${score}%`;
 
-            const selectedZoneId = zoneSelect ? zoneSelect.value : currentZoneId;
+            const selectedZone = zoneSelect ? zoneSelect.value : currentZoneId;
+            const zonesMap = getAvailableZonesMap();
+            const roomName = zonesMap[selectedZone] || selectedZone;
             const roomTitleEl = document.getElementById('roomScoreTitle');
-            const targetZoneConfig = houseConfig[selectedZoneId];
-            const roomName = targetZoneConfig ? targetZoneConfig.name : 'Pièce';
 
             if (roomTitleEl) {
-                roomTitleEl.textContent = selectedZoneId === 'all' 
-                    ? `Score d'Éco-Performance (Vue globale)` 
+                roomTitleEl.textContent = selectedZone === 'all'
+                    ? `Score d'Éco-Performance (Vue globale)`
                     : `Score d'Éco-Performance — ${roomName}`;
             }
 
-            const roomData = donneesHabitat[roomName] || { ta: 20, rh: 50 };
+            const targetZoneConfig = houseConfig[selectedZone] || null;
+            const roomData = donneesHabitat[roomName] || {
+                ta: parseFloat(sessionStorage.getItem('indoorAirTemp')) || 20,
+                rh: parseFloat(sessionStorage.getItem('indoorHumidity')) || 50
+            };
+
             const baseTa = roomData.ta;
             const baseTr = engine.calculateMeanRadiantTemp(targetZoneConfig, baseTa);
             const baseVel = engine.calculateAirVelocity(targetZoneConfig, roomName);
