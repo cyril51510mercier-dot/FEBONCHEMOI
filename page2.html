@@ -3,58 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solstice - Diagnostic & Coach</title>
+    <title>Solstice - Plan d'Action & Recommandations</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>📊 Diagnostic Solstice</h1>
-    <p class="subtitle">Intelligence Artificielle Thermique</p>
-
-    <div class="summary-card">
-        <div class="stat-box">
-            <div class="stat-value" id="disp-pmv">--</div>
-            <div class="stat-label">Votre PMV</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-value" id="disp-rh">--</div>
-            <div class="stat-label">Humidité Int.</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-value" id="disp-room">--</div>
-            <div class="stat-label">Pièce</div>
-        </div>
-    </div>
-
-    <h2 style="margin-top: 30px;">💡 Recommandations Opérationnelles</h2>
-    <div id="recommendations-container"></div>
-
-    <div class="section" style="margin-top: 30px; border-top: 4px solid var(--primary);">
-        <h3 style="color: var(--primary); margin-top: 0;">📅 Historique Télémétrique (Futur ML)</h3>
+    <div class="container">
         
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 0.9em; text-align: left;">
-                <thead>
-                    <tr style="background-color: #ecf0f1; border-bottom: 2px solid #bdc3c7;">
-                        <th style="padding: 10px;">Date</th>
-                        <th style="padding: 10px;">T° Inté.</th>
-                        <th style="padding: 10px;">T° Exté.</th>
-                        <th style="padding: 10px;">PMV</th>
-                    </tr>
-                </thead>
-                <tbody id="historyTableBody">
-                </tbody>
-            </table>
-        </div>
+        <!-- Barre de commande & Sélecteur de pièce -->
+        <header class="dashboard-bar">
+            <div>
+                <h1>📊 Plan d'Action & Recommandations</h1>
+                <p class="subtitle">Intelligence Artificielle Thermique Solstice</p>
+            </div>
+            <div class="filter-group">
+                <label for="zoneSelect"><strong>Filtrer par pièce :</strong></label>
+                <select id="zoneSelect">
+                    <!-- Injecté dynamiquement par page2_script.js -->
+                </select>
+            </div>
+        </header>
 
-        <button id="saveHistoryBtn" style="width: 100%; background-color: var(--primary); color: white; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer;">
-            💾 Enregistrer la mesure (Apprentissage)
-        </button>
+        <!-- Panneau de Feedback & Simulation PMV ISO 7730 -->
+        <section class="feedback-panel">
+            <div class="gauge-header">
+                <span>Score d'Éco-Performance</span>
+                <span id="scoreVal">0 / 100 pts</span>
+            </div>
+            <div class="progress-bg">
+                <div id="scoreBar" class="progress-fill"></div>
+            </div>
+            <div class="pmv-status">
+                <span>PMV Mesuré : <strong id="disp-pmv-init">--</strong></span>
+                <span>PMV Simulé (après actions) : <strong id="disp-pmv-sim">--</strong></span>
+            </div>
+        </section>
+
+        <!-- Liste des Actions Immédiates (Court terme) -->
+        <section class="reco-section">
+            <h2 class="section-title">⚡ Actions Immédiates (Court terme)</h2>
+            <div id="container-immediate" class="reco-group">
+                <!-- Injecté dynamiquement -->
+            </div>
+        </section>
+
+        <!-- Liste des Actions Anticipées (Inertie & Anticipation) -->
+        <section class="reco-section">
+            <h2 class="section-title">⏳ Actions Anticipées (Moyen terme / Inertie)</h2>
+            <div id="container-anticipated" class="reco-group">
+                <!-- Injecté dynamiquement -->
+            </div>
+        </section>
+
+        <!-- Navigation -->
+        <footer style="margin-top: 40px; text-align: center; margin-bottom: 30px;">
+            <a href="page1.html" class="btn-secondary">← Retour au Tableau de Bord</a>
+        </footer>
+
     </div>
 
-    <center style="margin-top: 30px; margin-bottom: 30px;">
-        <a href="page1.html">← Retour au Tableau de Bord</a>
-    </center>
-
+    <!-- ⚠️ RÈGLE CRITIQUE : script.js doit être chargé EN PREMIER pour exposer SolsticeEngine -->
+    <script src="script.js"></script>
     <script src="page2_script.js"></script>
 </body>
 </html>
