@@ -38,7 +38,7 @@ window.addEventListener('load', () => {
     if (savedSelection) {
         SELECTION_PIECES = JSON.parse(savedSelection);
     } else {
-        SELECTION_PIECES = ["Cuisine"];
+        SELECTION_PIECES = ["Cuisine", "Salon", "Chambre parents"];
         localStorage.setItem('SOLSTICE_SELECTION_PIECES', JSON.stringify(SELECTION_PIECES));
     }
 
@@ -176,6 +176,10 @@ function initialiserDashboard() {
                 <div class="sub-metric">
                     <span>Déperditions (Est.) :</span>
                     <strong id="energy-${idCapteur}">-- kWh/j</strong>
+                </div>
+                <div class="sub-metric">
+                    <span>Inertie C<sub>eff</sub> :</span>
+                    <strong id="storage-${idCapteur}">-- kWh/K</strong>
                 </div>
             </div>
 
@@ -324,11 +328,6 @@ function calculateMeanRadiantTemp(zone, t_air) {
     return sumAreaTemp / totalArea;
 }
 
-// ============================================================
-// DÉTECTION EXTERNE ET VITESSE DE L'AIR
-// ============================================================
-
-// Détermine si la pièce/capteur correspond à une zone extérieure
 function isOutdoorZone(nomPiece, zoneConfig) {
     if (nomPiece && (nomPiece.toLowerCase().includes('extér') || nomPiece.toLowerCase().includes('exter'))) {
         return true;
@@ -340,57 +339,45 @@ function isOutdoorZone(nomPiece, zoneConfig) {
 }
 
 function calculateAirVelocity(zoneConfig, nomPiece = '') {
-    // Si la zone est extérieure, on applique la vitesse du vent météo (convertie de km/h en m/s)
     if (isOutdoorZone(nomPiece, zoneConfig)) {
         const windMetersPerSecond = outdoorWind / 3.6;
-        return Math.max(0.1, windMetersPerSecond); // Pas de plafonnement intérieur
+        return Math.max(0.1, windMetersPerSecond);
     }
 
-    let vel = 0.08; // Vitesse d'air naturelle de base en intérieur (m/s)
-
+    let vel = 0.08; 
     if (!zoneConfig) return vel;
 
-    // 1. Équipements de brassage actif
     const fanSys = zoneConfig.equipment?.fanSystem;
     if (fanSys === 'plafond') vel += 0.65;
     else if (fanSys === 'mobile') vel += 0.35;
 
-    // 2. Infiltrations et VMC
     const vmcSys = zoneConfig.equipment?.vmcSystem;
     if (vmcSys === 'double_flux' || vmcSys === 'hygro_b') vel += 0.04;
 
-    // 3. Effet de courant d'air / perméabilité aux vents forts
     if (outdoorWind > 25 && Array.isArray(zoneConfig.windows)) {
         const hasPermeableWindow = zoneConfig.windows.some(w => w.glass === 'single' || w.vent === 'oscillante');
         if (hasPermeableWindow) vel += 0.12;
     }
 
-    return Math.min(1.5, vel); // Plafond physique de confort intérieur
+    return Math.min(1.5, vel); 
 }
 
-/**
- * MOTEUR PMV STANDARD (ISO 7730 / FANGER) - RÉSOLU
- */
 function calculatePMV(ta, tr, vel, rh, met, clo) {
     if (ta === undefined || ta === null || isNaN(ta)) return 0;
 
-    const M = met * 58.15; // W/m²
+    const M = met * 58.15; 
     const W = 0; 
-    const Icl = 0.155 * clo; // m²K/W
+    const Icl = 0.155 * clo; 
     const fcl = (clo <= 0.5) ? (1.0 + 0.2 * clo) : (1.05 + 0.1 * clo);
-    
-    // Pression de vapeur d'eau (Pa)
     const pa = rh * 10 * Math.exp(16.6536 - 4030.183 / (ta + 235));
 
-    let tcl = ta; // Initialisation Tcl °C
+    let tcl = ta; 
     
-    // Résolution itérative de la température de surface du vêtement Tcl
     for (let i = 0; i < 30; i++) {
         const hcFree = 2.38 * Math.pow(Math.abs(tcl - ta), 0.25);
         const hcForced = 12.1 * Math.sqrt(Math.max(vel, 0.001));
         const hc = Math.max(hcFree, hcForced);
         
-        // Coeff. d'échange radiatif linéarisé hr (W/m²K)
         const hr = 3.96e-8 * fcl * (Math.pow(tcl + 273.15, 2) + Math.pow(tr + 273.15, 2)) * (tcl + tr + 546.3);
         
         const top = (35.7 - 0.028 * (M - W)) / Icl + fcl * hr * tr + fcl * hc * ta;
@@ -408,7 +395,6 @@ function calculatePMV(ta, tr, vel, rh, met, clo) {
     const hcForced = 12.1 * Math.sqrt(Math.max(vel, 0.001));
     const hc = Math.max(hcFree, hcForced);
 
-    // Composantes des échanges thermiques corporels (W/m²)
     const pVapeurPeau = 3.05 * 0.001 * (5733 - 6.99 * (M - W) - pa);
     const pSueur = (M - W > 58.15) ? 0.42 * ((M - W) - 58.15) : 0;
     const pRespLatente = 1.7e-5 * M * (5867 - pa);
@@ -423,42 +409,34 @@ function calculatePMV(ta, tr, vel, rh, met, clo) {
     return Math.max(-3, Math.min(3, pmv));
 }
 
-/**
- * HUMIDITÉ ABSOLUE (Pression saturante en hPa)
- */
 function calculateAbsoluteHumidity(ta, rh) {
     if (ta === undefined || rh === undefined || isNaN(ta) || isNaN(rh)) return 0;
-    const pSat_hPa = 6.112 * Math.exp((17.67 * ta) / (ta + 243.5)); // hPa
-    const pv_hPa = pSat_hPa * (rh / 100); // hPa
-    const ah = (216.7 * pv_hPa) / (ta + 273.15); // g/m³
+    const pSat_hPa = 6.112 * Math.exp((17.67 * ta) / (ta + 243.5)); 
+    const pv_hPa = pSat_hPa * (rh / 100); 
+    const ah = (216.7 * pv_hPa) / (ta + 273.15); 
     return parseFloat(ah.toFixed(1));
 }
 
-// ============================================================
-// POTENTIEL DE SÉCHAGE DU LINGE (VPD & Drying Index)
-// ============================================================
 function calculateDryingPotential(ta, rh, vel = 0.1) {
-    const pSat = 611.2 * Math.exp((17.67 * ta) / (ta + 243.5)); // Pa
-    const vpd = (pSat * (1 - rh / 100)) / 1000; // kPa
+    const pSat = 611.2 * Math.exp((17.67 * ta) / (ta + 243.5)); 
+    const vpd = (pSat * (1 - rh / 100)) / 1000; 
 
-    // Indice composite intégrant le renouvellement d'air (vent ou brassage)
     const dryingIndex = vpd * (1 + 0.5 * vel);
 
     let status = "Très Mauvais";
     let score = 1;
 
-    // Évaluation sur l'indice dynamisé par la vitesse d'air
     if (dryingIndex < 0.4) {
-        status = "Très Mauvais (Risque d'odeurs / moisissures)";
+        status = "Très Mauvais (Moisissures)";
         score = 1;
     } else if (dryingIndex < 0.8) {
         status = "Moyen (Séchage lent)";
         score = 2;
     } else if (dryingIndex < 1.3) {
-        status = "Bon (Séchage optimal)";
+        status = "Bon (Optimal)";
         score = 4;
     } else {
-        status = "Excellent (Séchage très rapide)";
+        status = "Excellent (Très rapide)";
         score = 5;
     }
 
@@ -488,25 +466,156 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const deltaT = Math.max(0, ta - outdoorTemp);
     const deperditionskWh = (hTotal * deltaT * 24) / 1000;
 
-    return { deperditionskWh: parseFloat(deperditionskWh.toFixed(1)) };
+    let gainsSolaireskWh = 0;
+    const isSunny = sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun');
+
+    if (Array.isArray(zoneConfig?.windows)) {
+        zoneConfig.windows.forEach(win => {
+            const wArea = parseFloat(win.area) || 0;
+            if (wArea <= 0) return;
+
+            const gFactor = { 'single': 0.85, 'double_old': 0.75, 'double_recent': 0.60, 'triple': 0.45 }[win.glass] ?? 0.60;
+            const maskFactor = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 }[win.mask] ?? 1.0;
+            const shutterFactor = { 'aucun': 1.0, 'store_interieur': 0.7, 'roulant_pvc': 0.2 }[win.shutter] ?? 1.0;
+
+            let iSolar = { 'S': 3.2, 'SE': 2.5, 'SW': 2.5, 'E': 1.8, 'W': 1.8, 'N': 0.6 }[win.orient] ?? 1.5;
+            if (!isSunny) iSolar *= 0.3; 
+
+            gainsSolaireskWh += (wArea * gFactor * maskFactor * shutterFactor * iSolar);
+        });
+    }
+
+    const bilanNetkWh = gainsSolaireskWh - deperditionskWh;
+
+    return {
+        hTotalWPerK: parseFloat(hTotal.toFixed(1)),
+        deperditionskWh: parseFloat(deperditionskWh.toFixed(2)),
+        gainsSolaireskWh: parseFloat(gainsSolaireskWh.toFixed(2)),
+        bilanNetkWh: parseFloat(bilanNetkWh.toFixed(2))
+    };
 }
 
+// ============================================================
+// CALCUL DE LA CAPACITÉ ET CHARGE EN ÉNERGIE (STOCKAGE THERMIQUE)
+// ============================================================
+const PROPRIETES_MATERIAUX = {
+    'concrete':    { rho: 2300, cp: 1.0 },
+    'cinderblock': { rho: 1300, cp: 1.0 },
+    'brick':       { rho: 1800, cp: 0.9 },
+    'stone':       { rho: 2400, cp: 0.8 },
+    'wood':        { rho: 500,  cp: 1.6 },
+    'lourd':       { rho: 2200, cp: 1.0 },
+    'leger':       { rho: 400,  cp: 1.4 }
+};
+
+function calculateZoneThermalStorage(zoneConfig, currentTa) {
+    if (!zoneConfig) return { cEffkWhPerK: 0, maxStorageCapacitykWh: 0 };
+
+    const area = parseFloat(zoneConfig.area) || 16;
+    const h = parseFloat(zoneConfig.height) || 2.5;
+    const side = Math.sqrt(area);
+    const wallArea = side * h;
+    const dEff = 0.08; 
+
+    let cEffKJPerK = 0; 
+
+    const floorMat = PROPRIETES_MATERIAUX[zoneConfig.floorMat] || PROPRIETES_MATERIAUX['lourd'];
+    if (zoneConfig.floorInsulation !== 'iti_recent' && zoneConfig.floorInsulation !== 'iti_old') {
+        cEffKJPerK += (area * dEff) * floorMat.rho * floorMat.cp;
+    }
+
+    const ceilingMat = PROPRIETES_MATERIAUX[zoneConfig.ceilingMat] || PROPRIETES_MATERIAUX['leger'];
+    if (zoneConfig.ceilingInsulation !== 'iti_recent' && zoneConfig.ceilingInsulation !== 'iti_old') {
+        cEffKJPerK += (area * dEff) * ceilingMat.rho * ceilingMat.cp;
+    }
+
+    const wallMat = PROPRIETES_MATERIAUX[zoneConfig.wallMat] || PROPRIETES_MATERIAUX['cinderblock'];
+    const isITI = zoneConfig.insulation === 'iti_recent' || zoneConfig.insulation === 'iti_old';
+
+    if (!isITI) {
+        cEffKJPerK += (wallArea * 4 * dEff) * wallMat.rho * wallMat.cp;
+    }
+
+    const cEffkWhPerK = cEffKJPerK / 3600;
+    const deltaTPrecharge = 2.0;
+    const maxStorageCapacitykWh = cEffkWhPerK * deltaTPrecharge;
+
+    return {
+        cEffkWhPerK: parseFloat(cEffkWhPerK.toFixed(2)),
+        maxStorageCapacitykWh: parseFloat(maxStorageCapacitykWh.toFixed(2))
+    };
+}
+
+// ============================================================
+// INDICATEURS GLOBAUX DE L'HABITAT (PONDÉRATION VOLUMIQUE)
+// ============================================================
+function calculateGlobalHabitatMetrics() {
+    let totalVolume = 0;
+    let weightedTemp = 0;
+    let weightedRH = 0;
+    let weightedAH = 0;
+    let weightedPMV = 0;
+
+    let totalDeperditions = 0;
+    let totalGainsSolaires = 0;
+    let totalBilanNet = 0;
+
+    for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
+        if (!data || isNaN(data.ta) || isNaN(data.rh)) continue;
+
+        const zoneConfig = getZoneConfigByName(nomPiece) || { area: 15, height: 2.5 };
+        const area = parseFloat(zoneConfig.area) || 15;
+        const height = parseFloat(zoneConfig.height) || 2.5;
+        const volume = area * height;
+
+        const ah = calculateAbsoluteHumidity(data.ta, data.rh);
+        const vel = calculateAirVelocity(zoneConfig, nomPiece);
+        const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
+        const { met, totalClo } = getBaseCloAndMet(zoneConfig);
+        const pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
+        const energy = calculateDailyThermalBalance(zoneConfig, data.ta);
+
+        totalVolume += volume;
+        weightedTemp += data.ta * volume;
+        weightedRH += data.rh * volume;
+        weightedAH += ah * volume;
+        weightedPMV += pmv * volume;
+
+        totalDeperditions += energy.deperditionskWh;
+        totalGainsSolaires += energy.gainsSolaireskWh;
+        totalBilanNet += energy.bilanNetkWh;
+    }
+
+    if (totalVolume === 0) return null;
+
+    return {
+        avgTemp: parseFloat((weightedTemp / totalVolume).toFixed(1)),
+        avgRH: parseFloat((weightedRH / totalVolume).toFixed(0)),
+        avgAH: parseFloat((weightedAH / totalVolume).toFixed(2)),
+        avgPMV: parseFloat((weightedPMV / totalVolume).toFixed(2)),
+        totalDeperditionskWh: parseFloat(totalDeperditions.toFixed(2)),
+        totalGainsSolaireskWh: parseFloat(totalGainsSolaires.toFixed(2)),
+        totalBilanNetkWh: parseFloat(totalBilanNet.toFixed(2)),
+        totalVolumeM3: parseFloat(totalVolume.toFixed(1))
+    };
+}
+
+/**
+ * RENDU D'UNE TUILE INDIVIDUELLE
+ */
 function mettreAJourTuile(nomPiece) {
     if (!SELECTION_PIECES.includes(nomPiece)) return;
 
-    // 1. Récupération des données du capteur
     const data = DONNEES_HABITAT[nomPiece];
     const idCapteur = capteursMaison[nomPiece];
     if (!data || !idCapteur) return;
 
-    // 2. Mise à jour des éléments DOM de base
     const tempEl = document.getElementById('temp-' + idCapteur);
     const humEl = document.getElementById('hum-' + idCapteur);
 
     if (tempEl) tempEl.textContent = data.ta.toFixed(1) + " °C";
     if (humEl) humEl.textContent = data.rh.toFixed(0) + " %";
 
-    // 3. Récupération de la configuration d'expertise (ou fallback)
     const zoneConfig = getZoneConfigByName(nomPiece) || {
         name: nomPiece,
         area: 15,
@@ -520,7 +629,6 @@ function mettreAJourTuile(nomPiece) {
         usages: ['kitchen']
     };
 
-    // 4. Calculs des métriques physiques
     const vel = calculateAirVelocity(zoneConfig, nomPiece);
     const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
     const { met, totalClo } = getBaseCloAndMet(zoneConfig);
@@ -528,15 +636,14 @@ function mettreAJourTuile(nomPiece) {
     const ah = calculateAbsoluteHumidity(data.ta, data.rh);
     const drying = calculateDryingPotential(data.ta, data.rh, vel);
     const energyBalance = calculateDailyThermalBalance(zoneConfig, data.ta);
-
-    // ... suite de la fonction (affichage PMV, séchage et déperditions sur la tuile)
-}
+    const storage = calculateZoneThermalStorage(zoneConfig, data.ta);
 
     let pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
 
     const ahEl = document.getElementById('ah-' + idCapteur);
     const dryingEl = document.getElementById('drying-' + idCapteur);
     const energyEl = document.getElementById('energy-' + idCapteur);
+    const storageEl = document.getElementById('storage-' + idCapteur);
 
     if (ahEl) ahEl.textContent = ah.toFixed(1) + " g/m³";
     if (dryingEl) {
@@ -545,6 +652,7 @@ function mettreAJourTuile(nomPiece) {
                                (drying.score === 2 ? "var(--status-warning, #F59E0B)" : "var(--status-danger, #EF4444)");
     }
     if (energyEl) energyEl.textContent = energyBalance.deperditionskWh.toFixed(1) + " kWh/j";
+    if (storageEl) storageEl.textContent = storage.cEffkWhPerK.toFixed(2) + " kWh/K";
 
     const pmvBox = document.getElementById('pmv-box-' + idCapteur);
     const pmvVal = document.getElementById('pmv-' + idCapteur);
@@ -572,10 +680,75 @@ function mettreAJourTuile(nomPiece) {
     }
 }
 
+/**
+ * ACTUALISATION DU COCKPIT GLOBAL MAISON
+ */
+function actualiserCockpitGlobal() {
+    const metrics = calculateGlobalHabitatMetrics();
+
+    if (!metrics) {
+        if (document.getElementById('global-avg-temp')) document.getElementById('global-avg-temp').textContent = "-- °C";
+        if (document.getElementById('global-avg-rh')) document.getElementById('global-avg-rh').textContent = "-- %";
+        if (document.getElementById('global-avg-ah')) document.getElementById('global-avg-ah').textContent = "-- g/m³";
+        if (document.getElementById('global-pmv-val')) document.getElementById('global-pmv-val').textContent = "--";
+        if (document.getElementById('global-dep')) document.getElementById('global-dep').textContent = "-- kWh/j";
+        if (document.getElementById('global-gains')) document.getElementById('global-gains').textContent = "-- kWh/j";
+        if (document.getElementById('global-net')) document.getElementById('global-net').textContent = "-- kWh/j";
+        if (document.getElementById('global-ceff')) document.getElementById('global-ceff').textContent = "-- kWh/K";
+        if (document.getElementById('global-storage')) document.getElementById('global-storage').textContent = "-- kWh";
+        return;
+    }
+
+    let totalCEff = 0;
+    let totalMaxStorage = 0;
+    for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
+        if (!data || isNaN(data.ta)) continue;
+        const zoneConfig = getZoneConfigByName(nomPiece) || { area: 15, height: 2.5 };
+        const storage = calculateZoneThermalStorage(zoneConfig, data.ta);
+        totalCEff += storage.cEffkWhPerK;
+        totalMaxStorage += storage.maxStorageCapacitykWh;
+    }
+
+    if (document.getElementById('global-volume-badge')) document.getElementById('global-volume-badge').textContent = `Volume : ${metrics.totalVolumeM3} m³`;
+    if (document.getElementById('global-avg-temp')) document.getElementById('global-avg-temp').textContent = `${metrics.avgTemp} °C`;
+    if (document.getElementById('global-avg-rh')) document.getElementById('global-avg-rh').textContent = `${metrics.avgRH} %`;
+    if (document.getElementById('global-avg-ah')) document.getElementById('global-avg-ah').textContent = `${metrics.avgAH} g/m³`;
+
+    const pmvValEl = document.getElementById('global-pmv-val');
+    const pmvStatusEl = document.getElementById('global-pmv-status');
+    if (pmvValEl) pmvValEl.textContent = (metrics.avgPMV > 0 ? "+" : "") + metrics.avgPMV.toFixed(2);
+    
+    if (pmvStatusEl) {
+        if (metrics.avgPMV >= -0.5 && metrics.avgPMV <= 0.5) {
+            pmvStatusEl.textContent = "Confort Optimal";
+            pmvStatusEl.className = "badge badge-success";
+        } else if (metrics.avgPMV < -0.5) {
+            pmvStatusEl.textContent = "Frais Global";
+            pmvStatusEl.className = "badge badge-warning";
+        } else {
+            pmvStatusEl.textContent = "Chaud Global";
+            pmvStatusEl.className = "badge badge-danger";
+        }
+    }
+
+    if (document.getElementById('global-dep')) document.getElementById('global-dep').textContent = `${metrics.totalDeperditionskWh} kWh/j`;
+    if (document.getElementById('global-gains')) document.getElementById('global-gains').textContent = `${metrics.totalGainsSolaireskWh} kWh/j`;
+    
+    const netEl = document.getElementById('global-net');
+    if (netEl) {
+        netEl.textContent = `${metrics.totalBilanNetkWh > 0 ? '+' : ''}${metrics.totalBilanNetkWh} kWh/j`;
+        netEl.style.color = metrics.totalBilanNetkWh >= 0 ? "#4ADE80" : "#F87171";
+    }
+
+    if (document.getElementById('global-ceff')) document.getElementById('global-ceff').textContent = `${totalCEff.toFixed(2)} kWh/K`;
+    if (document.getElementById('global-storage')) document.getElementById('global-storage').textContent = `${totalMaxStorage.toFixed(2)} kWh`;
+}
+
 function recalculerToutLeDashboard() { 
     for (const nomPiece of SELECTION_PIECES) { 
         mettreAJourTuile(nomPiece); 
     } 
+    actualiserCockpitGlobal();
 }
 
 function adjustClothing(amount) { 
@@ -600,121 +773,7 @@ function updateClothingDisplay() {
 }
 
 // ============================================================
-// INDICATEURS GLOBAUX DE L'HABITAT (PONDÉRATION VOLUMIQUE)
-// ============================================================
-function calculateGlobalHabitatMetrics() {
-    let totalVolume = 0;
-    let weightedTemp = 0;
-    let weightedRH = 0;
-    let weightedAH = 0;
-    let weightedPMV = 0;
-
-    let totalDeperditions = 0;
-    let totalGainsSolaires = 0;
-    let totalBilanNet = 0;
-
-    for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
-        if (!data || isNaN(data.ta) || isNaN(data.rh)) continue;
-
-        const zoneConfig = getZoneConfigByName(nomPiece) || { area: 15, height: 2.5 };
-        const area = parseFloat(zoneConfig.area) || 15;
-        const height = parseFloat(zoneConfig.height) || 2.5;
-        const volume = area * height;
-
-        // Calculs unitaires par pièce
-        const ah = calculateAbsoluteHumidity(data.ta, data.rh);
-        const vel = calculateAirVelocity(zoneConfig, nomPiece);
-        const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
-        const { met, totalClo } = getBaseCloAndMet(zoneConfig);
-        const pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
-        const energy = calculateDailyThermalBalance(zoneConfig, data.ta);
-
-        // Cumuls volumiques
-        totalVolume += volume;
-        weightedTemp += data.ta * volume;
-        weightedRH += data.rh * volume;
-        weightedAH += ah * volume;
-        weightedPMV += pmv * volume;
-
-        // Cumuls énergétiques
-        totalDeperditions += energy.deperditionskWh;
-        totalGainsSolaires += energy.gainsSolaireskWh;
-        totalBilanNet += energy.bilanNetkWh;
-    }
-
-    if (totalVolume === 0) return null;
-
-    return {
-        avgTemp: parseFloat((weightedTemp / totalVolume).toFixed(1)),
-        avgRH: parseFloat((weightedRH / totalVolume).toFixed(0)),
-        avgAH: parseFloat((weightedAH / totalVolume).toFixed(2)),
-        avgPMV: parseFloat((weightedPMV / totalVolume).toFixed(2)),
-        totalDeperditionskWh: parseFloat(totalDeperditions.toFixed(2)),
-        totalGainsSolaireskWh: parseFloat(totalGainsSolaires.toFixed(2)),
-        totalBilanNetkWh: parseFloat(totalBilanNet.toFixed(2)),
-        totalVolumeM3: parseFloat(totalVolume.toFixed(1))
-    };
-}
-
-// ============================================================
-// CALCUL DE LA CAPACITÉ ET CHARGE EN ÉNERGIE (STOCKAGE THERMIQUE)
-// ============================================================
-const PROPRIETES_MATERIAUX = {
-    'concrete':    { rho: 2300, cp: 1.0 }, // Béton / Dalle
-    'cinderblock': { rho: 1300, cp: 1.0 }, // Parpaing
-    'brick':       { rho: 1800, cp: 0.9 }, // Brique pleine
-    'stone':       { rho: 2400, cp: 0.8 }, // Pierre dense
-    'wood':        { rho: 500,  cp: 1.6 }, // Structure légère
-    'lourd':       { rho: 2200, cp: 1.0 }, // Plancher béton
-    'leger':       { rho: 400,  cp: 1.4 }  // Plancher bois/plâtre
-};
-
-function calculateZoneThermalStorage(zoneConfig, currentTa) {
-    if (!zoneConfig) return { cEffkWhPerK: 0 };
-
-    const area = parseFloat(zoneConfig.area) || 16;
-    const h = parseFloat(zoneConfig.height) || 2.5;
-    const side = Math.sqrt(area);
-    const wallArea = side * h;
-    const dEff = 0.08; // 8 cm d'épaisseur active pour le stockage journalier
-
-    let cEffKJPerK = 0; // Capacité en kJ/K
-
-    // 1. Plancher et Plafond (surfaces complètes)
-    const floorMat = PROPRIETES_MATERIAUX[zoneConfig.floorMat] || PROPRIETES_MATERIAUX['lourd'];
-    if (zoneConfig.floorInsulation !== 'iti_recent' && zoneConfig.floorInsulation !== 'iti_old') {
-        cEffKJPerK += (area * dEff) * floorMat.rho * floorMat.cp;
-    }
-
-    const ceilingMat = PROPRIETES_MATERIAUX[zoneConfig.ceilingMat] || PROPRIETES_MATERIAUX['leger'];
-    if (zoneConfig.ceilingInsulation !== 'iti_recent' && zoneConfig.ceilingInsulation !== 'iti_old') {
-        cEffKJPerK += (area * dEff) * ceilingMat.rho * ceilingMat.cp;
-    }
-
-    // 2. Murs verticaux (accessible seulement si ITE ou non isolé)
-    const wallMat = PROPRIETES_MATERIAUX[zoneConfig.wallMat] || PROPRIETES_MATERIAUX['cinderblock'];
-    const isITI = zoneConfig.insulation === 'iti_recent' || zoneConfig.insulation === 'iti_old';
-
-    if (!isITI) {
-        // Si ITE ou non isolé, la masse des 4 murs est accessible de l'intérieur
-        cEffKJPerK += (wallArea * 4 * dEff) * wallMat.rho * wallMat.cp;
-    }
-
-    // Conversion kJ/K -> kWh/K
-    const cEffkWhPerK = cEffKJPerK / 3600;
-
-    // Calcul du potentiel de stockage sur une plage de pré-charge de +/- 2°C
-    const deltaTPrecharge = 2.0;
-    const maxStorageCapacitykWh = cEffkWhPerK * deltaTPrecharge;
-
-    return {
-        cEffkWhPerK: parseFloat(cEffkWhPerK.toFixed(2)),
-        maxStorageCapacitykWh: parseFloat(maxStorageCapacitykWh.toFixed(2))
-    };
-}
-
-// ============================================================
-// FLUX MÉTÉO SANS BLOCAGE
+// FLUX MÉTÉO ET RENDER STATUT
 // ============================================================
 
 document.getElementById('getWeatherButton')?.addEventListener('click', () => {
@@ -833,6 +892,7 @@ async function synchroniserTouteLaMaison() {
 
         localStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(DONNEES_HABITAT));
         sessionStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(DONNEES_HABITAT));
+        actualiserCockpitGlobal();
         
     } catch (error) { 
         console.error("Erreur Bulk Scan:", error); 
