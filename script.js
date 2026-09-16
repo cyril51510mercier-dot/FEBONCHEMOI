@@ -116,12 +116,12 @@ function toggleAllRooms(selectState) {
 }
 
 function initialiserDashboard() {
-    const grid = document.getElementById('dashboard-grid');
-    if (!grid) return; 
-    grid.innerHTML = ''; 
+    const tbody = document.getElementById('dashboard-table-body');
+    if (!tbody) return; 
+    tbody.innerHTML = ''; 
 
     if (SELECTION_PIECES.length === 0) {
-        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--slate-600);">⚠️ Aucune pièce sélectionnée. Cochez au moins une pièce ci-dessus.</div>`;
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 30px; color: var(--slate-600);">⚠️ Aucune pièce sélectionnée. Cochez au moins une pièce ci-dessus.</td></tr>`;
         return;
     }
 
@@ -129,71 +129,37 @@ function initialiserDashboard() {
         const idCapteur = capteursMaison[nomPiece];
         if (!idCapteur) continue;
 
-        const tuile = document.createElement('article');
-        tuile.className = 'room-tile';
-        tuile.setAttribute('data-zone-id', idCapteur);
-
         const configActive = getZoneConfigByName(nomPiece);
         const badgeExpert = configActive 
-            ? `<span class="badge badge-success">Modèle Actif</span>` 
-            : `<span class="badge badge-warning">Par défaut</span>`;
+            ? `<span class="badge badge-success" style="font-size: 0.7rem; padding: 2px 6px;">BEM Actif</span>` 
+            : `<span class="badge badge-warning" style="font-size: 0.7rem; padding: 2px 6px;">Par défaut</span>`;
 
-        tuile.innerHTML = `
-            <div class="tile-header">
-                <div>
-                    <h3>${nomPiece}</h3>
-                    <div style="margin-top: 4px;">${badgeExpert}</div>
-                </div>
-                <span id="status-${idCapteur}" class="badge" style="background: var(--slate-100); color: var(--slate-600);">En attente</span>
-            </div>
+        const row = document.createElement('tr');
+        row.style.borderBottom = "1px solid var(--border-color, #E2E8F0)";
+        row.setAttribute('data-zone-id', idCapteur);
 
-            <div class="tile-metrics-primary">
-                <div class="metric">
-                    <span class="metric-label">Température</span>
-                    <span id="temp-${idCapteur}" class="metric-value">-- °C</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Humidité Rel.</span>
-                    <span id="hum-${idCapteur}" class="metric-value">-- %</span>
-                </div>
-            </div>
-
-            <div id="pmv-box-${idCapteur}" style="text-align: center; margin-bottom: 14px; padding: 12px; background: var(--slate-50); border: 1px solid var(--border-color); border-radius: 8px;">
-                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Indice PMV</div>
-                <div id="pmv-${idCapteur}" style="font-size: 1.5rem; font-weight: 800; color: var(--slate-800);">--</div>
-                <div id="pmv-text-${idCapteur}" style="font-size: 0.8rem; font-weight: 600; margin-top: 2px; color: var(--text-muted);">En attente de calcul...</div>
-            </div>
-
-            <div class="tile-metrics-secondary">
-                <div class="sub-metric">
-                    <span>Humidité Absolue :</span>
-                    <strong id="ah-${idCapteur}">-- g/m³</strong>
-                </div>
-                <div class="sub-metric">
-                    <span>Potentiel Séchage :</span>
-                    <strong id="drying-${idCapteur}">--</strong>
-                </div>
-                <div class="sub-metric">
-                    <span>Déperditions (Est.) :</span>
-                    <strong id="energy-${idCapteur}">-- kWh/j</strong>
-                </div>
-                <div class="sub-metric">
-                    <span>T° Structure (Filtre) :</span>
-                    <strong id="tstruct-${idCapteur}">-- °C</strong>
-                </div>
-                <div class="sub-metric">
-                    <span>Flux Paroi / Air :</span>
-                    <strong id="flux-${idCapteur}">--</strong>
-                </div>
-            </div>
-
-            <div class="tile-actions">
-                <button class="btn-primary btn-block" onclick="voirRecommandations('${nomPiece}')">
-                    🔍 Lancer le diagnostic
-                </button>
-            </div>
+        row.innerHTML = `
+            <td style="padding: 12px 14px; font-weight: 600; color: var(--slate-900);">
+                <div>${nomPiece}</div>
+                <div style="margin-top: 2px;">${badgeExpert}</div>
+            </td>
+            <td style="padding: 12px 10px; text-align: center;">
+                <span id="status-${idCapteur}" class="badge" style="background: var(--slate-100); color: var(--slate-600); font-size: 0.75rem;">En attente</span>
+            </td>
+            <td id="temp-${idCapteur}" style="padding: 12px 10px; text-align: right; font-weight: 700; font-size: 1rem;">-- °C</td>
+            <td id="hum-${idCapteur}" style="padding: 12px 10px; text-align: right; font-weight: 600;">-- %</td>
+            <td id="ah-${idCapteur}" style="padding: 12px 10px; text-align: right; color: #0284C7;">-- g/m³</td>
+            <td style="padding: 12px 10px; text-align: center;">
+                <span id="pmv-badge-${idCapteur}" class="badge" style="font-size: 0.85rem; font-weight: 800; padding: 4px 8px;">--</span>
+            </td>
+            <td id="energy-${idCapteur}" style="padding: 12px 10px; text-align: right; color: #DC2626; font-weight: 600;">-- kWh/j</td>
+            <td id="tstruct-${idCapteur}" style="padding: 12px 10px; text-align: right; color: #D97706; font-weight: 600;">-- °C</td>
+            <td id="drying-${idCapteur}" style="padding: 12px 10px; text-align: center; font-weight: 500;">--</td>
+            <td style="padding: 12px 14px; text-align: center;">
+                <button class="btn-primary" style="padding: 5px 10px; font-size: 0.8rem;" onclick="voirRecommandations('${nomPiece}')">🔍 Diag</button>
+            </td>
         `;
-        grid.appendChild(tuile);
+        tbody.appendChild(row);
     }
 }
 
@@ -431,16 +397,16 @@ function calculateDryingPotential(ta, rh, vel = 0.1) {
     let score = 1;
 
     if (dryingIndex < 0.4) {
-        status = "Très Mauvais (Moisissures)";
+        status = "Très Mauvais";
         score = 1;
     } else if (dryingIndex < 0.8) {
-        status = "Moyen (Séchage lent)";
+        status = "Moyen";
         score = 2;
     } else if (dryingIndex < 1.3) {
-        status = "Bon (Optimal)";
+        status = "Bon";
         score = 4;
     } else {
-        status = "Excellent (Très rapide)";
+        status = "Excellent";
         score = 5;
     }
 
@@ -503,9 +469,6 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
 // MODÈLE D'INERTIE ET RÉSERVE THERMIQUE (LISSAGE PASSE-BAS)
 // ============================================================
 
-/**
- * Maintient et met à jour la température estimée des parois lourdes.
- */
 function updateStructureTemperature(nomPiece, currentTa) {
     const storageKey = `SOLSTICE_TSTRUCT_${nomPiece}`;
     const lastDataRaw = localStorage.getItem(storageKey);
@@ -534,9 +497,6 @@ function updateStructureTemperature(nomPiece, currentTa) {
     return newTstruct;
 }
 
-/**
- * Calcule l'état de la réserve thermique et le sens du flux air/structure.
- */
 function calculateStructureReserve(tStruct, tAir, tConfort = 21.0) {
     const deltaConfort = tStruct - tConfort;
 
@@ -639,7 +599,7 @@ function calculateGlobalHabitatMetrics() {
 }
 
 /**
- * RENDU D'UNE TUILE INDIVIDUELLE
+ * RENDU D'UNE LIGNE DE TABLEAU
  */
 function mettreAJourTuile(nomPiece) {
     if (!SELECTION_PIECES.includes(nomPiece)) return;
@@ -684,43 +644,28 @@ function mettreAJourTuile(nomPiece) {
     const dryingEl = document.getElementById('drying-' + idCapteur);
     const energyEl = document.getElementById('energy-' + idCapteur);
     const tStructEl = document.getElementById('tstruct-' + idCapteur);
-    const fluxEl = document.getElementById('flux-' + idCapteur);
 
     if (ahEl) ahEl.textContent = ah.toFixed(1) + " g/m³";
     if (dryingEl) {
         dryingEl.textContent = drying.status;
-        dryingEl.style.color = drying.score >= 4 ? "var(--status-success, #10B981)" : 
-                               (drying.score === 2 ? "var(--status-warning, #F59E0B)" : "var(--status-danger, #EF4444)");
+        dryingEl.style.color = drying.score >= 4 ? "#10B981" : (drying.score === 2 ? "#F59E0B" : "#EF4444");
     }
     if (energyEl) energyEl.textContent = energyBalance.deperditionskWh.toFixed(1) + " kWh/j";
     if (tStructEl) tStructEl.textContent = tStruct.toFixed(1) + " °C";
-    if (fluxEl) {
-        fluxEl.textContent = `${reserve.fluxIcon} (${reserve.chargePercent}%)`;
-        fluxEl.title = `${reserve.fluxDirection} — ${reserve.qualification}`;
-    }
 
-    const pmvBox = document.getElementById('pmv-box-' + idCapteur);
-    const pmvVal = document.getElementById('pmv-' + idCapteur);
-    const pmvText = document.getElementById('pmv-text-' + idCapteur);
-
-    if (pmvVal) pmvVal.textContent = (pmv > 0 ? "+" : "") + pmv.toFixed(2);
-
-    if (pmvBox && pmvVal && pmvText) {
+    const pmvBadge = document.getElementById('pmv-badge-' + idCapteur);
+    if (pmvBadge) {
+        pmvBadge.textContent = (pmv > 0 ? "+" : "") + pmv.toFixed(2);
         if (pmv < -0.75) { 
-            pmvBox.style.backgroundColor = "#E0F2FE"; pmvBox.style.borderColor = "#BAE6FD";
-            pmvVal.style.color = "#0369A1"; pmvText.textContent = "Sensation Froide 🥶";
+            pmvBadge.style.backgroundColor = "#E0F2FE"; pmvBadge.style.color = "#0369A1";
         } else if (pmv < -0.2) {
-            pmvBox.style.backgroundColor = "#F0F9FF"; pmvBox.style.borderColor = "#E0F2FE";
-            pmvVal.style.color = "#0284C7"; pmvText.textContent = "Légèrement Frais 🌬️";
+            pmvBadge.style.backgroundColor = "#F0F9FF"; pmvBadge.style.color = "#0284C7";
         } else if (pmv > 0.75) { 
-            pmvBox.style.backgroundColor = "#FEE2E2"; pmvBox.style.borderColor = "#FCA5A5";
-            pmvVal.style.color = "#B91C1C"; pmvText.textContent = "Sensation Chaude 🥵";
+            pmvBadge.style.backgroundColor = "#FEE2E2"; pmvBadge.style.color = "#B91C1C";
         } else if (pmv > 0.2) {
-            pmvBox.style.backgroundColor = "#FEF3C7"; pmvBox.style.borderColor = "#FDE68A";
-            pmvVal.style.color = "#B45309"; pmvText.textContent = "Légèrement Chaud ☀️";
+            pmvBadge.style.backgroundColor = "#FEF3C7"; pmvBadge.style.color = "#B45309";
         } else { 
-            pmvBox.style.backgroundColor = "#D1FAE5"; pmvBox.style.borderColor = "#A7F3D0";
-            pmvVal.style.color = "#047857"; pmvText.textContent = "Zone Neutre (Confort) ✅";
+            pmvBadge.style.backgroundColor = "#D1FAE5"; pmvBadge.style.color = "#047857";
         }
     }
 }
@@ -964,7 +909,7 @@ function voirRecommandations(nomPiece) {
 
     const zoneKey = Object.keys(GLOBAL_HOUSE_CONFIG).find(key => GLOBAL_HOUSE_CONFIG[key].name === nomPiece) || nomPiece;
     const idCapteur = capteursMaison[nomPiece];
-    const pmv = document.getElementById('pmv-' + idCapteur)?.textContent || "0";
+    const pmv = document.getElementById('pmv-badge-' + idCapteur)?.textContent || "0";
 
     sessionStorage.setItem('currentZoneId', zoneKey); 
     sessionStorage.setItem('calculatedPMV', pmv);
