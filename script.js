@@ -547,6 +547,95 @@ function calculateZoneThermalStorage(zoneConfig, currentTa) {
 }
 
 // ============================================================
+// MODÈLE D'INERTIE ET RÉSERVE THERMIQUE (LISSAGE PASSE-BAS)
+// ============================================================
+
+/**
+ * Maintient et met à jour la température estimée des parois lourdes.
+ */
+function updateStructureTemperature(nomPiece, currentTa) {
+    const storageKey = `SOLSTICE_TSTRUCT_${nomPiece}`;
+    const lastDataRaw = localStorage.getItem(storageKey);
+    const now = Date.now();
+
+    if (!lastDataRaw) {
+        // Initialisation : au premier lancement, T_struct = T_air
+        const initialData = { tStruct: currentTa, lastTimestamp: now };
+        localStorage.setItem(storageKey, JSON.stringify(initialData));
+        return currentTa;
+    }
+
+    const lastData = JSON.parse(lastDataRaw);
+    const dtHours = (now - lastData.lastTimestamp) / (1000 * 3600);
+
+    // Evite les sauts d'échelle si le scan est instantané (< 1 min)
+    if (dtHours < 0.016) return lastData.tStruct;
+
+    // Constante de temps tau = 18h (reponse dynamique de la maconnerie)
+    const tau = 18.0;
+    // Coeff de lissage alpha = 1 - exp(-dt / tau)
+    const alpha = 1 - Math.exp(-dtHours / tau);
+
+    // Equation du filtre passe-bas
+    const newTstruct = lastData.tStruct + alpha * (currentTa - lastData.tStruct);
+
+    localStorage.setItem(storageKey, JSON.stringify({
+        tStruct: parseFloat(newTstruct.toFixed(2)),
+        lastTimestamp: now
+    }));
+
+    return newTstruct;
+}
+
+/**
+ * Calcule l'état de la réserve thermique et le sens du flux air/structure.
+ */
+function calculateStructureReserve(tStruct, tAir, tConfort = 21.0) {
+    // Écart de la masse par rapport au point neutre de confort (ex: 21 °C)
+    const deltaConfort = tStruct - tConfort;
+
+    // Échelle continue de 0 % à 100 % sur une plage de +/- 3 °C autour de la consigne :
+    // -3 °C -> 0 %   (Plein de fraîcheur)
+    //  0 °C -> 50 %  (Neutre)
+    // +3 °C -> 100 % (Plein de chaleur)
+    const rawPercent = ((deltaConfort + 3.0) / 6.0) * 100;
+    const chargePercent = Math.max(0, Math.min(100, Math.round(rawPercent)));
+
+    // Analyse du sens du flux thermique (T_struct vs T_air)
+    const deltaFlux = tStruct - tAir;
+    const diffAbs = Math.abs(deltaFlux).toFixed(1);
+    
+    let fluxDirection = "";
+    let fluxIcon = "";
+
+    if (deltaFlux > 0.3) {
+        fluxDirection = `La structure réchauffe l'air (+${diffAbs} °C d'écart)`;
+        fluxIcon = "🔥 Restitution";
+    } else if (deltaFlux < -0.3) {
+        fluxDirection = `La structure absorbe la chaleur de l'air (-${diffAbs} °C d'écart)`;
+        fluxIcon = "❄️ Absorption";
+    } else {
+        fluxDirection = `Équilibre thermique air / parois`;
+        fluxIcon = "⚖️ Stabilité";
+    }
+
+    // Qualification lisible par l'utilisateur
+    let qualification = "Neutre";
+    if (deltaConfort >= 1.5) qualification = "Fortement chargée en chaleur";
+    else if (deltaConfort >= 0.5) qualification = "Modérément chaude";
+    else if (deltaConfort <= -1.5) qualification = "Fortement chargée en fraîcheur";
+    else if (deltaConfort <= -0.5) qualification = "Modérément fraîche";
+
+    return {
+        tStruct: parseFloat(tStruct.toFixed(1)),
+        chargePercent: chargePercent,
+        qualification: qualification,
+        fluxIcon: fluxIcon,
+        fluxDirection: fluxDirection
+    };
+}
+
+// ============================================================
 // INDICATEURS GLOBAUX DE L'HABITAT (PONDÉRATION VOLUMIQUE)
 // ============================================================
 function calculateGlobalHabitatMetrics() {
