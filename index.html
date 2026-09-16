@@ -28,13 +28,13 @@
                 <h2 style="font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-600);">🌍 Conditions Extérieures</h2>
                 <div class="location-picker" style="display: flex; gap: 8px; margin-top: 8px;">
                     <input type="text" id="location" placeholder="Ex: Reims" aria-label="Ville" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
-                    <button id="getWeatherButton" class="btn-secondary" title="Rechercher">🔍</button> 
-                    <button id="geoLocateButton" class="btn-secondary">📍 Géolocaliser</button>
+                    <button id="getWeatherButton" class="btn-secondary" title="Rechercher" onclick="rechercherMeteo()">🔍</button> 
+                    <button id="geoLocateButton" class="btn-secondary" onclick="geolocaliserMeteo()">📍 Géolocaliser</button>
                 </div>
                 <div id="weatherSummary" class="weather-summary" style="margin-top: 10px; font-size: 0.9em; min-height: 24px;"></div>
             </div>
 
-            <!-- Isolation Corporelle (Design Profilé) -->
+            <!-- Isolation Corporelle -->
             <div class="env-block" style="background: var(--slate-50, #F8FAFC); padding: 14px 18px; border-radius: 10px; border: 1px solid var(--border-color, #E2E8F0);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <h2 style="font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-600); margin: 0;">👕 Isolation Corporelle</h2>
@@ -148,7 +148,7 @@
                 <div id="room-checkboxes" style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.9em;"></div>
             </div>
 
-            <!-- NOUVEAU : Tableau de bord synthétique par pièce -->
+            <!-- Tableau de bord synthétique par pièce -->
             <div style="overflow-x: auto; background: white; border-radius: 10px; border: 1px solid var(--border-color, #E2E8F0); box-shadow: var(--shadow-sm);">
                 <table id="dashboard-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
                     <thead>
@@ -176,9 +176,9 @@
     </main>
 
     <footer class="app-footer">
-        <p>Solstice Engine v2.8 • Modélisation ISO 7730 / ASHRAE 55</p>
+        <p>Solstice Engine v2.9 • Modélisation ISO 7730 / ASHRAE 55</p>
     </footer>
 
-    <script src="script.js?v=2.8" defer></script>
+    <script src="script.js?v=2.9" defer></script>
 </body>
 </html>
