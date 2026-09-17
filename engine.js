@@ -435,37 +435,36 @@ function calculateDryingPotential(ta, rh, vel = 0.1) {
 }
 
 function calculateDailyThermalBalance(zoneConfig, ta) {
-    if (!zoneConfig) return { hTotalWPerK: 0, deperditionskWh: 0, gainsSolaireskWh: 0, bilanNetkWh: 0 };
+    if (!zoneConfig) return { hTotalWPerK: 0, deperditionskWh: 0, gainsConductionkWh: 0, gainsSolaireskWh: 0, gainsTotauxkWh: 0, bilanNetkWh: 0 };
 
-    // 1. Si la zone est configurée comme "Extérieur", aucun bilan thermique intérieur
+    // 1. Zone Extérieure : aucun bilan thermique intérieur
     if (Array.isArray(zoneConfig.usages) && zoneConfig.usages.includes('outdoor')) {
-        return { hTotalWPerK: 0, deperditionskWh: 0, gainsSolaireskWh: 0, bilanNetkWh: 0 };
+        return { hTotalWPerK: 0, deperditionskWh: 0, gainsConductionkWh: 0, gainsSolaireskWh: 0, gainsTotauxkWh: 0, bilanNetkWh: 0 };
     }
 
     const area = parseFloat(zoneConfig.area) || 15;
     const h = parseFloat(zoneConfig.height) || 2.5;
     const volume = area * h;
     const side = Math.sqrt(area);
-    const wallArea = side * h; // Surface unitaire d'un mur
+    const wallArea = side * h;
 
     // 2. Coefficients U des parois (W/m².K)
     const uWall = getUValueParoi('wall', zoneConfig.wallMat || 'cinderblock', zoneConfig.insulation || 'iti_recent');
     const uCeiling = getUValueParoi('ceiling', zoneConfig.ceilingMat || 'leger', zoneConfig.ceilingInsulation || 'iti_recent');
     const uFloor = getUValueParoi('floor', zoneConfig.floorMat || 'lourd', zoneConfig.floorInsulation || 'iti_recent');
 
-    // Helper pour déterminer le facteur de réduction de température b
+    // Helper pour le facteur de réduction de température b
     const getBFactor = (adj) => {
         if (Array.isArray(adj)) {
             if (adj.includes('outside')) return 1.0;
             if (adj.includes('unheated')) return 0.5;
-            return 0.0; // heated
+            return 0.0;
         }
         if (adj === 'outside') return 1.0;
         if (adj === 'unheated') return 0.5;
-        return 0.0; // heated
+        return 0.0;
     };
 
-    // Application des coefficients b selon les adjacences réelles
     const bW1 = getBFactor(zoneConfig.adj?.wall1 || 'outside');
     const bW2 = getBFactor(zoneConfig.adj?.wall2 || 'heated');
     const bW3 = getBFactor(zoneConfig.adj?.wall3 || 'heated');
@@ -473,14 +472,13 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const bCeiling = getBFactor(zoneConfig.adj?.ceiling || ['heated']);
     const bFloor = getBFactor(zoneConfig.adj?.floor || ['heated']);
 
-    // Déperditions surfaciques nettes (W/K)
     const hWall = uWall * wallArea * (bW1 + bW2 + bW3 + bW4);
     const hCeiling = uCeiling * area * bCeiling;
     const hFloor = uFloor * area * bFloor;
     const hSurfacique = hWall + hCeiling + hFloor;
 
-    // 3. Déperditions par renouvellement d'air (W/K)
-    let ach = 0.5; // Taux par défaut (vol/h)
+    // 3. Déperditions / Gains par renouvellement d'air (W/K)
+    let ach = 0.5;
     const vmc = zoneConfig.equipment?.vmcSystem;
     if (vmc === 'marche_forcee') ach = 1.0;
     else if (vmc === 'continue_non_pilotable') ach = 0.7;
@@ -490,9 +488,19 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const hVentilation = 0.34 * volume * ach;
     const hTotal = hSurfacique + hVentilation;
 
-    // 4. Calcul des déperditions quotidiennes (kWh/j)
-    const deltaT = Math.max(0, ta - outdoorTemp);
-    const deperditionskWh = (hTotal * deltaT * 24) / 1000;
+    // 4. Calcul des flux thermiques selon le sens du gradient de température
+    let deperditionskWh = 0;
+    let gainsConductionkWh = 0;
+
+    if (ta > outdoorTemp) {
+        // Pertes de chaleur de l'intérieur vers l'extérieur
+        const deltaT_dep = ta - outdoorTemp;
+        deperditionskWh = (hTotal * deltaT_dep * 24) / 1000;
+    } else {
+        // Apports thermiques de l'extérieur vers l'intérieur (Text > Ta)
+        const deltaT_gain = outdoorTemp - ta;
+        gainsConductionkWh = (hTotal * deltaT_gain * 24) / 1000;
+    }
 
     // 5. Apports solaires quotidiens (kWh/j)
     let gainsSolaireskWh = 0;
@@ -521,7 +529,6 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
             const maskFactor = maskMap[win.mask] ?? 1.0;
             const shutterFactor = shutterMap[win.shutter] ?? 1.0;
 
-            // Gestion multi-orientations (moyenne pondérée si plusieurs cases cochées)
             const orients = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
             let sumI = 0;
             orients.forEach(o => { sumI += (orientMap[o] || 1.5); });
@@ -533,12 +540,16 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
         });
     }
 
-    const bilanNetkWh = gainsSolaireskWh - deperditionskWh;
+    // Gains totaux = apports solaires + apports par conduction/ventilation quand Text > Ta
+    const gainsTotauxkWh = gainsSolaireskWh + gainsConductionkWh;
+    const bilanNetkWh = gainsTotauxkWh - deperditionskWh;
 
     return {
         hTotalWPerK: parseFloat(hTotal.toFixed(1)),
         deperditionskWh: parseFloat(deperditionskWh.toFixed(2)),
+        gainsConductionkWh: parseFloat(gainsConductionkWh.toFixed(2)),
         gainsSolaireskWh: parseFloat(gainsSolaireskWh.toFixed(2)),
+        gainsTotauxkWh: parseFloat(gainsTotauxkWh.toFixed(2)),
         bilanNetkWh: parseFloat(bilanNetkWh.toFixed(2))
     };
 }
