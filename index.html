@@ -23,15 +23,15 @@
 
     <main class="dashboard-container">
         
-        <!-- Section 1 : Météo & Isolation Corporelle -->
+        <!-- Section 1 : Météo Extérieure & Isolation Corporelle -->
         <section class="card-section environment-bar" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; align-items: center;">
             
             <div class="env-block">
                 <h2 style="font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-600);">🌍 Conditions Extérieures</h2>
                 <div class="location-picker" style="display: flex; gap: 8px; margin-top: 8px;">
                     <input type="text" id="location" placeholder="Ex: Reims" aria-label="Ville" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
-                    <button id="getWeatherButton" class="btn-secondary" title="Rechercher">🔍</button> 
-                    <button id="geoLocateButton" class="btn-secondary">📍 Géolocaliser</button>
+                    <button id="getWeatherButton" class="btn-secondary" title="Rechercher" onclick="rechercherMeteo()">🔍</button> 
+                    <button id="geoLocateButton" class="btn-secondary" onclick="geolocaliserMeteo()">📍 Géolocaliser</button>
                 </div>
                 <div id="weatherSummary" class="weather-summary" style="margin-top: 10px; font-size: 0.9em; min-height: 24px;"></div>
             </div>
@@ -53,7 +53,7 @@
 
         </section>
 
-        <!-- Section 2 : Radiographie et Cockpit Global Restauré (4 Bloc-Clés) -->
+        <!-- Section 2 : Radiographie et Cockpit Global -->
         <section class="card-section hab-radiography">
             <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                 <div>
@@ -65,15 +65,20 @@
                 </button>
             </div>
 
-            <!-- Cockpit Global Complet -->
+            <!-- Cockpit Global Synthétique -->
             <div id="global-habitat-cockpit" style="margin-top: 20px; background: var(--slate-900, #1E293B); border-radius: 12px; padding: 20px; color: white; box-shadow: var(--shadow-md);">
                 
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--slate-800, #334155); padding-bottom: 12px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--slate-800, #334155); padding-bottom: 12px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 1.2rem;">🏛️</span>
                         <h3 style="margin: 0; font-size: 1.05rem; color: #F8FAFC; font-weight: 700;">Synthèse Multi-Vectorielle de l'Habitat</h3>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 12px;">
+                    
+                    <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                        <label style="font-size: 0.85rem; color: #CBD5E1; cursor: pointer; display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.06); padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.12);">
+                            <input type="checkbox" id="include-buffer-checkbox" onchange="toggleIncludeBuffer(this.checked)" checked>
+                            <span>Inclure pièces tampons</span>
+                        </label>
                         <span id="global-volume-badge" class="badge" style="background: var(--slate-800); color: #94A3B8; font-weight: 600;">Volume : -- m³</span>
                         <button onclick="voirToutesLesRecommandations()" style="background: var(--secondary, #e67e22); color: white; padding: 6px 12px; font-size: 0.85rem; border-radius: 6px; border: none; cursor: pointer; font-weight: bold;">
                             💡 Recommandations →
@@ -81,7 +86,7 @@
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
                     
                     <!-- 1. Microclimat -->
                     <div style="background: rgba(255,255,255,0.05); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
@@ -101,32 +106,36 @@
                     </div>
 
                     <!-- 2. Confort PMV -->
-                    <div style="background: rgba(255,255,255,0.05); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="background: rgba(255,255,255,0.05); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; justify-content: space-between;">
                         <div style="font-size: 0.75rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; letter-spacing: 0.5px;">Confort Corporel Global</div>
-                        <div style="text-align: center; margin-top: 8px;">
+                        <div style="text-align: center; margin: auto 0;">
                             <span id="global-pmv-val" style="font-size: 1.8rem; font-weight: 800; color: #F8FAFC; display: block; line-height: 1;">--</span>
                             <span id="global-pmv-status" class="badge" style="margin-top: 8px; display: inline-block;">En attente</span>
                         </div>
                     </div>
 
-                    <!-- 3. Bilan Énergétique (24h) -->
+                    <!-- 3. Bilan Énergétique (24h - 3 Lignes + Total Bilan Net) -->
                     <div style="background: rgba(255,255,255,0.05); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
                         <div style="font-size: 0.75rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; letter-spacing: 0.5px;">Bilan Énergétique (24h)</div>
                         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px;">
-                            <span style="font-size: 0.8rem; color: #CBD5E1;">Déperditions :</span>
-                            <strong id="global-dep" style="font-size: 0.95rem; color: #F87171;">-- kWh/j</strong>
+                            <span style="font-size: 0.8rem; color: #CBD5E1;">Gains extérieurs (Air) :</span>
+                            <strong id="global-gains-ext" style="font-size: 0.9rem; color: #38BDF8;">-- kWh/j</strong>
                         </div>
                         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px;">
-                            <span style="font-size: 0.8rem; color: #CBD5E1;">Gains Solaires :</span>
-                            <strong id="global-gains" style="font-size: 0.95rem; color: #4ADE80;">-- kWh/j</strong>
+                            <span style="font-size: 0.8rem; color: #CBD5E1;">Déperditions :</span>
+                            <strong id="global-dep" style="font-size: 0.9rem; color: #F87171;">-- kWh/j</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px;">
+                            <span style="font-size: 0.8rem; color: #CBD5E1;">Apports solaires :</span>
+                            <strong id="global-gains-sol" style="font-size: 0.9rem; color: #4ADE80;">-- kWh/j</strong>
                         </div>
                         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 6px;">
-                            <span style="font-size: 0.85rem; font-weight: 600; color: #F8FAFC;">Bilan Net :</span>
+                            <span style="font-size: 0.85rem; font-weight: 700; color: #F8FAFC;">Bilan Net Final :</span>
                             <strong id="global-net" style="font-size: 1.05rem;">-- kWh/j</strong>
                         </div>
                     </div>
 
-                    <!-- 4. Réserve Thermique (Masse & Structure) -->
+                    <!-- 4. Réserve Thermique -->
                     <div style="background: rgba(255,255,255,0.05); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
                         <div style="font-size: 0.75rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; letter-spacing: 0.5px;">Réserve Thermique des Parois</div>
                         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px;">
@@ -158,7 +167,7 @@
                 <div id="room-checkboxes" style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.9em;"></div>
             </div>
 
-            <!-- Tableau Synthétique 10 Colonnes Restauré -->
+            <!-- Tableau Synthétique par Pièce -->
             <div style="overflow-x: auto; background: white; border-radius: 10px; border: 1px solid var(--border-color, #E2E8F0); box-shadow: var(--shadow-sm);">
                 <table id="dashboard-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
                     <thead>
@@ -169,14 +178,14 @@
                             <th style="padding: 12px 10px; text-align: right;">Humidité Rel.</th>
                             <th style="padding: 12px 10px; text-align: right;">Humidité Abs.</th>
                             <th style="padding: 12px 10px; text-align: center;">PMV (Confort)</th>
-                            <th style="padding: 12px 10px; text-align: right;">Déperditions</th>
+                            <th style="padding: 12px 10px; text-align: right;">Bilan Net (24h)</th>
                             <th style="padding: 12px 10px; text-align: right;">T° Masse Parois</th>
                             <th style="padding: 12px 10px; text-align: center;">Séchage Linge</th>
                             <th style="padding: 12px 14px; text-align: center;">Action</th>
                         </tr>
                     </thead>
                     <tbody id="dashboard-table-body">
-                        <!-- Alimenté dynamiquement par script.js / engine.js -->
+                        <!-- Alimenté dynamiquement par engine.js -->
                     </tbody>
                 </table>
             </div>
@@ -186,11 +195,10 @@
     </main>
 
     <footer class="app-footer">
-        <p>Solstice Engine v2.8 • Modélisation ISO 7730 / ASHRAE 55</p>
+        <p>Solstice Engine v3.0 • Modélisation ISO 7730 / ASHRAE 55</p>
     </footer>
 
-    <script src="engine.js"></script>
-    <script src="script.js?v=2.8" defer></script>
+    <script src="engine.js?v=3.0" defer></script>
     <script>
         function voirToutesLesRecommandations() {
             sessionStorage.setItem('currentZoneId', 'all');
