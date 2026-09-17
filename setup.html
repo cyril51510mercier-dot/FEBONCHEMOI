@@ -697,10 +697,8 @@
 
             windowsContainer.innerHTML = '';
             windowCounter = 0;
-            if (Array.isArray(data.windows)) {
+            if (Array.isArray(data.windows) && data.windows.length > 0) {
                 data.windows.forEach(win => addWindowBlock(win));
-            } else {
-                addWindowBlock();
             }
         }
 
@@ -726,6 +724,7 @@
 
             windowsContainer.innerHTML = '';
             windowCounter = 0;
+            addWindowBlock();
         }
     </script>
 </body>
