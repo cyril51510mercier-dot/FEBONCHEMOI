@@ -328,7 +328,7 @@
                         const raw = localStorage.getItem(this.STORAGE_KEY);
                         this.config = raw ? JSON.parse(raw) : {};
                     } catch (e) {
-                        console.error("[Solstice] Erreur Storage:", e);
+                        console.error("[Solstice] Erreur Storage :", e);
                         this.config = {};
                     }
                 },
@@ -339,7 +339,7 @@
                         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.config));
                         return true;
                     } catch (e) {
-                        console.error("[Solstice] Échec sauvegarde:", e);
+                        console.error("[Solstice] Échec sauvegarde :", e);
                         return false;
                     }
                 },
@@ -369,9 +369,9 @@
         });
 
         function initEventListeners() {
-            // Mode Extérieur : Masque les sections A, B, C, D
             usageOutdoorCb.addEventListener('change', toggleOutdoorMode);
 
+            // Changement dans le menu déroulant "Zone existante"
             existingZonesSelect.addEventListener('change', () => {
                 const selectedId = existingZonesSelect.value;
                 if (selectedId && SolsticeStore.getZone(selectedId)) {
@@ -384,6 +384,7 @@
                     zoneNameInput.value = "";
                     sensorNameInput.value = "";
                     sensorIdInput.value = "";
+                    restoreUsages([]);
                 }
                 form.style.display = 'none';
                 statusBadge.style.display = 'none';
@@ -398,11 +399,12 @@
                 }
                 const srcData = SolsticeStore.getZone(srcId);
                 if (srcData) {
-                    populateForm(srcData, true); // true = garde nom & capteur actuels
-                    alert(`✅ Paramètres de "${srcData.name}" copiés dans le formulaire.`);
+                    populateForm(srcData, true);
+                    alert(`✅ Paramètres de « ${srcData.name} » copiés dans le formulaire.`);
                 }
             });
 
+            // Clic sur "Charger / Éditer cette Zone"
             document.getElementById('loadZoneBtn').addEventListener('click', () => {
                 const name = zoneNameInput.value.trim();
                 if (!name) {
@@ -410,18 +412,28 @@
                     return;
                 }
 
+                // Génération d'un ID déterministe (évite la création de doublons)
                 const selectedId = existingZonesSelect.value;
-                currentZoneId = selectedId ? selectedId : name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36);
+                const normalizedId = 'zone_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                currentZoneId = selectedId ? selectedId : normalizedId;
+
+                // Récupération des usages actuellement coché(e)s par l'utilisateur à l'écran
+                const userSelectedUsages = Array.from(document.querySelectorAll('input[name="usage"]:checked')).map(cb => cb.value);
 
                 form.style.display = 'block';
 
                 const existingData = SolsticeStore.getZone(currentZoneId);
                 if (existingData) {
+                    // Si l'utilisateur a coché des usages avant de charger, on conserve sa saisie écran
+                    if (userSelectedUsages.length > 0) {
+                        existingData.usages = userSelectedUsages;
+                    }
                     populateForm(existingData);
                     statusBadge.textContent = "✅ Mode Modification : " + existingData.name;
                     statusBadge.style.color = "#27ae60";
                 } else {
                     clearCurrentForm();
+                    restoreUsages(userSelectedUsages);
                     statusBadge.textContent = "🆕 Nouvelle Zone Thermalisée : " + name;
                     statusBadge.style.color = "#2980b9";
                 }
@@ -530,13 +542,12 @@
                 </div>
             `;
 
-            // Verrouiller à 2 orientations max
             div.querySelectorAll('.win-orient-cb').forEach(cb => {
                 cb.addEventListener('change', (e) => {
                     const checked = div.querySelectorAll('.win-orient-cb:checked');
                     if (checked.length > 2) {
                         e.target.checked = false;
-                        alert("Vous ne pouvez sélectionner que 2 orientations maximum par fenêtre (ex: Sud + Est).");
+                        alert("Vous ne pouvez sélectionner que 2 orientations maximum par fenêtre.");
                     }
                 });
             });
@@ -645,7 +656,7 @@
         }
 
         function populateForm(data, keepIdentity = false) {
-            if (!keepIdentity) {
+            if (!keepIdentity && Array.isArray(data.usages)) {
                 restoreUsages(data.usages);
             }
 
