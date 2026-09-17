@@ -1,5 +1,5 @@
 // ============================================================
-// SOLSTICE - MOTEUR DE CALCUL THERMIQUE ET DASHBOARD (ISO 7730)
+// SOLSTICE - MOTEUR DE CALCUL THERMIQUE ET DASHBOARD
 // ============================================================
 
 let outdoorTemp = 15, outdoorHumidity = 50, outdoorPressure = 1013, outdoorWind = 0, sunshineStatus = 'Clouds';
@@ -7,22 +7,21 @@ let manualCloAdjustment = 0;
 const apiKey = '4ec1eb2b0cc90a4b18a79008b17581a8'; 
 let GLOBAL_HOUSE_CONFIG = {};
 let DONNEES_HABITAT = {}; 
-let SELECTION_PIECES = []; 
 
-const capteursMaison = {
-    "Cuisine": "98e2d34a-769f-4296-93ed-6083772e703e",
-    "Chambre parents": "051291b5-d2d0-43a8-b783-08b8509d2c84",
-    "Chambre Orso": "c432fd4b-3836-4d98-94fd-3e6822aa96c5",
-    "Garage": "762dd667-b30a-4bed-8bf6-2fc2a09fc29b",
-    "Entrée": "598d83ea-cfcd-43f8-89f6-cfed3a4517d4",
-    "Cave": "d8906d8b-68d2-4100-a074-03129a672ae1",
-    "Chambre Ysée": "5ac8836a-c232-4225-a688-f161dcca60f6",
-    "Extérieur - Jardin": "50ad97e0-a6e1-4b54-9b6a-dc306df7c068",
-    "Salle de bain - Haut": "322388c4-c9b2-475d-9c68-3e13e501ce6a",
-    "Extérieur - Rue": "c755bde8-9f8a-4ea4-ac2e-2fea154e9c09",
-    "Salon": "20fee90c-95f2-47ea-b477-e3d8a6058440",
-    "Salle de bain - Bas": "a70def7d-7071-4950-99d1-3a16e9759eee"
-};
+// Dictionnaire dynamique généré à partir de HOUSE_CONFIG (localStorage)
+let capteursMaison = {};
+
+/**
+ * Reconstruit la cartographie Nom de Pièce -> ID Capteur depuis le paramétrage expert
+ */
+function rafraichirCapteursDepuisConfig() {
+    capteursMaison = {};
+    Object.values(GLOBAL_HOUSE_CONFIG).forEach(zone => {
+        if (zone.name && zone.sensorId) {
+            capteursMaison[zone.name] = zone.sensorId;
+        }
+    });
+}
 
 function getZoneConfigByName(roomName) { 
     return Object.values(GLOBAL_HOUSE_CONFIG).find(z => z.name === roomName); 
