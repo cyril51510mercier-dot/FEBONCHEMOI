@@ -36,6 +36,19 @@
             </div>
         </div>
 
+        <!-- Duplication rapide d'une zone existante -->
+        <div id="duplicateContainer" style="margin-top:15px; padding:10px; background:#f1f5f9; border-radius:6px;">
+            <label for="copyFromZone" style="font-weight:bold; font-size:0.85em; color:#334155; display:block; margin-bottom:5px;">
+                💡 Copier la configuration d'une zone modèle :
+            </label>
+            <div style="display:flex; gap:10px;">
+                <select id="copyFromZone" style="flex:1;">
+                    <option value="">-- Sélectionner une pièce source --</option>
+                </select>
+                <button type="button" id="btnCopyZone" style="background:#e67e22; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:0.85em;">Dupliquer</button>
+            </div>
+        </div>
+
         <label style="color:var(--primary, #2c3e50); font-size:0.9em; display:block; margin-bottom:8px; margin-top:15px; font-weight:bold;">Usages thermiques de cette zone :</label>
         <div class="usage-grid" id="usageCheckboxes" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 20px;">
             <label><input type="checkbox" name="usage" value="living"> 🛋️ Salon / Repos</label>
@@ -44,6 +57,8 @@
             <label><input type="checkbox" name="usage" value="bedroom"> 🛏️ Sommeil</label>
             <label><input type="checkbox" name="usage" value="bath"> 🚿 Salle d'eau</label>
             <label><input type="checkbox" name="usage" value="office"> 💻 Bureau / Actif</label>
+            <label><input type="checkbox" name="usage" value="buffer"> 🧱 Pièce tampon</label>
+            <label><input type="checkbox" name="usage" value="outdoor" id="usageOutdoor"> 🌳 Extérieur</label>
         </div>
 
         <button type="button" class="btn-load" id="loadZoneBtn" style="width: 100%;">Charger / Éditer cette Zone ↓</button>
@@ -53,7 +68,11 @@
     <!-- Formulaire de Configuration Expert -->
     <form id="expertForm" style="display:none;" novalidate>
         
-        <!-- SECTION A: Géométrie, Structures & Isolations (Inertie) -->
+        <div id="outdoorNotice" style="display:none; background:#e0f2fe; color:#0369a1; padding:15px; border-radius:6px; margin-bottom:20px; font-weight:bold; text-align:center;">
+            🌳 Zone configurée comme "Extérieur" : Les paramètres géométriques et constructifs ne sont pas requis.
+        </div>
+
+        <!-- SECTION A: Géométrie, Structures & Isolations -->
         <div class="config-section">
             <h2>A. Géométrie, Structures & Isolations (Inertie Thermique)</h2>
             <div class="form-grid">
@@ -66,7 +85,6 @@
                     <input type="number" id="ceilingHeight" step="0.05" min="1" value="2.5">
                 </div>
 
-                <!-- MURS -->
                 <div class="full-width" style="margin-top:10px;"><strong style="color:var(--primary, #2c3e50);">Structure des Murs :</strong></div>
                 <div>
                     <label for="wallMaterial">Matériau des Murs</label>
@@ -93,7 +111,6 @@
                     </select>
                 </div>
 
-                <!-- PLAFOND / TOITURE -->
                 <div class="full-width" style="margin-top:10px;"><strong style="color:var(--primary, #2c3e50);">Plafond / Toiture :</strong></div>
                 <div>
                     <label for="ceilingMaterial">Matériau / Inertie Plafond</label>
@@ -113,7 +130,6 @@
                     </select>
                 </div>
 
-                <!-- PLANCHER -->
                 <div class="full-width" style="margin-top:10px;"><strong style="color:var(--primary, #2c3e50);">Plancher Bas :</strong></div>
                 <div>
                     <label for="floorMaterial">Matériau / Inertie Plancher</label>
@@ -172,7 +188,6 @@
                     </select>
                 </div>
 
-                <!-- Adjacences Plafond (Multi-sélection) -->
                 <div class="full-width" style="margin-top:10px;">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plafond :</label>
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
@@ -182,7 +197,6 @@
                     </div>
                 </div>
 
-                <!-- Adjacences Plancher (Multi-sélection) -->
                 <div class="full-width" style="margin-top:10px;">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plancher :</label>
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
@@ -213,6 +227,7 @@
                 <div class="full-width">
                     <label for="heatingSystem">Générateur / Émetteur Chauffage</label>
                     <select id="heatingSystem">
+                        <option value="none">Aucun chauffage</option>
                         <option value="convection">Convecteurs Électriques (Effet Joule direct)</option>
                         <option value="radiator_steel">Radiateurs Acier / Aluminium</option>
                         <option value="radiator_cast">Radiateurs Fonte (Inertie émetteur)</option>
@@ -230,11 +245,10 @@
                 </div>
 
                 <div class="full-width">
-                    <label for="heatingIntermittency">Gestion de l'Intermittence Chauffage</label>
+                    <label for="heatingIntermittency">Programmation de réduit (Chauffage)</label>
                     <select id="heatingIntermittency">
-                        <option value="continuous">Chauffe continue (24h/24 sans réduit)</option>
-                        <option value="night_reduction">Réduit nocturne (-2°C à -3°C la nuit)</option>
-                        <option value="occupancy_based">Intermittence forte (Coupure/Réduit pendant absences)</option>
+                        <option value="yes">Oui</option>
+                        <option value="no" selected>Non</option>
                     </select>
                 </div>
             </div>
@@ -245,7 +259,7 @@
                 <div class="full-width">
                     <label for="coolingSystem">Système de Refroidissement</label>
                     <select id="coolingSystem">
-                        <option value="aucun">Aucun système (Refroidissement passif uniquement)</option>
+                        <option value="aucun" selected>Aucun système (Refroidissement passif uniquement)</option>
                         <option value="clim_fixe">Climatisation fixe (Split / Gainable PAC air-air)</option>
                         <option value="clim_mobile">Climatisation mobile (Monobloc à évacuation)</option>
                         <option value="plancher_raf">Plancher rafraîchissant</option>
@@ -261,11 +275,10 @@
                 </div>
 
                 <div class="full-width">
-                    <label for="coolingIntermittency">Gestion de l'Intermittence Refroidissement</label>
+                    <label for="coolingIntermittency">Programmation de réduit (Refroidissement)</label>
                     <select id="coolingIntermittency">
-                        <option value="continuous">Consigne maintenue en permanence</option>
-                        <option value="heatwave_only">Utilisation restreinte aux pics de chaleur</option>
-                        <option value="occupancy_only">Fonctionnement uniquement lors de la présence</option>
+                        <option value="yes">Oui</option>
+                        <option value="no" selected>Non</option>
                     </select>
                 </div>
             </div>
@@ -282,11 +295,12 @@
                     </select>
                 </div>
                 <div>
-                    <label for="vmcSystem">VMC / Extraction d'air</label>
+                    <label for="vmcSystem">Ventilation</label>
                     <select id="vmcSystem">
-                        <option value="standard">Ouverture VMC Standard Auto/Hygro A</option>
-                        <option value="acceleree">VMC Hygro B / Débit contrôlé accéléré</option>
-                        <option value="fermee">Extraction fermée / Obstruée</option>
+                        <option value="trappe">Trappe actionnable</option>
+                        <option value="continue_non_pilotable">Ventilation continue non pilotable</option>
+                        <option value="marche_forcee">Ventilation avec marche forcée</option>
+                        <option value="none" selected>Aucune</option>
                     </select>
                 </div>
             </div>
@@ -305,7 +319,6 @@
 
     <script src="engine.js"></script>
     <script>
-        // Secours si engine.js ne contient pas encore SolsticeStore
         if (typeof SolsticeStore === 'undefined') {
             window.SolsticeStore = {
                 STORAGE_KEY: 'HOUSE_CONFIG',
@@ -330,15 +343,9 @@
                         return false;
                     }
                 },
-                getZone(zoneId) {
-                    return this.config[zoneId] || null;
-                },
-                getAllZones() {
-                    return this.config;
-                },
-                getZones() {
-                    return this.config;
-                }
+                getZone(zoneId) { return this.config[zoneId] || null; },
+                getAllZones() { return this.config; },
+                getZones() { return this.config; }
             };
         }
 
@@ -349,9 +356,11 @@
         const sensorNameInput = document.getElementById('sensorName');
         const sensorIdInput = document.getElementById('sensorId');
         const existingZonesSelect = document.getElementById('existingZones');
+        const copyFromZoneSelect = document.getElementById('copyFromZone');
         const form = document.getElementById('expertForm');
         const windowsContainer = document.getElementById('windowsContainer');
         const statusBadge = document.getElementById('zoneStatus');
+        const usageOutdoorCb = document.getElementById('usageOutdoor');
 
         window.addEventListener('DOMContentLoaded', () => {
             SolsticeStore.init();
@@ -360,6 +369,9 @@
         });
 
         function initEventListeners() {
+            // Mode Extérieur : Masque les sections A, B, C, D
+            usageOutdoorCb.addEventListener('change', toggleOutdoorMode);
+
             existingZonesSelect.addEventListener('change', () => {
                 const selectedId = existingZonesSelect.value;
                 if (selectedId && SolsticeStore.getZone(selectedId)) {
@@ -367,9 +379,7 @@
                     zoneNameInput.value = zone.name || '';
                     sensorNameInput.value = zone.sensorName || '';
                     sensorIdInput.value = zone.sensorId || '';
-                    document.querySelectorAll('input[name="usage"]').forEach(cb => {
-                        cb.checked = Array.isArray(zone.usages) && zone.usages.includes(cb.value);
-                    });
+                    restoreUsages(zone.usages);
                 } else {
                     zoneNameInput.value = "";
                     sensorNameInput.value = "";
@@ -377,6 +387,20 @@
                 }
                 form.style.display = 'none';
                 statusBadge.style.display = 'none';
+            });
+
+            // Bouton Dupliquer
+            document.getElementById('btnCopyZone').addEventListener('click', () => {
+                const srcId = copyFromZoneSelect.value;
+                if (!srcId) {
+                    alert("Veuillez sélectionner une zone source à dupliquer.");
+                    return;
+                }
+                const srcData = SolsticeStore.getZone(srcId);
+                if (srcData) {
+                    populateForm(srcData, true); // true = garde nom & capteur actuels
+                    alert(`✅ Paramètres de "${srcData.name}" copiés dans le formulaire.`);
+                }
             });
 
             document.getElementById('loadZoneBtn').addEventListener('click', () => {
@@ -402,6 +426,7 @@
                     statusBadge.style.color = "#2980b9";
                 }
                 statusBadge.style.display = 'block';
+                toggleOutdoorMode();
             });
 
             document.getElementById('addWindowBtn').addEventListener('click', () => addWindowBlock());
@@ -416,12 +441,29 @@
             document.getElementById('saveConfigBtn').addEventListener('click', handleSave);
         }
 
+        function toggleOutdoorMode() {
+            const isOutdoor = usageOutdoorCb.checked;
+            const sections = document.querySelectorAll('.config-section');
+            const notice = document.getElementById('outdoorNotice');
+            sections.forEach(s => s.style.display = isOutdoor ? 'none' : 'block');
+            notice.style.display = isOutdoor ? 'block' : 'none';
+        }
+
+        function restoreUsages(usagesArray) {
+            document.querySelectorAll('input[name="usage"]').forEach(cb => {
+                cb.checked = Array.isArray(usagesArray) && usagesArray.includes(cb.value);
+            });
+            toggleOutdoorMode();
+        }
+
         function addWindowBlock(data = null) {
             windowCounter++;
             const div = document.createElement('div');
             div.className = 'window-block';
             div.style.cssText = "background: #f8f9fa; border-left: 4px solid var(--secondary, #e67e22); padding: 15px; margin-bottom: 15px; border-radius: 4px; position: relative;";
             
+            const orients = Array.isArray(data?.orient) ? data.orient : (data?.orient ? [data.orient] : ['S']);
+
             div.innerHTML = `
                 <h4 style="margin-top:0; color:var(--primary, #2c3e50);">Menuiserie Vitrée #${windowCounter}</h4>
                 <button type="button" class="btn-remove-window" style="background:#e74c3c; color:white; border:none; padding:5px 10px; font-size:0.8em; border-radius:3px; position:absolute; top:15px; right:15px; cursor:pointer;">Supprimer ✕</button>
@@ -431,15 +473,13 @@
                         <input type="number" step="0.1" min="0.1" class="win-area" value="${data ? data.area : '2.0'}">
                     </div>
                     <div>
-                        <label>Orientation</label>
-                        <select class="win-orient">
-                            <option value="S" ${data && data.orient === 'S' ? 'selected' : ''}>SUD (Gain Solaire Max)</option>
-                            <option value="SE" ${data && data.orient === 'SE' ? 'selected' : ''}>SUD-EST</option>
-                            <option value="SW" ${data && data.orient === 'SW' ? 'selected' : ''}>SUD-OUEST</option>
-                            <option value="E" ${data && data.orient === 'E' ? 'selected' : ''}>EST</option>
-                            <option value="W" ${data && data.orient === 'W' ? 'selected' : ''}>OUEST</option>
-                            <option value="N" ${data && data.orient === 'N' ? 'selected' : ''}>NORD (Déperdition brute)</option>
-                        </select>
+                        <label>Orientation(s) (2 max)</label>
+                        <div class="win-orient-group" style="display:flex; gap:12px; margin-top:8px;">
+                            <label><input type="checkbox" class="win-orient-cb" value="N" ${orients.includes('N') ? 'checked' : ''}> N</label>
+                            <label><input type="checkbox" class="win-orient-cb" value="S" ${orients.includes('S') ? 'checked' : ''}> S</label>
+                            <label><input type="checkbox" class="win-orient-cb" value="E" ${orients.includes('E') ? 'checked' : ''}> E</label>
+                            <label><input type="checkbox" class="win-orient-cb" value="W" ${orients.includes('W') ? 'checked' : ''}> O</label>
+                        </div>
                     </div>
                     <div>
                         <label>Masque Solaire (Ombrage)</label>
@@ -467,13 +507,11 @@
                         </select>
                     </div>
                     <div>
-                        <label>Capacité de ventilation</label>
+                        <label>Capacité d'ouverture</label>
                         <select class="win-vent">
-                            <option value="battante" ${data && data.vent === 'battante' ? 'selected' : ''}>Battante (Ouverture totale)</option>
-                            <option value="oscillo_battante" ${data && data.vent === 'oscillo_battante' ? 'selected' : ''}>Oscillo-battante</option>
-                            <option value="oscillante" ${data && data.vent === 'oscillante' ? 'selected' : ''}>Oscillante (Entrebâillement)</option>
-                            <option value="coulissante" ${data && data.vent === 'coulissante' ? 'selected' : ''}>Coulissante</option>
-                            <option value="fixe" ${data && data.vent === 'fixe' ? 'selected' : ''}>Fixe (Inouvrable)</option>
+                            <option value="total" ${data && (data.vent === 'total' || data.vent === 'battante') ? 'selected' : ''}>Ouverture totale</option>
+                            <option value="partial" ${data && (data.vent === 'partial' || data.vent === 'oscillo_battante' || data.vent === 'coulissante') ? 'selected' : ''}>Ouverture partielle</option>
+                            <option value="fixed" ${data && (data.vent === 'fixed' || data.vent === 'fixe') ? 'selected' : ''}>Fixe</option>
                         </select>
                     </div>
                     <div class="full-width">
@@ -491,6 +529,18 @@
                     </div>
                 </div>
             `;
+
+            // Verrouiller à 2 orientations max
+            div.querySelectorAll('.win-orient-cb').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    const checked = div.querySelectorAll('.win-orient-cb:checked');
+                    if (checked.length > 2) {
+                        e.target.checked = false;
+                        alert("Vous ne pouvez sélectionner que 2 orientations maximum par fenêtre (ex: Sud + Est).");
+                    }
+                });
+            });
+
             windowsContainer.appendChild(div);
         }
 
@@ -509,9 +559,10 @@
             const windows = [];
             document.querySelectorAll('.window-block').forEach(block => {
                 const areaVal = parseFloat(block.querySelector('.win-area').value);
+                const selectedOrients = Array.from(block.querySelectorAll('.win-orient-cb:checked')).map(cb => cb.value);
                 windows.push({
                     area: isNaN(areaVal) ? 0 : areaVal,
-                    orient: block.querySelector('.win-orient').value,
+                    orient: selectedOrients.length > 0 ? selectedOrients : ['S'],
                     mask: block.querySelector('.win-mask').value,
                     glass: block.querySelector('.win-glass').value,
                     tilt: block.querySelector('.win-tilt').value,
@@ -577,19 +628,26 @@
 
         function refreshExistingZonesDropdown() {
             existingZonesSelect.innerHTML = '<option value="">-- Créer une nouvelle zone --</option>';
+            copyFromZoneSelect.innerHTML = '<option value="">-- Sélectionner une pièce source --</option>';
+
             const zones = SolsticeStore.getAllZones ? SolsticeStore.getAllZones() : SolsticeStore.getZones();
             for (const key in zones) {
                 const opt = document.createElement('option');
                 opt.value = key;
                 opt.textContent = `⚙️ ${zones[key].name || key}`;
                 existingZonesSelect.appendChild(opt);
+
+                const optCopy = document.createElement('option');
+                optCopy.value = key;
+                optCopy.textContent = `📋 ${zones[key].name || key}`;
+                copyFromZoneSelect.appendChild(optCopy);
             }
         }
 
-        function populateForm(data) {
-            document.querySelectorAll('input[name="usage"]').forEach(cb => {
-                cb.checked = Array.isArray(data.usages) && data.usages.includes(cb.value);
-            });
+        function populateForm(data, keepIdentity = false) {
+            if (!keepIdentity) {
+                restoreUsages(data.usages);
+            }
 
             document.getElementById('roomArea').value = data.area || '';
             document.getElementById('ceilingHeight').value = data.height || 2.5;
@@ -616,20 +674,20 @@
             }
 
             if (data.equipment) {
-                document.getElementById('heatingSystem').value = data.equipment.heating?.system || 'convection';
+                document.getElementById('heatingSystem').value = data.equipment.heating?.system || 'none';
                 document.querySelectorAll('input[name="heatingRegulation"]').forEach(cb => {
                     cb.checked = Array.isArray(data.equipment.heating?.regulation) && data.equipment.heating.regulation.includes(cb.value);
                 });
-                document.getElementById('heatingIntermittency').value = data.equipment.heating?.intermittency || 'continuous';
+                document.getElementById('heatingIntermittency').value = data.equipment.heating?.intermittency || 'no';
 
                 document.getElementById('coolingSystem').value = data.equipment.cooling?.system || 'aucun';
                 document.querySelectorAll('input[name="coolingRegulation"]').forEach(cb => {
                     cb.checked = Array.isArray(data.equipment.cooling?.regulation) && data.equipment.cooling.regulation.includes(cb.value);
                 });
-                document.getElementById('coolingIntermittency').value = data.equipment.cooling?.intermittency || 'continuous';
+                document.getElementById('coolingIntermittency').value = data.equipment.cooling?.intermittency || 'no';
 
                 document.getElementById('fanSystem').value = data.equipment.fanSystem || 'aucun';
-                document.getElementById('vmcSystem').value = data.equipment.vmcSystem || 'standard';
+                document.getElementById('vmcSystem').value = data.equipment.vmcSystem || 'none';
             }
 
             windowsContainer.innerHTML = '';
@@ -650,11 +708,16 @@
             document.getElementById('adjWall3').value = 'heated';
             document.getElementById('adjWall4').value = 'heated';
 
-            document.querySelectorAll('input[name="usage"]').forEach(cb => cb.checked = false);
             document.querySelectorAll('input[name="adjCeiling"]').forEach(cb => cb.checked = (cb.value === 'heated'));
             document.querySelectorAll('input[name="adjFloor"]').forEach(cb => cb.checked = (cb.value === 'heated'));
             document.querySelectorAll('input[name="heatingRegulation"]').forEach(cb => cb.checked = (cb.value === 'thermostat_central'));
             document.querySelectorAll('input[name="coolingRegulation"]').forEach(cb => cb.checked = false);
+
+            document.getElementById('heatingSystem').value = 'none';
+            document.getElementById('coolingSystem').value = 'aucun';
+            document.getElementById('heatingIntermittency').value = 'no';
+            document.getElementById('coolingIntermittency').value = 'no';
+            document.getElementById('vmcSystem').value = 'none';
 
             windowsContainer.innerHTML = '';
             windowCounter = 0;
