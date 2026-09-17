@@ -32,13 +32,20 @@ window.addEventListener('load', () => {
     const savedConfig = localStorage.getItem('HOUSE_CONFIG');
     if (savedConfig) { 
         GLOBAL_HOUSE_CONFIG = JSON.parse(savedConfig); 
+        // Synchronisation dynamique de capteursMaison avec la configuration expert
+        for (const key in GLOBAL_HOUSE_CONFIG) {
+            const z = GLOBAL_HOUSE_CONFIG[key];
+            if (z.name && z.sensorId) {
+                capteursMaison[z.name] = z.sensorId;
+            }
+        }
     }
 
     const savedSelection = localStorage.getItem('SOLSTICE_SELECTION_PIECES');
     if (savedSelection) {
         SELECTION_PIECES = JSON.parse(savedSelection);
     } else {
-        SELECTION_PIECES = ["Cuisine", "Salon", "Chambre parents"];
+        SELECTION_PIECES = Object.keys(capteursMaison).slice(0, 3);
         localStorage.setItem('SOLSTICE_SELECTION_PIECES', JSON.stringify(SELECTION_PIECES));
     }
 
@@ -289,7 +296,12 @@ function calculateMeanRadiantTemp(zone, t_air) {
             }[win.shutter] ?? 1.0;
 
             if (isSunny && maskFactor > 0.1) {
-                const orientFactor = { 'S': 3.5, 'SE': 2.8, 'SW': 2.8, 'E': 1.8, 'W': 1.8, 'N': 0.4 }[win.orient] ?? 1.0;
+                // Calcul pondéré des orientations de vitrages
+            const orientArr = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
+            const orientFactors = { 'S': 3.2, 'SE': 2.5, 'SW': 2.5, 'E': 1.8, 'W': 1.8, 'N': 0.6 };
+            let sumOrientFactor = 0;
+            orientArr.forEach(o => { sumOrientFactor += (orientFactors[o] || 1.5); });
+            const orientFactor = orientArr.length > 0 ? (sumOrientFactor / orientArr.length) : 1.5;
                 const tiltFactor = { 'verticale': 1.0, 'inclinee': 1.3, 'horizontale': 1.5 }[win.tilt] ?? 1.0;
                 tWin += (spec.g * orientFactor * tiltFactor * maskFactor * shutterFactor * 5.0);
             }
@@ -423,37 +435,99 @@ function calculateDryingPotential(ta, rh, vel = 0.1) {
 }
 
 function calculateDailyThermalBalance(zoneConfig, ta) {
-    const area = parseFloat(zoneConfig?.area) || 15;
-    const h = parseFloat(zoneConfig?.height) || 2.5;
+    if (!zoneConfig) return { hTotalWPerK: 0, deperditionskWh: 0, gainsSolaireskWh: 0, bilanNetkWh: 0 };
+
+    // 1. Si la zone est configurée comme "Extérieur", aucun bilan thermique intérieur
+    if (Array.isArray(zoneConfig.usages) && zoneConfig.usages.includes('outdoor')) {
+        return { hTotalWPerK: 0, deperditionskWh: 0, gainsSolaireskWh: 0, bilanNetkWh: 0 };
+    }
+
+    const area = parseFloat(zoneConfig.area) || 15;
+    const h = parseFloat(zoneConfig.height) || 2.5;
     const volume = area * h;
     const side = Math.sqrt(area);
-    const wallArea = side * h;
+    const wallArea = side * h; // Surface unitaire d'un mur
 
-    const uWall = getUValueParoi('wall', zoneConfig?.wallMat || 'cinderblock', zoneConfig?.insulation || 'iti_recent');
-    const uCeiling = getUValueParoi('ceiling', zoneConfig?.ceilingMat || 'concrete', zoneConfig?.ceilingInsulation || 'iti_recent');
-    const uFloor = getUValueParoi('floor', zoneConfig?.floorMat || 'concrete', zoneConfig?.floorInsulation || 'low');
+    // 2. Coefficients U des parois (W/m².K)
+    const uWall = getUValueParoi('wall', zoneConfig.wallMat || 'cinderblock', zoneConfig.insulation || 'iti_recent');
+    const uCeiling = getUValueParoi('ceiling', zoneConfig.ceilingMat || 'leger', zoneConfig.ceilingInsulation || 'iti_recent');
+    const uFloor = getUValueParoi('floor', zoneConfig.floorMat || 'lourd', zoneConfig.floorInsulation || 'iti_recent');
 
-    const hSurfacique = (uWall * wallArea * 4) + (uCeiling * area) + (uFloor * area);
-    const hVentilation = 0.34 * (volume * 0.5);
+    // Helper pour déterminer le facteur de réduction de température b
+    const getBFactor = (adj) => {
+        if (Array.isArray(adj)) {
+            if (adj.includes('outside')) return 1.0;
+            if (adj.includes('unheated')) return 0.5;
+            return 0.0; // heated
+        }
+        if (adj === 'outside') return 1.0;
+        if (adj === 'unheated') return 0.5;
+        return 0.0; // heated
+    };
+
+    // Application des coefficients b selon les adjacences réelles
+    const bW1 = getBFactor(zoneConfig.adj?.wall1 || 'outside');
+    const bW2 = getBFactor(zoneConfig.adj?.wall2 || 'heated');
+    const bW3 = getBFactor(zoneConfig.adj?.wall3 || 'heated');
+    const bW4 = getBFactor(zoneConfig.adj?.wall4 || 'heated');
+    const bCeiling = getBFactor(zoneConfig.adj?.ceiling || ['heated']);
+    const bFloor = getBFactor(zoneConfig.adj?.floor || ['heated']);
+
+    // Déperditions surfaciques nettes (W/K)
+    const hWall = uWall * wallArea * (bW1 + bW2 + bW3 + bW4);
+    const hCeiling = uCeiling * area * bCeiling;
+    const hFloor = uFloor * area * bFloor;
+    const hSurfacique = hWall + hCeiling + hFloor;
+
+    // 3. Déperditions par renouvellement d'air (W/K)
+    let ach = 0.5; // Taux par défaut (vol/h)
+    const vmc = zoneConfig.equipment?.vmcSystem;
+    if (vmc === 'marche_forcee') ach = 1.0;
+    else if (vmc === 'continue_non_pilotable') ach = 0.7;
+    else if (vmc === 'trappe') ach = 0.5;
+    else if (vmc === 'none') ach = 0.25;
+
+    const hVentilation = 0.34 * volume * ach;
     const hTotal = hSurfacique + hVentilation;
 
+    // 4. Calcul des déperditions quotidiennes (kWh/j)
     const deltaT = Math.max(0, ta - outdoorTemp);
     const deperditionskWh = (hTotal * deltaT * 24) / 1000;
 
+    // 5. Apports solaires quotidiens (kWh/j)
     let gainsSolaireskWh = 0;
     const isSunny = sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun');
 
-    if (Array.isArray(zoneConfig?.windows)) {
+    if (Array.isArray(zoneConfig.windows)) {
+        const glassMap = { 'single': 0.85, 'double_old': 0.75, 'double_recent': 0.60, 'triple': 0.45 };
+        const maskMap = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 };
+        const shutterMap = {
+            'aucun': 1.0,
+            'store_interieur': 0.7,
+            'rideau_interieur': 0.8,
+            'store_banne': 0.3,
+            'persienne': 0.3,
+            'roulant_pvc': 0.15,
+            'roulant_metal': 0.2,
+            'battant_bois': 0.15
+        };
+        const orientMap = { 'S': 3.2, 'SE': 2.5, 'SW': 2.5, 'E': 1.8, 'W': 1.8, 'N': 0.6 };
+
         zoneConfig.windows.forEach(win => {
             const wArea = parseFloat(win.area) || 0;
             if (wArea <= 0) return;
 
-            const gFactor = { 'single': 0.85, 'double_old': 0.75, 'double_recent': 0.60, 'triple': 0.45 }[win.glass] ?? 0.60;
-            const maskFactor = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 }[win.mask] ?? 1.0;
-            const shutterFactor = { 'aucun': 1.0, 'store_interieur': 0.7, 'roulant_pvc': 0.2 }[win.shutter] ?? 1.0;
+            const gFactor = glassMap[win.glass] ?? 0.60;
+            const maskFactor = maskMap[win.mask] ?? 1.0;
+            const shutterFactor = shutterMap[win.shutter] ?? 1.0;
 
-            let iSolar = { 'S': 3.2, 'SE': 2.5, 'SW': 2.5, 'E': 1.8, 'W': 1.8, 'N': 0.6 }[win.orient] ?? 1.5;
-            if (!isSunny) iSolar *= 0.3; 
+            // Gestion multi-orientations (moyenne pondérée si plusieurs cases cochées)
+            const orients = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
+            let sumI = 0;
+            orients.forEach(o => { sumI += (orientMap[o] || 1.5); });
+            let iSolar = orients.length > 0 ? (sumI / orients.length) : 1.5;
+
+            if (!isSunny) iSolar *= 0.3;
 
             gainsSolaireskWh += (wArea * gFactor * maskFactor * shutterFactor * iSolar);
         });
