@@ -31,14 +31,32 @@ window.addEventListener('load', () => {
     const savedConfig = localStorage.getItem('HOUSE_CONFIG');
     if (savedConfig) { 
         GLOBAL_HOUSE_CONFIG = JSON.parse(savedConfig); 
-        // Synchronisation dynamique de capteursMaison avec la configuration expert
-        for (const key in GLOBAL_HOUSE_CONFIG) {
-            const z = GLOBAL_HOUSE_CONFIG[key];
-            if (z.name && z.sensorId) {
-                capteursMaison[z.name] = z.sensorId;
+        rafraichirCapteursDepuisConfig(); // <-- Génération de la liste des capteurs actifs
+        initialiserDashboard(); 
+    } else { 
+        alert("Veuillez paramétrer l'habitat dans l'espace Expert."); 
+        window.location.href = 'setup.html'; 
+        return; 
+    }
+    
+    restoreSessionData();
+
+    const cachedHabitat = sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
+    if (cachedHabitat) {
+        DONNEES_HABITAT = JSON.parse(cachedHabitat);
+        recalculerToutLeDashboard();
+        
+        for (const [nomPiece, idCapteur] of Object.entries(capteursMaison)) {
+            if (DONNEES_HABITAT[nomPiece]) {
+                const statusEl = document.getElementById('status-' + idCapteur);
+                if (statusEl) {
+                    statusEl.textContent = "En mémoire";
+                    statusEl.style.color = "var(--eco)";
+                }
             }
         }
     }
+});
 
     const savedSelection = localStorage.getItem('SOLSTICE_SELECTION_PIECES');
     if (savedSelection) {
@@ -49,7 +67,7 @@ window.addEventListener('load', () => {
     }
 
     genererSelecteurPieces();
-    initialiserDashboard(); 
+    (); 
     restoreSessionData();
 
     const savedLoc = localStorage.getItem('location') || 'Reims';
@@ -111,7 +129,7 @@ window.onRoomSelectionChange = function(checkbox) {
     }
     localStorage.setItem('SOLSTICE_SELECTION_PIECES', JSON.stringify(SELECTION_PIECES));
     genererSelecteurPieces();
-    initialiserDashboard();
+    ();
     recalculerToutLeDashboard();
 };
 
@@ -119,58 +137,48 @@ window.toggleAllRooms = function(selectState) {
     SELECTION_PIECES = selectState ? Object.keys(capteursMaison) : [];
     localStorage.setItem('SOLSTICE_SELECTION_PIECES', JSON.stringify(SELECTION_PIECES));
     genererSelecteurPieces();
-    initialiserDashboard();
+    ();
     recalculerToutLeDashboard();
 };
 
 function initialiserDashboard() {
-    const tbody = document.getElementById('dashboard-table-body');
-    if (!tbody) return; 
-    tbody.innerHTML = ''; 
+    const grid = document.getElementById('dashboard-grid');
+    if (!grid) return; 
+    grid.innerHTML = ''; 
 
-    if (SELECTION_PIECES.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 30px; color: var(--slate-600);">⚠️ Aucune pièce sélectionnée. Cochez au moins une pièce ci-dessus.</td></tr>`;
+    const zones = Object.values(GLOBAL_HOUSE_CONFIG);
+    if (zones.length === 0) {
+        grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #7f8c8d; padding: 20px;">Aucune zone paramétrée dans l'Espace Expert.</p>`;
         return;
     }
 
-    for (const nomPiece of SELECTION_PIECES) {
-        const idCapteur = capteursMaison[nomPiece];
-        if (!idCapteur) continue;
+    zones.forEach(zone => {
+        const nomPiece = zone.name;
+        const idCapteur = zone.sensorId || zone.id;
 
-        const configActive = getZoneConfigByName(nomPiece);
-        const badgeExpert = configActive 
-            ? `<span class="badge badge-success" style="font-size: 0.7rem; padding: 2px 6px;">BEM Actif</span>` 
-            : `<span class="badge badge-warning" style="font-size: 0.7rem; padding: 2px 6px;">Par défaut</span>`;
+        const tuile = document.createElement('div');
+        tuile.style.cssText = 'background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);';
+        
+        const badgeExpert = `<span style="font-size: 0.7em; color: var(--eco); background: #e9f7ef; padding: 2px 6px; border-radius: 4px;">Modèle Actif</span>`;
 
-        const row = document.createElement('tr');
-        row.style.borderBottom = "1px solid var(--border-color, #E2E8F0)";
-        row.setAttribute('data-zone-id', idCapteur);
-
-        const safeName = nomPiece.replace(/'/g, "\\'");
-
-        row.innerHTML = `
-            <td style="padding: 12px 14px; font-weight: 600; color: var(--slate-900);">
-                <div>${nomPiece}</div>
-                <div style="margin-top: 2px;">${badgeExpert}</div>
-            </td>
-            <td style="padding: 12px 10px; text-align: center;">
-                <span id="status-${idCapteur}" class="badge" style="background: var(--slate-100); color: var(--slate-600); font-size: 0.75rem;">En attente</span>
-            </td>
-            <td id="temp-${idCapteur}" style="padding: 12px 10px; text-align: right; font-weight: 700; font-size: 1rem;">-- °C</td>
-            <td id="hum-${idCapteur}" style="padding: 12px 10px; text-align: right; font-weight: 600;">-- %</td>
-            <td id="ah-${idCapteur}" style="padding: 12px 10px; text-align: right; color: #0284C7;">-- g/m³</td>
-            <td style="padding: 12px 10px; text-align: center;">
-                <span id="pmv-badge-${idCapteur}" class="badge" style="font-size: 0.85rem; font-weight: 800; padding: 4px 8px;">--</span>
-            </td>
-            <td id="energy-${idCapteur}" style="padding: 12px 10px; text-align: right; color: #DC2626; font-weight: 600;">-- kWh/j</td>
-            <td id="tstruct-${idCapteur}" style="padding: 12px 10px; text-align: right; color: #D97706; font-weight: 600;">-- °C</td>
-            <td id="drying-${idCapteur}" style="padding: 12px 10px; text-align: center; font-weight: 500;">--</td>
-            <td style="padding: 12px 14px; text-align: center;">
-                <button class="btn-primary" style="padding: 5px 10px; font-size: 0.8rem;" onclick="voirRecommandations('${safeName}')">🔍 Diag</button>
-            </td>
+        tuile.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+                <div><h3 style="margin: 0; font-size: 1.2em; color: var(--primary);">${nomPiece}</h3><div style="margin-top: 4px;">${badgeExpert}</div></div>
+                <span id="status-${idCapteur}" style="font-size: 0.75em; color: #7f8c8d; background: #f1f2f6; padding: 3px 8px; border-radius: 10px;">En attente</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                <div style="text-align: center; flex: 1;"><div style="font-size: 0.85em; color: #95a5a6;">Temp.</div><div id="temp-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary);">--°C</div></div>
+                <div style="text-align: center; flex: 1; border-left: 1px solid #eee;"><div style="font-size: 0.85em; color: #95a5a6;">Humidité</div><div id="hum-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary);">--%</div></div>
+            </div>
+            <div id="pmv-box-${idCapteur}" style="text-align: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+                <div style="font-size: 0.85em; color: #7f8c8d;">Indice PMV</div>
+                <div id="pmv-${idCapteur}" style="font-size: 1.3em; font-weight: bold; color: #bdc3c7;">--</div>
+                <div id="pmv-text-${idCapteur}" style="font-size: 0.8em; margin-top: 5px; color: #7f8c8d;">--</div>
+            </div>
+            <button onclick="voirRecommandations('${nomPiece}')" style="width: 100%; padding: 12px; background-color: var(--secondary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🔍 Lancer le diagnostic</button>
         `;
-        tbody.appendChild(row);
-    }
+        grid.appendChild(tuile);
+    });
 }
 
 function restoreSessionData() {
