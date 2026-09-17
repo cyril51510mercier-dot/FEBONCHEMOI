@@ -95,7 +95,7 @@ window.addEventListener('load', () => {
                 const statusEl = document.getElementById('status-' + idCapteur);
                 if (statusEl) {
                     statusEl.textContent = "En mémoire";
-                    statusEl.style.color = "var(--status-success, #10B981)";
+                    statusEl.style.color = "#10B981";
                 }
             }
         }
@@ -115,12 +115,13 @@ function genererSelecteurPieces() {
             align-items: center; 
             gap: 6px; 
             cursor: pointer; 
-            background: ${isChecked ? '#FDF4F0' : 'white'}; 
+            background: ${isChecked ? '#FDF4F0' : '#F8FAFC'}; 
             padding: 5px 10px; 
             border-radius: 6px; 
             border: 1px solid ${isChecked ? '#D96B43' : '#CBD5E1'};
-            font-size: 0.85em;
+            font-size: 0.82em;
             color: #1E293B;
+            font-weight: 500;
         `;
         label.innerHTML = `
             <input type="checkbox" value="${nomPiece}" ${isChecked ? 'checked' : ''} onchange="onRoomSelectionChange(this)">
@@ -149,21 +150,21 @@ function initialiserDashboard() {
 
             const idCapteur = zone.sensorId || zone.id;
             const tr = document.createElement('tr');
-            tr.style.cssText = 'border-bottom: 1px solid var(--border-color, #E2E8F0);';
+            tr.style.cssText = 'border-bottom: 1px solid #E2E8F0;';
             const safeName = nomPiece.replace(/'/g, "\\'");
 
             tr.innerHTML = `
-                <td style="padding: 12px 14px; font-weight: 600; color: var(--slate-800, #1E293B);">${nomPiece}</td>
-                <td style="padding: 12px 10px; text-align: center;"><span id="status-${idCapteur}" class="badge" style="background: #F1F5F9; color: #64748B; font-size: 0.75rem;">En attente</span></td>
-                <td style="padding: 12px 10px; text-align: right; font-weight: 700; color: var(--slate-800, #1E293B);" id="temp-${idCapteur}">-- °C</td>
-                <td style="padding: 12px 10px; text-align: right; font-weight: 600;" id="hum-${idCapteur}">-- %</td>
+                <td style="padding: 12px 14px; font-weight: 600; color: #0F172A;">${nomPiece}</td>
+                <td style="padding: 12px 10px; text-align: center;"><span id="status-${idCapteur}" style="background: #F1F5F9; color: #64748B; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; font-weight: 600;">En attente</span></td>
+                <td style="padding: 12px 10px; text-align: right; font-weight: 700; color: #0F172A;" id="temp-${idCapteur}">-- °C</td>
+                <td style="padding: 12px 10px; text-align: right; font-weight: 600; color: #334155;" id="hum-${idCapteur}">-- %</td>
                 <td style="padding: 12px 10px; text-align: right; font-weight: 600; color: #0284C7;" id="ah-${idCapteur}">-- g/m³</td>
-                <td style="padding: 12px 10px; text-align: center;"><span id="pmv-badge-${idCapteur}" class="badge" style="font-weight: 700;">--</span></td>
+                <td style="padding: 12px 10px; text-align: center;"><span id="pmv-badge-${idCapteur}" style="font-weight: 700; padding: 4px 8px; border-radius: 6px; font-size: 0.82rem;">--</span></td>
                 <td style="padding: 12px 10px; text-align: right; font-weight: 600;" id="energy-${idCapteur}">-- kWh/j</td>
                 <td style="padding: 12px 10px; text-align: right; font-weight: 600; color: #D97706;" id="tstruct-${idCapteur}">-- °C</td>
                 <td style="padding: 12px 10px; text-align: center; font-weight: 600;" id="drying-${idCapteur}">--</td>
                 <td style="padding: 12px 14px; text-align: center;">
-                    <button onclick="voirRecommandations('${safeName}')" class="btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer;">🔍 Diag</button>
+                    <button onclick="voirRecommandations('${safeName}')" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 4px 10px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: #0F172A;">🔍 Diag</button>
                 </td>
             `;
             tableBody.appendChild(tr);
@@ -188,7 +189,7 @@ function initialiserDashboard() {
             tuile.style.cssText = 'background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);';
             tuile.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
-                    <div><h3 style="margin: 0; font-size: 1.2em; color: var(--primary, #2c3e50);">${nomPiece}</h3></div>
+                    <div><h3 style="margin: 0; font-size: 1.2em; color: #2c3e50;">${nomPiece}</h3></div>
                     <span id="status-${idCapteur}" style="font-size: 0.75em; color: #7f8c8d; background: #f1f2f6; padding: 3px 8px; border-radius: 10px;">En attente</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
@@ -198,7 +199,7 @@ function initialiserDashboard() {
                 <div id="pmv-box-${idCapteur}" style="text-align: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
                     <span id="pmv-badge-${idCapteur}" style="font-size: 1.3em; font-weight: bold;">--</span>
                 </div>
-                <button onclick="voirRecommandations('${safeName}')" style="width: 100%; padding: 12px; background-color: var(--secondary, #e67e22); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🔍 Lancer le diagnostic</button>
+                <button onclick="voirRecommandations('${safeName}')" style="width: 100%; padding: 12px; background-color: #e67e22; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🔍 Lancer le diagnostic</button>
             `;
             grid.appendChild(tuile);
         });
@@ -670,10 +671,7 @@ function calculateGlobalHabitatMetrics() {
 
         const zoneConfig = getZoneConfigByName(nomPiece) || { area: 15, height: 2.5 };
 
-        // 1. Exclure systématiquement les pièces extérieures du cockpit global
         if (isOutdoorZone(nomPiece, zoneConfig)) continue;
-
-        // 2. Exclure les pièces tampons si l'option est décochée
         if (!includeBufferZones && isBufferZone(nomPiece, zoneConfig)) continue;
 
         const area = parseFloat(zoneConfig.area) || 15;
@@ -786,7 +784,6 @@ function mettreAJourTuile(nomPiece) {
         dryingEl.style.color = drying.score >= 4 ? "#10B981" : (drying.score === 2 ? "#F59E0B" : "#EF4444");
     }
 
-    // Affichage du Bilan Net (24h) dans la colonne tableau
     if (energyEl) {
         const netVal = energyBalance.bilanNetkWh;
         const prefix = netVal > 0 ? "+" : "";
@@ -842,17 +839,20 @@ function actualiserCockpitGlobal() {
     if (pmvStatusEl) {
         if (metrics.avgPMV >= -0.5 && metrics.avgPMV <= 0.5) {
             pmvStatusEl.textContent = "Confort Optimal";
-            pmvStatusEl.className = "badge badge-success";
+            pmvStatusEl.style.background = "#059669";
+            pmvStatusEl.style.color = "#FFFFFF";
         } else if (metrics.avgPMV < -0.5) {
             pmvStatusEl.textContent = "Frais Global";
-            pmvStatusEl.className = "badge badge-warning";
+            pmvStatusEl.style.background = "#D97706";
+            pmvStatusEl.style.color = "#FFFFFF";
         } else {
             pmvStatusEl.textContent = "Chaud Global";
-            pmvStatusEl.className = "badge badge-danger";
+            pmvStatusEl.style.background = "#DC2626";
+            pmvStatusEl.style.color = "#FFFFFF";
         }
     }
 
-    // Mise à jour des 3 lignes + Bilan Net Final
+    // Mise à jour Option 3 : Gains extérieurs, Déperditions, Gains solaires, Bilan net global
     if (document.getElementById('global-gains-ext')) document.getElementById('global-gains-ext').textContent = `+${metrics.totalGainsConductionkWh} kWh/j`;
     if (document.getElementById('global-dep')) document.getElementById('global-dep').textContent = `-${metrics.totalDeperditionskWh} kWh/j`;
     if (document.getElementById('global-gains-sol')) document.getElementById('global-gains-sol').textContent = `+${metrics.totalGainsSolaireskWh} kWh/j`;
@@ -970,16 +970,16 @@ function updateWeatherUI(loading = false, error = false, errorMsg = "") {
     if (!summaryEl) return;
 
     if (loading) {
-        summaryEl.innerHTML = '<span class="muted-text">⏳ Chargement météo...</span>';
+        summaryEl.innerHTML = '<span style="color: #64748B;">⏳ Chargement météo...</span>';
         return;
     }
     if (error) {
-        summaryEl.innerHTML = `<span style="color: var(--status-danger, #EF4444); font-weight: bold;">❌ ${errorMsg || "Météo indisponible"}</span>`;
+        summaryEl.innerHTML = `<span style="color: #EF4444; font-weight: bold;">❌ ${errorMsg || "Météo indisponible"}</span>`;
         return;
     }
 
     summaryEl.innerHTML = `
-        <span style="color: var(--slate-800, #1E293B); font-weight: 600;">
+        <span>
             🌡️ ${outdoorTemp.toFixed(1)} °C &nbsp;|&nbsp; 💧 ${outdoorHumidity}% HR &nbsp;|&nbsp; 💨 ${outdoorWind.toFixed(0)} km/h (${sunshineStatus})
         </span>
     `;
@@ -998,7 +998,7 @@ window.synchroniserTouteLaMaison = async function() {
     const btn = document.getElementById('btn-sync-all');
     if (btn) {
         btn.innerHTML = "⏳ Scan Global en cours...";
-        btn.style.backgroundColor = "var(--slate-600, #475569)";
+        btn.style.backgroundColor = "#475569";
     }
 
     try {
@@ -1025,7 +1025,7 @@ window.synchroniserTouteLaMaison = async function() {
                     if (statusEl) {
                         const now = new Date();
                         statusEl.textContent = "Actuel (" + now.getHours() + "h" + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes() + ")";
-                        statusEl.style.color = "var(--status-success, #10B981)";
+                        statusEl.style.color = "#10B981";
                     }
                 }
             }
@@ -1042,7 +1042,7 @@ window.synchroniserTouteLaMaison = async function() {
 
     if (btn) {
         btn.innerHTML = "⚡ Interroger les capteurs (Super-Scan)";
-        btn.style.backgroundColor = "var(--terracotta-500, #D96B43)";
+        btn.style.backgroundColor = "#D96B43";
     }
 };
 
