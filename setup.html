@@ -371,7 +371,6 @@
         function initEventListeners() {
             usageOutdoorCb.addEventListener('change', toggleOutdoorMode);
 
-            // Changement dans le menu déroulant "Zone existante"
             existingZonesSelect.addEventListener('change', () => {
                 const selectedId = existingZonesSelect.value;
                 if (selectedId && SolsticeStore.getZone(selectedId)) {
@@ -390,7 +389,6 @@
                 statusBadge.style.display = 'none';
             });
 
-            // Bouton Dupliquer
             document.getElementById('btnCopyZone').addEventListener('click', () => {
                 const srcId = copyFromZoneSelect.value;
                 if (!srcId) {
@@ -404,7 +402,6 @@
                 }
             });
 
-            // Clic sur "Charger / Éditer cette Zone"
             document.getElementById('loadZoneBtn').addEventListener('click', () => {
                 const name = zoneNameInput.value.trim();
                 if (!name) {
@@ -412,19 +409,16 @@
                     return;
                 }
 
-                // Génération d'un ID déterministe (évite la création de doublons)
                 const selectedId = existingZonesSelect.value;
                 const normalizedId = 'zone_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_');
                 currentZoneId = selectedId ? selectedId : normalizedId;
 
-                // Récupération des usages actuellement coché(e)s par l'utilisateur à l'écran
                 const userSelectedUsages = Array.from(document.querySelectorAll('input[name="usage"]:checked')).map(cb => cb.value);
 
                 form.style.display = 'block';
 
                 const existingData = SolsticeStore.getZone(currentZoneId);
                 if (existingData) {
-                    // Si l'utilisateur a coché des usages avant de charger, on conserve sa saisie écran
                     if (userSelectedUsages.length > 0) {
                         existingData.usages = userSelectedUsages;
                     }
@@ -703,7 +697,7 @@
 
             windowsContainer.innerHTML = '';
             windowCounter = 0;
-            if (Array.isArray(data.windows) && data.windows.length > 0) {
+            if (Array.isArray(data.windows)) {
                 data.windows.forEach(win => addWindowBlock(win));
             } else {
                 addWindowBlock();
@@ -732,7 +726,6 @@
 
             windowsContainer.innerHTML = '';
             windowCounter = 0;
-            addWindowBlock();
         }
     </script>
 </body>
