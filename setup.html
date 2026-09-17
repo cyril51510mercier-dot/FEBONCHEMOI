@@ -46,264 +46,7 @@
             <label><input type="checkbox" name="usage" value="office"> 💻 Bureau / Actif</label>
         </div>
 
-        <button type="button" class="btn-load" id="loadZoneBtn" style="width: 100%;">Charger / Éditer cette Zone ↓</button>
-        <div id="zoneStatus" class="status-badge" style="display:none; text-align:center; margin-top:10px; font-weight:bold;"></div>
-    </div>
-
-    <!-- Formulaire de Configuration Expert -->
-    <form id="expertForm" style="display:none;" novalidate>
-        
-        <!-- SECTION A: Géométrie, Structures & Isolations (Inertie) -->
-        <div class="config-section">
-            <h2>A. Géométrie, Structures & Isolations (Inertie Thermique)</h2>
-            <div class="form-grid">
-                <div>
-                    <label for="roomArea">Surface utile (m²)</label>
-                    <input type="number" id="roomArea" step="0.1" min="1" placeholder="ex : 45">
-                </div>
-                <div>
-                    <label for="ceilingHeight">Hauteur moyenne sous plafond (m)</label>
-                    <input type="number" id="ceilingHeight" step="0.05" min="1" value="2.5">
-                </div>
-
-                <!-- MURS -->
-                <div class="full-width" style="margin-top:10px;"><strong style="color:var(--primary, #2c3e50);">Structure des Murs :</strong></div>
-                <div>
-                    <label for="wallMaterial">Matériau des Murs</label>
-                    <select id="wallMaterial">
-                        <option value="cinderblock">Parpaing Creux (Standard)</option>
-                        <option value="concrete">Béton Banché (Très Lourd)</option>
-                        <option value="stone">Pierre Mulière / Moellon (Très Lourd / Conducteur)</option>
-                        <option value="brick">Brique Creuse / Alvéolaire</option>
-                        <option value="wood">Ossature Bois (Léger)</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="wallThickness">Épaisseur Mur Brut (cm)</label>
-                    <input type="number" id="wallThickness" step="1" min="5" placeholder="ex : 30">
-                </div>
-                <div class="full-width">
-                    <label for="zoneInsulation">Isolation des Murs</label>
-                    <select id="zoneInsulation">
-                        <option value="none">Rien (Non isolé)</option>
-                        <option value="iti_old">ITI Ancienne (Isolant intérieur fin)</option>
-                        <option value="iti_recent" selected>ITI Récente (Isolant intérieur performant)</option>
-                        <option value="ite_old">ITE Ancienne (Isolant extérieur modéré)</option>
-                        <option value="ite_heavy">ITE Lourde (Isolant extérieur performant)</option>
-                    </select>
-                </div>
-
-                <!-- PLAFOND / TOITURE -->
-                <div class="full-width" style="margin-top:10px;"><strong style="color:var(--primary, #2c3e50);">Plafond / Toiture :</strong></div>
-                <div>
-                    <label for="ceilingMaterial">Matériau / Inertie Plafond</label>
-                    <select id="ceilingMaterial">
-                        <option value="lourd">Lourd (Dalle béton / Hourdis)</option>
-                        <option value="leger" selected>Léger (Placo / Bois / Rampant)</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="ceilingInsulation">Isolation Plafond / Rampant</label>
-                    <select id="ceilingInsulation">
-                        <option value="none">Rien (Non isolé)</option>
-                        <option value="iti_old">ITI Ancienne</option>
-                        <option value="iti_recent" selected>ITI Récente</option>
-                        <option value="ite_old">ITE Ancienne</option>
-                        <option value="ite_heavy">ITE Lourde</option>
-                    </select>
-                </div>
-
-                <!-- PLANCHER -->
-                <div class="full-width" style="margin-top:10px;"><strong style="color:var(--primary, #2c3e50);">Plancher Bas :</strong></div>
-                <div>
-                    <label for="floorMaterial">Matériau / Inertie Plancher</label>
-                    <select id="floorMaterial">
-                        <option value="lourd" selected>Lourd (Dalle béton / Carrelage)</option>
-                        <option value="leger">Léger (Parquet flottant / Lambourdes bois)</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="floorInsulation">Isolation Plancher</label>
-                    <select id="floorInsulation">
-                        <option value="none">Rien (Non isolé)</option>
-                        <option value="iti_old">ITI Ancienne</option>
-                        <option value="iti_recent" selected>ITI Récente</option>
-                        <option value="ite_old">ITE Ancienne</option>
-                        <option value="ite_heavy">ITE Lourde</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECTION B: Environnement & Adjacences des Parois -->
-        <div class="config-section">
-            <h2>B. Environnement (Adjacences des Parois)</h2>
-            <div class="form-grid">
-                <div>
-                    <label for="adjWall1">Mur 1</label>
-                    <select id="adjWall1">
-                        <option value="outside">Extérieur</option>
-                        <option value="unheated">Pièce non chauffée</option>
-                        <option value="heated">Pièce chauffée</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="adjWall2">Mur 2</label>
-                    <select id="adjWall2">
-                        <option value="outside">Extérieur</option>
-                        <option value="unheated">Pièce non chauffée</option>
-                        <option value="heated" selected>Pièce chauffée</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="adjWall3">Mur 3</label>
-                    <select id="adjWall3">
-                        <option value="outside">Extérieur</option>
-                        <option value="unheated">Pièce non chauffée</option>
-                        <option value="heated" selected>Pièce chauffée</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="adjWall4">Mur 4</label>
-                    <select id="adjWall4">
-                        <option value="outside">Extérieur</option>
-                        <option value="unheated">Pièce non chauffée</option>
-                        <option value="heated" selected>Pièce chauffée</option>
-                    </select>
-                </div>
-
-                <!-- Adjacences Plafond (Multi-sélection) -->
-                <div class="full-width" style="margin-top:10px;">
-                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plafond :</label>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
-                        <label><input type="checkbox" name="adjCeiling" value="outside"> Extérieur / Toiture / Rampant</label>
-                        <label><input type="checkbox" name="adjCeiling" value="unheated"> Pièce non chauffée (Combles)</label>
-                        <label><input type="checkbox" name="adjCeiling" value="heated" checked> Pièce chauffée (Étage)</label>
-                    </div>
-                </div>
-
-                <!-- Adjacences Plancher (Multi-sélection) -->
-                <div class="full-width" style="margin-top:10px;">
-                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plancher :</label>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
-                        <label><input type="checkbox" name="adjFloor" value="outside"> Extérieur / Sol / Vide sanitaire</label>
-                        <label><input type="checkbox" name="adjFloor" value="unheated"> Pièce non chauffée (Cave / SS)</label>
-                        <label><input type="checkbox" name="adjFloor" value="heated" checked> Pièce chauffée (Étage inférieur)</label>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECTION C: Apports Solaires & Vitrages -->
-        <div class="config-section">
-            <h2>C. Apports Solaires & Menuiseries Vitrées</h2>
-            <div id="windowsContainer"></div>
-            <button type="button" id="addWindowBtn" style="background-color:var(--primary, #2c3e50); color:white; padding:10px 15px; border:none; border-radius:4px; cursor:pointer; margin-top:10px;">
-                + Ajouter une baie / fenêtre à cette zone
-            </button>
-        </div>
-
-        <!-- SECTION D: Équipements Actifs & Régulation -->
-        <div class="config-section">
-            <h2>D. Équipements Actifs & Régulation</h2>
-            
-            <!-- Chauffage -->
-            <h4 style="margin-bottom:5px; color:#c0392b;">♨️ Chauffage</h4>
-            <div class="form-grid">
-                <div class="full-width">
-                    <label for="heatingSystem">Générateur / Émetteur Chauffage</label>
-                    <select id="heatingSystem">
-                        <option value="convection">Convecteurs Électriques (Effet Joule direct)</option>
-                        <option value="radiator_steel">Radiateurs Acier / Aluminium</option>
-                        <option value="radiator_cast">Radiateurs Fonte (Inertie émetteur)</option>
-                        <option value="floor">Plancher Chauffant (Hydraulique / Électrique)</option>
-                    </select>
-                </div>
-                
-                <div class="full-width">
-                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Dispositif(s) de Régulation Chauffage :</label>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
-                        <label><input type="checkbox" name="heatingRegulation" value="thermostat_central" checked> Thermostat central</label>
-                        <label><input type="checkbox" name="heatingRegulation" value="thermostatic_valve"> Robinet thermostatique</label>
-                        <label><input type="checkbox" name="heatingRegulation" value="temperature_setpoint"> Consigne de température</label>
-                    </div>
-                </div>
-
-                <div class="full-width">
-                    <label for="heatingIntermittency">Gestion de l'Intermittence Chauffage</label>
-                    <select id="heatingIntermittency">
-                        <option value="continuous">Chauffe continue (24h/24 sans réduit)</option>
-                        <option value="night_reduction">Réduit nocturne (-2°C à -3°C la nuit)</option>
-                        <option value="occupancy_based">Intermittence forte (Coupure/Réduit pendant absences)</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Refroidissement -->
-            <h4 style="margin-bottom:5px; margin-top:15px; color:#2980b9;">❄️ Refroidissement / Climatisation</h4>
-            <div class="form-grid">
-                <div class="full-width">
-                    <label for="coolingSystem">Système de Refroidissement</label>
-                    <select id="coolingSystem">
-                        <option value="aucun">Aucun système (Refroidissement passif uniquement)</option>
-                        <option value="clim_fixe">Climatisation fixe (Split / Gainable PAC air-air)</option>
-                        <option value="clim_mobile">Climatisation mobile (Monobloc à évacuation)</option>
-                        <option value="plancher_raf">Plancher rafraîchissant</option>
-                    </select>
-                </div>
-
-                <div class="full-width">
-                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Dispositif(s) de Régulation Refroidissement :</label>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
-                        <label><input type="checkbox" name="coolingRegulation" value="thermostat_central"> Thermostat central</label>
-                        <label><input type="checkbox" name="coolingRegulation" value="temperature_setpoint"> Consigne de température</label>
-                    </div>
-                </div>
-
-                <div class="full-width">
-                    <label for="coolingIntermittency">Gestion de l'Intermittence Refroidissement</label>
-                    <select id="coolingIntermittency">
-                        <option value="continuous">Consigne maintenue en permanence</option>
-                        <option value="heatwave_only">Utilisation restreinte aux pics de chaleur</option>
-                        <option value="occupancy_only">Fonctionnement uniquement lors de la présence</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Auxiliaires et Ventilation -->
-            <h4 style="margin-bottom:5px; margin-top:15px; color:#27ae60;">🌀 Brassage d'Air & Ventilation</h4>
-            <div class="form-grid">
-                <div>
-                    <label for="fanSystem">Brassage de l'air</label>
-                    <select id="fanSystem">
-                        <option value="aucun">Aucun équipement</option>
-                        <option value="plafond">Ventilateur de plafond (Destratificateur / Brasseur fixe)</option>
-                        <option value="mobile">Ventilateur sur pied / Table (Mobile)</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="vmcSystem">VMC / Extraction d'air</label>
-                    <select id="vmcSystem">
-                        <option value="standard">Ouverture VMC Standard Auto/Hygro A</option>
-                        <option value="acceleree">VMC Hygro B / Débit contrôlé accéléré</option>
-                        <option value="fermee">Extraction fermée / Obstruée</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        <div style="margin-top:30px; margin-bottom:20px;">
-            <button type="button" class="save-btn" id="saveConfigBtn" style="width:100%; padding:15px; background:#27ae60; color:white; font-size:1.1em; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">
-                💾 SAUVEGARDER CETTE ZONE THERMIQUE
-            </button>
-        </div>
-    </form>
-
-    <center style="margin-top:40px; margin-bottom:40px;">
-        <a href="index.html">← Retour à l'Espace Habitant</a>
-    </center>
-
-<!-- Charger engine.js avant le script de la page -->
+        <!-- Charger engine.js avant le script de la page -->
     <script src="engine.js"></script>
     <script>
         let currentZoneId = null;
@@ -622,6 +365,265 @@
             addWindowBlock();
         }
     </script>
+
+        <button type="button" class="btn-load" id="loadZoneBtn" style="width: 100%;">Charger / Éditer cette Zone ↓</button>
+        <div id="zoneStatus" class="status-badge" style="display:none; text-align:center; margin-top:10px; font-weight:bold;"></div>
+    </div>
+
+    <!-- Formulaire de Configuration Expert -->
+    <form id="expertForm" style="display:none;" novalidate>
+        
+        <!-- SECTION A: Géométrie, Structures & Isolations (Inertie) -->
+        <div class="config-section">
+            <h2>A. Géométrie, Structures & Isolations (Inertie Thermique)</h2>
+            <div class="form-grid">
+                <div>
+                    <label for="roomArea">Surface utile (m²)</label>
+                    <input type="number" id="roomArea" step="0.1" min="1" placeholder="ex : 45">
+                </div>
+                <div>
+                    <label for="ceilingHeight">Hauteur moyenne sous plafond (m)</label>
+                    <input type="number" id="ceilingHeight" step="0.05" min="1" value="2.5">
+                </div>
+
+                <!-- MURS -->
+                <div class="full-width" style="margin-top:10px;"><strong style="color:var(--primary, #2c3e50);">Structure des Murs :</strong></div>
+                <div>
+                    <label for="wallMaterial">Matériau des Murs</label>
+                    <select id="wallMaterial">
+                        <option value="cinderblock">Parpaing Creux (Standard)</option>
+                        <option value="concrete">Béton Banché (Très Lourd)</option>
+                        <option value="stone">Pierre Mulière / Moellon (Très Lourd / Conducteur)</option>
+                        <option value="brick">Brique Creuse / Alvéolaire</option>
+                        <option value="wood">Ossature Bois (Léger)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="wallThickness">Épaisseur Mur Brut (cm)</label>
+                    <input type="number" id="wallThickness" step="1" min="5" placeholder="ex : 30">
+                </div>
+                <div class="full-width">
+                    <label for="zoneInsulation">Isolation des Murs</label>
+                    <select id="zoneInsulation">
+                        <option value="none">Rien (Non isolé)</option>
+                        <option value="iti_old">ITI Ancienne (Isolant intérieur fin)</option>
+                        <option value="iti_recent" selected>ITI Récente (Isolant intérieur performant)</option>
+                        <option value="ite_old">ITE Ancienne (Isolant extérieur modéré)</option>
+                        <option value="ite_heavy">ITE Lourde (Isolant extérieur performant)</option>
+                    </select>
+                </div>
+
+                <!-- PLAFOND / TOITURE -->
+                <div class="full-width" style="margin-top:10px;"><strong style="color:var(--primary, #2c3e50);">Plafond / Toiture :</strong></div>
+                <div>
+                    <label for="ceilingMaterial">Matériau / Inertie Plafond</label>
+                    <select id="ceilingMaterial">
+                        <option value="lourd">Lourd (Dalle béton / Hourdis)</option>
+                        <option value="leger" selected>Léger (Placo / Bois / Rampant)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="ceilingInsulation">Isolation Plafond / Rampant</label>
+                    <select id="ceilingInsulation">
+                        <option value="none">Rien (Non isolé)</option>
+                        <option value="iti_old">ITI Ancienne</option>
+                        <option value="iti_recent" selected>ITI Récente</option>
+                        <option value="ite_old">ITE Ancienne</option>
+                        <option value="ite_heavy">ITE Lourde</option>
+                    </select>
+                </div>
+
+                <!-- PLANCHER -->
+                <div class="full-width" style="margin-top:10px;"><strong style="color:var(--primary, #2c3e50);">Plancher Bas :</strong></div>
+                <div>
+                    <label for="floorMaterial">Matériau / Inertie Plancher</label>
+                    <select id="floorMaterial">
+                        <option value="lourd" selected>Lourd (Dalle béton / Carrelage)</option>
+                        <option value="leger">Léger (Parquet flottant / Lambourdes bois)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="floorInsulation">Isolation Plancher</label>
+                    <select id="floorInsulation">
+                        <option value="none">Rien (Non isolé)</option>
+                        <option value="iti_old">ITI Ancienne</option>
+                        <option value="iti_recent" selected>ITI Récente</option>
+                        <option value="ite_old">ITE Ancienne</option>
+                        <option value="ite_heavy">ITE Lourde</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION B: Environnement & Adjacences des Parois -->
+        <div class="config-section">
+            <h2>B. Environnement (Adjacences des Parois)</h2>
+            <div class="form-grid">
+                <div>
+                    <label for="adjWall1">Mur 1</label>
+                    <select id="adjWall1">
+                        <option value="outside">Extérieur</option>
+                        <option value="unheated">Pièce non chauffée</option>
+                        <option value="heated">Pièce chauffée</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="adjWall2">Mur 2</label>
+                    <select id="adjWall2">
+                        <option value="outside">Extérieur</option>
+                        <option value="unheated">Pièce non chauffée</option>
+                        <option value="heated" selected>Pièce chauffée</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="adjWall3">Mur 3</label>
+                    <select id="adjWall3">
+                        <option value="outside">Extérieur</option>
+                        <option value="unheated">Pièce non chauffée</option>
+                        <option value="heated" selected>Pièce chauffée</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="adjWall4">Mur 4</label>
+                    <select id="adjWall4">
+                        <option value="outside">Extérieur</option>
+                        <option value="unheated">Pièce non chauffée</option>
+                        <option value="heated" selected>Pièce chauffée</option>
+                    </select>
+                </div>
+
+                <!-- Adjacences Plafond (Multi-sélection) -->
+                <div class="full-width" style="margin-top:10px;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plafond :</label>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
+                        <label><input type="checkbox" name="adjCeiling" value="outside"> Extérieur / Toiture / Rampant</label>
+                        <label><input type="checkbox" name="adjCeiling" value="unheated"> Pièce non chauffée (Combles)</label>
+                        <label><input type="checkbox" name="adjCeiling" value="heated" checked> Pièce chauffée (Étage)</label>
+                    </div>
+                </div>
+
+                <!-- Adjacences Plancher (Multi-sélection) -->
+                <div class="full-width" style="margin-top:10px;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plancher :</label>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
+                        <label><input type="checkbox" name="adjFloor" value="outside"> Extérieur / Sol / Vide sanitaire</label>
+                        <label><input type="checkbox" name="adjFloor" value="unheated"> Pièce non chauffée (Cave / SS)</label>
+                        <label><input type="checkbox" name="adjFloor" value="heated" checked> Pièce chauffée (Étage inférieur)</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION C: Apports Solaires & Vitrages -->
+        <div class="config-section">
+            <h2>C. Apports Solaires & Menuiseries Vitrées</h2>
+            <div id="windowsContainer"></div>
+            <button type="button" id="addWindowBtn" style="background-color:var(--primary, #2c3e50); color:white; padding:10px 15px; border:none; border-radius:4px; cursor:pointer; margin-top:10px;">
+                + Ajouter une baie / fenêtre à cette zone
+            </button>
+        </div>
+
+        <!-- SECTION D: Équipements Actifs & Régulation -->
+        <div class="config-section">
+            <h2>D. Équipements Actifs & Régulation</h2>
+            
+            <!-- Chauffage -->
+            <h4 style="margin-bottom:5px; color:#c0392b;">♨️ Chauffage</h4>
+            <div class="form-grid">
+                <div class="full-width">
+                    <label for="heatingSystem">Générateur / Émetteur Chauffage</label>
+                    <select id="heatingSystem">
+                        <option value="convection">Convecteurs Électriques (Effet Joule direct)</option>
+                        <option value="radiator_steel">Radiateurs Acier / Aluminium</option>
+                        <option value="radiator_cast">Radiateurs Fonte (Inertie émetteur)</option>
+                        <option value="floor">Plancher Chauffant (Hydraulique / Électrique)</option>
+                    </select>
+                </div>
+                
+                <div class="full-width">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Dispositif(s) de Régulation Chauffage :</label>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
+                        <label><input type="checkbox" name="heatingRegulation" value="thermostat_central" checked> Thermostat central</label>
+                        <label><input type="checkbox" name="heatingRegulation" value="thermostatic_valve"> Robinet thermostatique</label>
+                        <label><input type="checkbox" name="heatingRegulation" value="temperature_setpoint"> Consigne de température</label>
+                    </div>
+                </div>
+
+                <div class="full-width">
+                    <label for="heatingIntermittency">Gestion de l'Intermittence Chauffage</label>
+                    <select id="heatingIntermittency">
+                        <option value="continuous">Chauffe continue (24h/24 sans réduit)</option>
+                        <option value="night_reduction">Réduit nocturne (-2°C à -3°C la nuit)</option>
+                        <option value="occupancy_based">Intermittence forte (Coupure/Réduit pendant absences)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Refroidissement -->
+            <h4 style="margin-bottom:5px; margin-top:15px; color:#2980b9;">❄️ Refroidissement / Climatisation</h4>
+            <div class="form-grid">
+                <div class="full-width">
+                    <label for="coolingSystem">Système de Refroidissement</label>
+                    <select id="coolingSystem">
+                        <option value="aucun">Aucun système (Refroidissement passif uniquement)</option>
+                        <option value="clim_fixe">Climatisation fixe (Split / Gainable PAC air-air)</option>
+                        <option value="clim_mobile">Climatisation mobile (Monobloc à évacuation)</option>
+                        <option value="plancher_raf">Plancher rafraîchissant</option>
+                    </select>
+                </div>
+
+                <div class="full-width">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Dispositif(s) de Régulation Refroidissement :</label>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
+                        <label><input type="checkbox" name="coolingRegulation" value="thermostat_central"> Thermostat central</label>
+                        <label><input type="checkbox" name="coolingRegulation" value="temperature_setpoint"> Consigne de température</label>
+                    </div>
+                </div>
+
+                <div class="full-width">
+                    <label for="coolingIntermittency">Gestion de l'Intermittence Refroidissement</label>
+                    <select id="coolingIntermittency">
+                        <option value="continuous">Consigne maintenue en permanence</option>
+                        <option value="heatwave_only">Utilisation restreinte aux pics de chaleur</option>
+                        <option value="occupancy_only">Fonctionnement uniquement lors de la présence</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Auxiliaires et Ventilation -->
+            <h4 style="margin-bottom:5px; margin-top:15px; color:#27ae60;">🌀 Brassage d'Air & Ventilation</h4>
+            <div class="form-grid">
+                <div>
+                    <label for="fanSystem">Brassage de l'air</label>
+                    <select id="fanSystem">
+                        <option value="aucun">Aucun équipement</option>
+                        <option value="plafond">Ventilateur de plafond (Destratificateur / Brasseur fixe)</option>
+                        <option value="mobile">Ventilateur sur pied / Table (Mobile)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="vmcSystem">VMC / Extraction d'air</label>
+                    <select id="vmcSystem">
+                        <option value="standard">Ouverture VMC Standard Auto/Hygro A</option>
+                        <option value="acceleree">VMC Hygro B / Débit contrôlé accéléré</option>
+                        <option value="fermee">Extraction fermée / Obstruée</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top:30px; margin-bottom:20px;">
+            <button type="button" class="save-btn" id="saveConfigBtn" style="width:100%; padding:15px; background:#27ae60; color:white; font-size:1.1em; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">
+                💾 SAUVEGARDER CETTE ZONE THERMIQUE
+            </button>
+        </div>
+    </form>
+
+    <center style="margin-top:40px; margin-bottom:40px;">
+        <a href="index.html">← Retour à l'Espace Habitant</a>
+    </center>
+
+
 
     <!-- ARCHITECTURE JS SOLSTICE -->
     <script>
