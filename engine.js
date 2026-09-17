@@ -1,5 +1,5 @@
 // ============================================================
-// SOLSTICE - MOTEUR DE CALCUL THERMIQUE ET DASHBOARD
+// SOLSTICE - MOTEUR DE CALCUL THERMIQUE ET DASHBOARD (ISO 7730)
 // ============================================================
 
 let outdoorTemp = 15, outdoorHumidity = 50, outdoorPressure = 1013, outdoorWind = 0, sunshineStatus = 'Clouds';
@@ -7,12 +7,13 @@ let manualCloAdjustment = 0;
 const apiKey = '4ec1eb2b0cc90a4b18a79008b17581a8'; 
 let GLOBAL_HOUSE_CONFIG = {};
 let DONNEES_HABITAT = {}; 
+let SELECTION_PIECES = [];
 
 // Dictionnaire dynamique généré à partir de HOUSE_CONFIG (localStorage)
 let capteursMaison = {};
 
 /**
- * Reconstruit la cartographie Nom de Pièce -> ID Capteur depuis le paramétrage expert
+ * Point 1 : Reconstruit la cartographie Nom de Pièce -> ID Capteur depuis le paramétrage expert
  */
 function rafraichirCapteursDepuisConfig() {
     capteursMaison = {};
@@ -27,55 +28,42 @@ function getZoneConfigByName(roomName) {
     return Object.values(GLOBAL_HOUSE_CONFIG).find(z => z.name === roomName); 
 }
 
+/**
+ * Point 2 : Initialisation unifiée au chargement de la page
+ */
 window.addEventListener('load', () => {
+    // 1. Chargement de la configuration expert
     const savedConfig = localStorage.getItem('HOUSE_CONFIG');
     if (savedConfig) { 
         GLOBAL_HOUSE_CONFIG = JSON.parse(savedConfig); 
-        rafraichirCapteursDepuisConfig(); // <-- Génération de la liste des capteurs actifs
-        initialiserDashboard(); 
+        rafraichirCapteursDepuisConfig();
     } else { 
         alert("Veuillez paramétrer l'habitat dans l'espace Expert."); 
         window.location.href = 'setup.html'; 
         return; 
     }
-    
-    restoreSessionData();
 
-    const cachedHabitat = sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
-    if (cachedHabitat) {
-        DONNEES_HABITAT = JSON.parse(cachedHabitat);
-        recalculerToutLeDashboard();
-        
-        for (const [nomPiece, idCapteur] of Object.entries(capteursMaison)) {
-            if (DONNEES_HABITAT[nomPiece]) {
-                const statusEl = document.getElementById('status-' + idCapteur);
-                if (statusEl) {
-                    statusEl.textContent = "En mémoire";
-                    statusEl.style.color = "var(--eco)";
-                }
-            }
-        }
-    }
-});
-
+    // 2. Chargement de la sélection de pièces
     const savedSelection = localStorage.getItem('SOLSTICE_SELECTION_PIECES');
     if (savedSelection) {
         SELECTION_PIECES = JSON.parse(savedSelection);
     } else {
-        SELECTION_PIECES = Object.keys(capteursMaison).slice(0, 3);
+        SELECTION_PIECES = Object.keys(capteursMaison);
         localStorage.setItem('SOLSTICE_SELECTION_PIECES', JSON.stringify(SELECTION_PIECES));
     }
 
+    // 3. Initialisation de l'IHM et restauration des sessions
     genererSelecteurPieces();
-    (); 
+    initialiserDashboard(); 
     restoreSessionData();
 
+    // 4. Météo
     const savedLoc = localStorage.getItem('location') || 'Reims';
     const locEl = document.getElementById('location');
     if (locEl) locEl.value = savedLoc;
-
     fetchWeather(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(savedLoc)}&appid=${apiKey}&units=metric&lang=fr`);
 
+    // 5. Restauration des données capteurs en cache
     const cachedHabitat = localStorage.getItem('SOLSTICE_DONNEES_HABITAT') || sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
     if (cachedHabitat) {
         DONNEES_HABITAT = JSON.parse(cachedHabitat);
@@ -129,7 +117,6 @@ window.onRoomSelectionChange = function(checkbox) {
     }
     localStorage.setItem('SOLSTICE_SELECTION_PIECES', JSON.stringify(SELECTION_PIECES));
     genererSelecteurPieces();
-    ();
     recalculerToutLeDashboard();
 };
 
@@ -137,10 +124,12 @@ window.toggleAllRooms = function(selectState) {
     SELECTION_PIECES = selectState ? Object.keys(capteursMaison) : [];
     localStorage.setItem('SOLSTICE_SELECTION_PIECES', JSON.stringify(SELECTION_PIECES));
     genererSelecteurPieces();
-    ();
     recalculerToutLeDashboard();
 };
 
+/**
+ * Point 3 : Génération dynamique du Dashboard basée sur GLOBAL_HOUSE_CONFIG
+ */
 function initialiserDashboard() {
     const grid = document.getElementById('dashboard-grid');
     if (!grid) return; 
@@ -159,23 +148,22 @@ function initialiserDashboard() {
         const tuile = document.createElement('div');
         tuile.style.cssText = 'background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);';
         
-        const badgeExpert = `<span style="font-size: 0.7em; color: var(--eco); background: #e9f7ef; padding: 2px 6px; border-radius: 4px;">Modèle Actif</span>`;
+        const badgeExpert = `<span style="font-size: 0.7em; color: var(--eco, #27ae60); background: #e9f7ef; padding: 2px 6px; border-radius: 4px;">Modèle Actif</span>`;
 
         tuile.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
-                <div><h3 style="margin: 0; font-size: 1.2em; color: var(--primary);">${nomPiece}</h3><div style="margin-top: 4px;">${badgeExpert}</div></div>
+                <div><h3 style="margin: 0; font-size: 1.2em; color: var(--primary, #2c3e50);">${nomPiece}</h3><div style="margin-top: 4px;">${badgeExpert}</div></div>
                 <span id="status-${idCapteur}" style="font-size: 0.75em; color: #7f8c8d; background: #f1f2f6; padding: 3px 8px; border-radius: 10px;">En attente</span>
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                <div style="text-align: center; flex: 1;"><div style="font-size: 0.85em; color: #95a5a6;">Temp.</div><div id="temp-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary);">--°C</div></div>
-                <div style="text-align: center; flex: 1; border-left: 1px solid #eee;"><div style="font-size: 0.85em; color: #95a5a6;">Humidité</div><div id="hum-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary);">--%</div></div>
+                <div style="text-align: center; flex: 1;"><div style="font-size: 0.85em; color: #95a5a6;">Temp.</div><div id="temp-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary, #2c3e50);">--°C</div></div>
+                <div style="text-align: center; flex: 1; border-left: 1px solid #eee;"><div style="font-size: 0.85em; color: #95a5a6;">Humidité</div><div id="hum-${idCapteur}" style="font-size: 1.6em; font-weight: bold; color: var(--primary, #2c3e50);">--%</div></div>
             </div>
             <div id="pmv-box-${idCapteur}" style="text-align: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
                 <div style="font-size: 0.85em; color: #7f8c8d;">Indice PMV</div>
-                <div id="pmv-${idCapteur}" style="font-size: 1.3em; font-weight: bold; color: #bdc3c7;">--</div>
-                <div id="pmv-text-${idCapteur}" style="font-size: 0.8em; margin-top: 5px; color: #7f8c8d;">--</div>
+                <div id="pmv-badge-${idCapteur}" style="font-size: 1.3em; font-weight: bold; color: #bdc3c7; display: inline-block; padding: 2px 8px; border-radius: 6px;">--</div>
             </div>
-            <button onclick="voirRecommandations('${nomPiece}')" style="width: 100%; padding: 12px; background-color: var(--secondary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🔍 Lancer le diagnostic</button>
+            <button onclick="voirRecommandations('${nomPiece}')" style="width: 100%; padding: 12px; background-color: var(--secondary, #e67e22); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🔍 Lancer le diagnostic</button>
         `;
         grid.appendChild(tuile);
     });
@@ -230,7 +218,7 @@ function getBaseCloAndMet(zoneConfig) {
     if (zoneConfig && Array.isArray(zoneConfig.usages)) {
         if (zoneConfig.usages.includes('kitchen')) met = 1.6;
         else if (zoneConfig.usages.includes('office')) met = 1.1;
-        else if (zoneConfig.usages.includes('bathroom')) met = 1.3;
+        else if (zoneConfig.usages.includes('bathroom') || zoneConfig.usages.includes('bath')) met = 1.3;
         else if (zoneConfig.usages.includes('bedroom')) {
             met = 0.9;
             const currentMonth = new Date().getMonth();
@@ -303,12 +291,11 @@ function calculateMeanRadiantTemp(zone, t_air) {
             }[win.shutter] ?? 1.0;
 
             if (isSunny && maskFactor > 0.1) {
-                // Calcul pondéré des orientations de vitrages
-            const orientArr = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
-            const orientFactors = { 'S': 3.2, 'SE': 2.5, 'SW': 2.5, 'E': 1.8, 'W': 1.8, 'N': 0.6 };
-            let sumOrientFactor = 0;
-            orientArr.forEach(o => { sumOrientFactor += (orientFactors[o] || 1.5); });
-            const orientFactor = orientArr.length > 0 ? (sumOrientFactor / orientArr.length) : 1.5;
+                const orientArr = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
+                const orientFactors = { 'S': 3.2, 'SE': 2.5, 'SW': 2.5, 'E': 1.8, 'W': 1.8, 'N': 0.6 };
+                let sumOrientFactor = 0;
+                orientArr.forEach(o => { sumOrientFactor += (orientFactors[o] || 1.5); });
+                const orientFactor = orientArr.length > 0 ? (sumOrientFactor / orientArr.length) : 1.5;
                 const tiltFactor = { 'verticale': 1.0, 'inclinee': 1.3, 'horizontale': 1.5 }[win.tilt] ?? 1.0;
                 tWin += (spec.g * orientFactor * tiltFactor * maskFactor * shutterFactor * 5.0);
             }
@@ -348,7 +335,7 @@ function calculateAirVelocity(zoneConfig, nomPiece = '') {
     if (vmcSys === 'double_flux' || vmcSys === 'hygro_b') vel += 0.04;
 
     if (outdoorWind > 25 && Array.isArray(zoneConfig.windows)) {
-        const hasPermeableWindow = zoneConfig.windows.some(w => w.glass === 'single' || w.vent === 'oscillante');
+        const hasPermeableWindow = zoneConfig.windows.some(w => w.glass === 'single' || w.vent === 'partial');
         if (hasPermeableWindow) vel += 0.12;
     }
 
@@ -444,7 +431,6 @@ function calculateDryingPotential(ta, rh, vel = 0.1) {
 function calculateDailyThermalBalance(zoneConfig, ta) {
     if (!zoneConfig) return { hTotalWPerK: 0, deperditionskWh: 0, gainsConductionkWh: 0, gainsSolaireskWh: 0, gainsTotauxkWh: 0, bilanNetkWh: 0 };
 
-    // 1. Zone Extérieure : aucun bilan thermique intérieur
     if (Array.isArray(zoneConfig.usages) && zoneConfig.usages.includes('outdoor')) {
         return { hTotalWPerK: 0, deperditionskWh: 0, gainsConductionkWh: 0, gainsSolaireskWh: 0, gainsTotauxkWh: 0, bilanNetkWh: 0 };
     }
@@ -455,12 +441,10 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const side = Math.sqrt(area);
     const wallArea = side * h;
 
-    // 2. Coefficients U des parois (W/m².K)
     const uWall = getUValueParoi('wall', zoneConfig.wallMat || 'cinderblock', zoneConfig.insulation || 'iti_recent');
     const uCeiling = getUValueParoi('ceiling', zoneConfig.ceilingMat || 'leger', zoneConfig.ceilingInsulation || 'iti_recent');
     const uFloor = getUValueParoi('floor', zoneConfig.floorMat || 'lourd', zoneConfig.floorInsulation || 'iti_recent');
 
-    // Helper pour le facteur de réduction de température b
     const getBFactor = (adj) => {
         if (Array.isArray(adj)) {
             if (adj.includes('outside')) return 1.0;
@@ -484,7 +468,6 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const hFloor = uFloor * area * bFloor;
     const hSurfacique = hWall + hCeiling + hFloor;
 
-    // 3. Déperditions / Gains par renouvellement d'air (W/K)
     let ach = 0.5;
     const vmc = zoneConfig.equipment?.vmcSystem;
     if (vmc === 'marche_forcee') ach = 1.0;
@@ -495,21 +478,17 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const hVentilation = 0.34 * volume * ach;
     const hTotal = hSurfacique + hVentilation;
 
-    // 4. Calcul des flux thermiques selon le sens du gradient de température
     let deperditionskWh = 0;
     let gainsConductionkWh = 0;
 
     if (ta > outdoorTemp) {
-        // Pertes de chaleur de l'intérieur vers l'extérieur
         const deltaT_dep = ta - outdoorTemp;
         deperditionskWh = (hTotal * deltaT_dep * 24) / 1000;
     } else {
-        // Apports thermiques de l'extérieur vers l'intérieur (Text > Ta)
         const deltaT_gain = outdoorTemp - ta;
         gainsConductionkWh = (hTotal * deltaT_gain * 24) / 1000;
     }
 
-    // 5. Apports solaires quotidiens (kWh/j)
     let gainsSolaireskWh = 0;
     const isSunny = sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun');
 
@@ -517,14 +496,8 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
         const glassMap = { 'single': 0.85, 'double_old': 0.75, 'double_recent': 0.60, 'triple': 0.45 };
         const maskMap = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 };
         const shutterMap = {
-            'aucun': 1.0,
-            'store_interieur': 0.7,
-            'rideau_interieur': 0.8,
-            'store_banne': 0.3,
-            'persienne': 0.3,
-            'roulant_pvc': 0.15,
-            'roulant_metal': 0.2,
-            'battant_bois': 0.15
+            'aucun': 1.0, 'store_interieur': 0.7, 'rideau_interieur': 0.8, 'store_banne': 0.3,
+            'persienne': 0.3, 'roulant_pvc': 0.15, 'roulant_metal': 0.2, 'battant_bois': 0.15
         };
         const orientMap = { 'S': 3.2, 'SE': 2.5, 'SW': 2.5, 'E': 1.8, 'W': 1.8, 'N': 0.6 };
 
@@ -547,7 +520,6 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
         });
     }
 
-    // Gains totaux = apports solaires + apports par conduction/ventilation quand Text > Ta
     const gainsTotauxkWh = gainsSolaireskWh + gainsConductionkWh;
     const bilanNetkWh = gainsTotauxkWh - deperditionskWh;
 
@@ -694,9 +666,6 @@ function calculateGlobalHabitatMetrics() {
     };
 }
 
-/**
- * RENDU D'UNE LIGNE DE TABLEAU
- */
 function mettreAJourTuile(nomPiece) {
     if (!SELECTION_PIECES.includes(nomPiece)) return;
 
@@ -732,7 +701,6 @@ function mettreAJourTuile(nomPiece) {
     const energyBalance = calculateDailyThermalBalance(zoneConfig, data.ta);
 
     const tStruct = updateStructureTemperature(nomPiece, data.ta);
-    const reserve = calculateStructureReserve(tStruct, data.ta);
 
     let pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
 
@@ -766,9 +734,6 @@ function mettreAJourTuile(nomPiece) {
     }
 }
 
-/**
- * ACTUALISATION DU COCKPIT GLOBAL MAISON
- */
 function actualiserCockpitGlobal() {
     const metrics = calculateGlobalHabitatMetrics();
 
@@ -940,7 +905,7 @@ function updateWeatherUI(loading = false, error = false, errorMsg = "") {
 }
 
 /**
- * SUPER SCAN MAKE.COM
+ * Point 4 : Interrogation Make.com mappée sur GLOBAL_HOUSE_CONFIG
  */
 window.synchroniserTouteLaMaison = async function() {
     if (SELECTION_PIECES.length === 0) {
@@ -961,7 +926,10 @@ window.synchroniserTouteLaMaison = async function() {
         const dataPack = await response.json();
         for (const capteur of dataPack) {
             const idCapteur = capteur.id;
-            const nomPiece = Object.keys(capteursMaison).find(key => capteursMaison[key] === idCapteur);
+            
+            // Recherche de la zone correspondante dans GLOBAL_HOUSE_CONFIG
+            const zone = Object.values(GLOBAL_HOUSE_CONFIG).find(z => z.sensorId === idCapteur || z.id === idCapteur);
+            const nomPiece = zone ? zone.name : null;
             
             if (nomPiece && capteur.temperature !== null && capteur.humidity !== null) {
                 DONNEES_HABITAT[nomPiece] = { 
@@ -1018,17 +986,22 @@ window.voirRecommandations = function(nomPiece) {
 };
 
 // ============================================================
-// EXTENSION RECOMMANDATIONS & SIMULATION (À intégrer dans engine.js)
+// SIMULATEUR DE CONSEILS ET RECOMMANDATIONS (SolsticeEngine)
 // ============================================================
 
-// 1. Ajoute cette méthode dans SolsticeEngine pour calculer le PMV simulé
+const SolsticeEngine = {
+    calculatePMV,
+    calculateMeanRadiantTemp,
+    calculateAirVelocity,
+    getBaseCloAndMet
+};
+
 SolsticeEngine.evaluateSimulatedPMV = function(baseState, checkedActionKeys, envData) {
     let simTa = baseState.ta;
     let simTr = baseState.tr;
     let simVel = baseState.vel;
     let simRh = baseState.rh;
 
-    // Modificateurs d'état physique dosés
     if (checkedActionKeys.includes('shutter_close') || checkedActionKeys.includes('anticipate_sun')) {
         simTr -= 0.6;
         simTa -= 0.2;
@@ -1048,19 +1021,16 @@ SolsticeEngine.evaluateSimulatedPMV = function(baseState, checkedActionKeys, env
         simTa += 0.2;
     }
 
-    // Recalcul ISO 7730 via ta fonction calculatePMV existante
     const pmvSim = this.calculatePMV(simTa, simTr, simVel, simRh, baseState.met, baseState.clo);
     return { pmv: pmvSim, simTa, simTr, simVel, simRh };
 };
 
-// 2. Ajoute cette méthode dans SolsticeEngine pour générer les conseils
 SolsticeEngine.generateRecommendations = function(zone, zoneId, roomData, envData) {
     const recs = [];
     const zoneName = zone ? (zone.name || zoneId) : zoneId;
     const ta = roomData.ta || 20;
     const rh = roomData.rh || 50;
 
-    // Réutilisation de tes fonctions thermiques existantes
     const tr = this.calculateMeanRadiantTemp(zone, ta);
     const vel = this.calculateAirVelocity(zone, zoneName);
     const { met, totalClo } = this.getBaseCloAndMet(zone);
@@ -1070,18 +1040,17 @@ SolsticeEngine.generateRecommendations = function(zone, zoneId, roomData, envDat
     const needsCooling = roomPmv > 0.4;
     const isSunny = envData.sun_status.toLowerCase().includes('clear') || envData.sun_status.toLowerCase().includes('sun');
 
-    const hasWindows = !zone || !zone.windows || zone.windows.length === 0 || zone.windows.some(w => w.vent !== 'fixe');
+    const hasWindows = !zone || !zone.windows || zone.windows.length === 0 || zone.windows.some(w => w.vent !== 'fixed' && w.vent !== 'fixe');
     const hasShutters = !zone || !zone.windows || zone.windows.some(w => !w.shutter || w.shutter !== 'aucun');
 
-    // --- HUMIDITÉ ---
     if (rh > 65) {
-        if (zone?.equipment?.vmcSystem === 'acceleree') {
+        if (zone?.equipment?.vmcSystem === 'marche_forcee' || zone?.equipment?.vmcSystem === 'continue_non_pilotable') {
             recs.push({
                 id: `${zoneId}_vmc_boost`,
                 actionKey: 'vmc_boost',
                 zoneId, zoneName, timing: 'immediate', type: 'type-air',
-                title: 'Activer la VMC en mode accéléré',
-                text: `L'humidité atteint ${rh} %. Basculez la VMC en vitesse rapide.`,
+                title: 'Activer la VMC en mode renforcé',
+                text: `L'humidité atteint ${rh} %. Basculez la ventilation en vitesse rapide.`,
                 impactWeight: 15
             });
         } else if (hasWindows) {
@@ -1090,13 +1059,12 @@ SolsticeEngine.generateRecommendations = function(zone, zoneId, roomData, envDat
                 actionKey: 'open_win_humidity',
                 zoneId, zoneName, timing: 'immediate', type: 'type-air',
                 title: 'Aération flash ciblée',
-                text: `Ouvrez la fenêtre pendant 5 minutes pour évacuer l'humidité.`,
+                text: `Ouvrez la fenêtre pendant 5 minutes pour évacuer l'humidité accumulée.`,
                 impactWeight: 12
             });
         }
     }
 
-    // --- SURCHAUFFE ---
     if (needsCooling) {
         if (envData.t_ext < ta && hasWindows) {
             recs.push({
@@ -1104,7 +1072,7 @@ SolsticeEngine.generateRecommendations = function(zone, zoneId, roomData, envDat
                 actionKey: 'free_cooling',
                 zoneId, zoneName, timing: 'immediate', type: 'type-cool',
                 title: 'Ventilation traversante (Free-cooling)',
-                text: `Il fait plus frais dehors (${envData.t_ext} °C). Ouvrez pour décharger la chaleur accumulée.`,
+                text: `Il fait plus frais dehors (${envData.t_ext} °C). Ouvrez pour décharger la chaleur.`,
                 impactWeight: 20
             });
         }
@@ -1140,7 +1108,6 @@ SolsticeEngine.generateRecommendations = function(zone, zoneId, roomData, envDat
         }
     }
 
-    // --- FROID ---
     if (needsHeat) {
         if (isSunny && envData.t_ext < ta) {
             recs.push({
@@ -1165,7 +1132,6 @@ SolsticeEngine.generateRecommendations = function(zone, zoneId, roomData, envDat
         }
     }
 
-    // --- ÉQUILIBRE ET ÉCO-GESTES ---
     if (recs.length === 0) {
         recs.push({
             id: `${zoneId}_maintain_vmc`,
