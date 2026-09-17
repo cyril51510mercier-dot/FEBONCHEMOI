@@ -113,32 +113,42 @@ a:hover {
     gap: 10px;
 }
 
-/* --- 3. LAYOUT & CONTENEURS --- */
-.container {
-    max-width: 900px;
-    margin: 24px auto;
-    padding: 0 16px;
-}
+/* --- 3. LAYOUT & CONTENEURS (RECADRAGE ET LISIBILITÉ PC) --- */
 
+/* Conteneurs principaux (index.html, reco.html) */
+.container,
 .dashboard-container {
-    max-width: 1280px;
+    max-width: 940px; /* Largeur optimale : lisible sur PC, spacieuse pour les tableaux */
     margin: 24px auto;
     padding: 0 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
 }
 
+/* Recadrage spécifique pour setup.html (Console Expert) */
+.zone-selector-container,
+#expertForm,
+body > h1,
+body > .subtitle,
+body > center {
+    max-width: 940px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+body > h1 {
+    margin-top: 20px;
+}
+
+/* Grilles ajustées pour conserver des proportions harmonieuses */
 .grid-2col {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 16px;
 }
 
 .grid-metrics {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
 }
 
 /* --- 4. CARTES ET PANNEAUX --- */
