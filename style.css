@@ -1,136 +1,399 @@
 /**
  * ==================================================================
- * SOLSTICE - DESIGN SYSTEM (V6)
+ * SOLSTICE - DESIGN SYSTEM (V7)
+ * Modélisation Thermique BEM & Diagnostic Multi-Vectoriel
  * ==================================================================
  */
 
 :root {
-    /* Palette Solstice */
-    --primary: #2c3e50;      /* Bleu Ardoise (Texte principal, En-têtes) */
-    --secondary: #e67e22;    /* Terracotta (Boutons d'action, Liens) */
-    --bg-color: #f4f7f6;     /* Fond de l'application (Gris très clair/frais) */
-    --card-bg: #ffffff;      /* Fond des cartes */
-    
-    /* Couleurs de statut (Thermique & Financier) */
-    --cold: #3498db;         /* Froid */
-    --hot: #e74c3c;          /* Chaud */
-    --comfort: #2ecc71;      /* Confort / Parfait */
-    --eco: #27ae60;          /* Économie financière (Vert profond) */
-    --warning: #f39c12;      /* Solaire / Attention */
+    /* Palette Solstice Harmonisée */
+    --primary: #0f172a;          /* Slate très sombre (En-têtes, Cockpit) */
+    --primary-light: #1e293b;    /* Slate intermédiaire */
+    --secondary: #d96b43;        /* Terracotta (Actions principales, Boutons CTA) */
+    --secondary-hover: #c45a33;
+    --bg-color: #f1f5f9;         /* Fond global de l'application */
+    --card-bg: #ffffff;          /* Fond des cartes */
+    --border-color: #e2e8f0;     /* Bordures douces */
+    --text-main: #0f172a;        /* Texte principal */
+    --text-muted: #64748b;       /* Texte secondaire / Légendes */
 
-    /* Ombres et Bordures */
-    --shadow-sm: 0 2px 5px rgba(0,0,0,0.05);
-    --shadow-md: 0 5px 15px rgba(0,0,0,0.08);
+    /* Statuts Thermiques & Physiques */
+    --cold: #0284c7;             /* Froid / Bleu */
+    --cold-bg: #e0f2fe;
+    --hot: #b91c1c;              /* Chaud / Rouge */
+    --hot-bg: #fee2e2;
+    --comfort: #047857;          /* Confort / Vert émeraude */
+    --comfort-bg: #d1fae5;
+    --eco: #10b981;              /* Éco-performance */
+    --eco-bg: #e9f7ef;
+    --warning: #b45309;          /* Solaire / Attention */
+    --warning-bg: #fef3c7;
+
+    /* Ombres & Rayons */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+    --radius-sm: 6px;
     --radius: 10px;
+    --radius-lg: 12px;
 }
 
-/* --- BASE --- */
+/* --- 1. BASE & TYPOGRAPHIE --- */
+* {
+    box-sizing: border-box;
+}
+
 body {
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--bg-color);
-    color: var(--primary);
-    line-height: 1.6;
+    color: var(--text-main);
+    line-height: 1.5;
     margin: 0;
-    padding: 15px;
-    max-width: 800px;
-    margin: 0 auto;
+    padding: 0;
 }
 
-h1 {
-    text-align: center;
-    font-size: 2.2em;
+h1, h2, h3, h4 {
     color: var(--primary);
-    margin-bottom: 5px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-}
-
-h2 {
-    font-size: 1.2em;
-    border-bottom: 2px solid #ecf0f1;
-    padding-bottom: 8px;
     margin-top: 0;
-    color: var(--primary);
+    font-weight: 800;
+    letter-spacing: -0.3px;
 }
+
+h1 { font-size: 1.8rem; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1.1rem; }
+h4 { font-size: 0.95rem; }
 
 .subtitle {
-    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: 2px 0 0 0;
+    font-weight: 400;
+}
+
+a {
     color: var(--secondary);
-    font-style: italic;
-    margin-top: 0;
-    margin-bottom: 30px;
+    text-decoration: none;
+    font-weight: 600;
 }
 
-/* --- CARTES ET SECTIONS --- */
-.section, .summary-card, .config-section, .zone-selector-container {
-    background-color: var(--card-bg);
+a:hover {
+    text-decoration: underline;
+}
+
+/* --- 2. EN-TÊTE ET NAVIGATION --- */
+.app-header {
+    background: var(--primary);
+    color: #ffffff;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--primary-light);
+}
+
+.header-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.header-brand h1 {
+    color: #ffffff;
+    margin: 0;
+    font-size: 1.4rem;
+}
+
+.header-brand .subtitle {
+    color: #94a3b8;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* --- 3. LAYOUT & CONTENEURS --- */
+.container {
+    max-width: 900px;
+    margin: 24px auto;
+    padding: 0 16px;
+}
+
+.dashboard-container {
+    max-width: 1280px;
+    margin: 24px auto;
+    padding: 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.grid-2col {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+.grid-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+}
+
+/* --- 4. CARTES ET PANNEAUX --- */
+.card, .solstice-card {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
     padding: 20px;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-md);
-    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
 }
 
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-.full-width { grid-column: 1 / -1; }
+.cockpit-card {
+    background: var(--primary);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    color: #ffffff;
+    box-shadow: var(--shadow-md);
+}
 
-/* --- FORMULAIRES ET INPUTS --- */
+.cockpit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--primary-light);
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.metric-box {
+    background: rgba(255, 255, 255, 0.04);
+    padding: 14px 16px;
+    border-radius: var(--radius);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.metric-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    color: #94a3b8;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.82rem;
+    color: #cbd5e1;
+}
+
+/* --- 5. FORMULAIRES ET INPUTS --- */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.full-width {
+    grid-column: 1 / -1;
+}
+
 label {
     display: block;
     font-weight: 600;
     margin-bottom: 6px;
-    font-size: 0.9em;
+    font-size: 0.88rem;
     color: var(--primary);
 }
 
-input[type="text"], input[type="number"], select {
+input[type="text"],
+input[type="number"],
+select {
     width: 100%;
-    padding: 12px;
-    border: 1px solid #dfe6e9;
-    border-radius: 6px;
-    box-sizing: border-box;
-    font-size: 1em;
-    background-color: #fcfcfc;
-    margin-bottom: 15px;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    background-color: #ffffff;
+    color: var(--text-main);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-input:focus, select:focus {
+input:focus,
+select:focus {
     border-color: var(--secondary);
     outline: none;
-    box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.1);
+    box-shadow: 0 0 0 3px rgba(217, 107, 67, 0.15);
 }
 
-/* --- BOUTONS --- */
-button {
-    font-family: inherit;
-    font-size: 1em;
-    font-weight: 600;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    padding: 12px 20px;
-}
-
-button:active { transform: scale(0.98); }
-
-#geoLocateButton, #getWeatherButton, .btn-load, #btn-sync-all {
-    background-color: var(--secondary);
-    color: white;
-}
-
-#btn-sync-all {
-    width: 100%;
-    padding: 15px;
-    font-size: 1.1em;
+.usage-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
     margin-bottom: 20px;
-    box-shadow: 0 4px 6px rgba(230, 126, 34, 0.2);
 }
 
-#viewRecommendationsButton, .save-btn {
-    background-color: var(--primary);
-    color: white;
+.usage-grid label {
+    font-weight: 500;
+    cursor: pointer;
+    background: #f8fafc;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+}
+
+/* --- 6. BOUTONS ET ACTIONS --- */
+button, .btn {
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    padding: 10px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+button:active, .btn:active {
+    transform: scale(0.98);
+}
+
+.btn-primary {
+    background-color: var(--secondary);
+    color: #ffffff;
+}
+
+.btn-primary:hover {
+    background-color: var(--secondary-hover);
+}
+
+.btn-secondary {
+    background-color: var(--primary-light);
+    color: #f8fafc;
+    border: 1px solid #334155;
+}
+
+.btn-secondary:hover {
+    background-color: #334155;
+}
+
+.btn-sync {
+    width: 100%;
+    padding: 12px;
+    font-size: 1rem;
+    background-color: var(--secondary);
+    color: #ffffff;
+    box-shadow: 0 2px 4px rgba(217, 107, 67, 0.2);
+}
+
+.btn-save {
+    background-color: #27ae60;
+    color: #ffffff;
     width: 100%;
     padding: 15px;
+    font-size: 1.1rem;
+}
+
+.btn-load {
+    background-color: var(--secondary);
+    color: #ffffff;
+}
+
+/* --- 7. BADGES ET STATUTS --- */
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.badge-pmv-cold { background-color: var(--cold-bg); color: var(--cold); }
+.badge-pmv-hot { background-color: var(--hot-bg); color: var(--hot); }
+.badge-pmv-comfort { background-color: var(--comfort-bg); color: var(--comfort); }
+.badge-pmv-warning { background-color: var(--warning-bg); color: var(--warning); }
+.badge-pmv-neutral { background-color: #f1f5f9; color: var(--text-muted); }
+
+/* --- 8. TABLEAUX --- */
+.table-container {
+    overflow-x: auto;
+    background: #ffffff;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+}
+
+table, .solstice-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.88rem;
+}
+
+th {
+    background-color: #f8fafc;
+    color: #475569;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 12px 14px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-main);
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+/* --- 9. RECOMMANDATIONS & CONSEILS --- */
+.advice-card {
+    padding: 15px 20px;
+    margin-bottom: 12px;
+    border-radius: var(--radius);
+    border-left: 5px solid var(--border-color);
+    background-color: var(--card-bg);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    cursor: pointer;
+}
+
+.advice-card.type-air { border-left-color: var(--secondary); background-color: #fef5e7; }
+.advice-card.type-sun { border-left-color: var(--warning); background-color: #fef9e7; }
+.advice-card.type-heat { border-left-color: var(--hot); background-color: #fdedec; }
+.advice-card.type-eco { border-left-color: var(--eco); background-color: #e9f7ef; }
+.advice-card.type-cool { border-left-color: var(--cold); background-color: #ebf5fb; }
+
+.progress-bg {
+    width: 100%;
+    height: 14px;
+    background: #e2e8f0;
+    border-radius: 7px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--secondary), var(--eco));
+    transition: width 0.3s ease;
 }
 
 .window-block {
@@ -138,35 +401,17 @@ button:active { transform: scale(0.98); }
     border-left: 4px solid var(--secondary);
     padding: 15px;
     margin-bottom: 15px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     position: relative;
 }
+
 .btn-remove-window {
-    background: #e74c3c; color: white; padding: 5px 10px; font-size: 0.8em; position: absolute; top: 15px; right: 15px;
+    background: #e74c3c;
+    color: #ffffff;
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    border-radius: 3px;
 }
-
-/* --- PAGE COACH --- */
-.stat-box { text-align: center; padding: 10px; }
-.stat-value { font-size: 1.8em; font-weight: 800; }
-.stat-label { font-size: 0.8em; text-transform: uppercase; color: #7f8c8d; }
-.summary-card { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-
-.advice-card {
-    padding: 15px 20px;
-    margin-bottom: 15px;
-    border-radius: var(--radius);
-    border-left: 5px solid #ccc;
-    background-color: var(--card-bg);
-    box-shadow: var(--shadow-sm);
-}
-.advice-title { font-weight: bold; font-size: 1.1em; margin-bottom: 8px; }
-.type-air { border-left-color: var(--secondary); background-color: #fef5e7; }
-.type-sun { border-left-color: var(--warning); background-color: #fef9e7; }
-.type-heat { border-left-color: var(--hot); background-color: #fdedec; }
-.type-eco { border-left-color: var(--eco); background-color: #e9f7ef; }
-.type-cool { border-left-color: var(--cold); background-color: #ebf5fb; }
-
-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-th { background-color: #f8f9fa; color: #7f8c8d; text-align: left; padding: 12px; }
-td { padding: 12px; border-bottom: 1px solid #ecf0f1; }
-a { color: var(--secondary); text-decoration: none; font-weight: 600; }
