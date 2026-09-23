@@ -6,8 +6,8 @@
     <title>Solstice — Plan d'Action & Recommandations</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        .reco-container { max-width: 900px; margin: 0 auto; }
-        .feedback-panel { background: var(--card-bg, #ffffff); padding: 1.5rem; border-radius: 12px; box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0,0,0,0.1)); margin-bottom: 2rem; border: 1px solid #e2e8f0; }
+        .reco-container { max-width: 900px; margin: 0 auto; padding: 0 1rem; }
+        .feedback-panel { background: #ffffff; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem; border: 1px solid #e2e8f0; }
         .gauge-header { display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 0.5rem; }
         .progress-bg { width: 100%; height: 14px; background: #e2e8f0; border-radius: 7px; overflow: hidden; margin-bottom: 1rem; }
         .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #e67e22, #2ecc71); transition: width 0.3s ease; }
@@ -38,20 +38,22 @@
 </head>
 <body>
 
+    <!-- Header harmonisé centré identique au Tableau de Bord -->
     <header class="app-header">
         <div class="header-brand">
             <h1>☀️ SOLSTICE</h1>
             <p class="subtitle">Diagnostic & Suivi Thera-Aéraulique de l'Habitat</p>
         </div>
-        <div class="header-actions">
-            <a href="index.html" class="btn-primary">📊 Tableau de Bord</a>
+        <div class="header-actions" style="display: flex; gap: 10px; justify-content: center;">
+            <a href="index.html" class="btn-primary" style="padding: 8px 16px; font-weight: bold;">📊 Tableau de Bord</a>
             <a href="setup.html" class="btn-secondary link-setup">⚙️ Config. BEM</a>
         </div>
     </header>
 
     <main class="reco-container">
 
-        <div class="summary-card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding: 1rem 1.5rem; background: white; border-radius: 10px; border: 1px solid #e2e8f0;">
+        <!-- Sélection de zone -->
+        <div class="summary-card" style="display: flex; justify-content: space-between; align-items: center; margin: 1.5rem 0; padding: 1rem 1.5rem; background: white; border-radius: 10px; border: 1px solid #e2e8f0;">
             <div>
                 <h2 style="margin: 0; border: none; padding: 0;">📋 Plan d'Action Thermique</h2>
                 <p id="profileIndicator" style="margin: 0.2rem 0 0 0; font-size: 0.85rem; color: #64748b;">Profil : Chargement...</p>
@@ -62,6 +64,7 @@
             </div>
         </div>
 
+        <!-- Jauge d'Éco-Performance -->
         <section class="feedback-panel">
             <div class="gauge-header">
                 <span id="roomScoreTitle">Score d'Éco-Performance</span>
@@ -76,34 +79,31 @@
             </div>
         </section>
 
-        <!-- Insérer sous la section .feedback-panel dans reco.html -->
-<div class="financial-card" style="background: linear-gradient(135deg, #0f172a, #1e293b); color: white; border-radius: 12px; padding: 1.25rem; margin-bottom: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-    
-    <!-- 1. Gain instantané du plan d'action -->
-    <div style="border-right: 1px solid rgba(255,255,255,0.1); padding-right: 1rem;">
-        <div style="font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px;">Économie Instantanée du Plan</div>
-        <div style="margin-top: 6px; display: flex; align-items: baseline; gap: 8px;">
-            <strong id="disp-daily-savings-eur" style="font-size: 1.6rem; color: #4ade80;">0,00 €</strong>
-            <span style="font-size: 0.85rem; color: #cbd5e1;">/ jour</span>
-        </div>
-        <div id="disp-daily-savings-kwh" style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">0,0 kWh/j évités</div>
-    </div>
+        <!-- Carte Financière & Cagnotte Cumulée -->
+        <div class="financial-card" style="background: linear-gradient(135deg, #0f172a, #1e293b); color: white; border-radius: 12px; padding: 1.25rem; margin-bottom: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+            <div style="border-right: 1px solid rgba(255,255,255,0.1); padding-right: 1rem;">
+                <div style="font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px;">Gains du Plan d'Action</div>
+                <div style="margin-top: 6px; display: flex; align-items: baseline; gap: 8px;">
+                    <strong id="disp-daily-savings-eur" style="font-size: 1.6rem; color: #4ade80;">0,00 €</strong>
+                    <span style="font-size: 0.85rem; color: #cbd5e1;">/ jour</span>
+                </div>
+                <div id="disp-daily-savings-kwh" style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">0,0 kWh/j évités</div>
+            </div>
 
-    <!-- 2. La Cagnotte Cumulée -->
-    <div>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.75rem; text-transform: uppercase; color: #f2994a; font-weight: 700; letter-spacing: 0.5px;">🐷 Cagnotte Cumulée Solstice</span>
-            <button onclick="resetCagnotte()" style="background: transparent; border: none; color: #64748b; cursor: pointer; font-size: 0.75rem;" title="Réinitialiser la cagnotte">🔄 Réinit.</button>
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.75rem; text-transform: uppercase; color: #f2994a; font-weight: 700; letter-spacing: 0.5px;">🐷 Cagnotte Cumulée Solstice</span>
+                    <button onclick="resetCagnotte()" style="background: transparent; border: none; color: #64748b; cursor: pointer; font-size: 0.75rem;" title="Réinitialiser la cagnotte">🔄 Réinit.</button>
+                </div>
+                <div style="margin-top: 6px; display: flex; align-items: baseline; gap: 8px;">
+                    <strong id="disp-cagnotte-total" style="font-size: 1.8rem; color: #f2994a;">0,00 €</strong>
+                    <span style="font-size: 0.8rem; color: #cbd5e1;">économisés</span>
+                </div>
+                <div id="disp-cagnotte-details" style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">0 pts d'Éco-Score cumulés</div>
+            </div>
         </div>
-        <div style="margin-top: 6px; display: flex; align-items: baseline; gap: 8px;">
-            <strong id="disp-cagnotte-total" style="font-size: 1.8rem; color: #f2994a;">0,00 €</strong>
-            <span style="font-size: 0.8rem; color: #cbd5e1;">économisés</span>
-        </div>
-        <div id="disp-cagnotte-co2" style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">0,0 kg CO₂ évités</div>
-    </div>
 
-</div>
-
+        <!-- Groupes par Niveau -->
         <section>
             <h2 class="section-title">⚡ Actions Immédiates (Niveau 1 — Court terme)</h2>
             <div id="container-immediate" class="reco-group"></div>
