@@ -399,7 +399,6 @@
         function initEventListeners() {
             usageOutdoorCb.addEventListener('change', toggleOutdoorMode);
 
-            // Enregistrement automatique du profil de gestion thermique
             userProfileSelect.addEventListener('change', () => {
                 const allConfig = SolsticeStore.getAllZones();
                 allConfig.global = allConfig.global || {};
@@ -407,12 +406,17 @@
                 localStorage.setItem(SolsticeStore.STORAGE_KEY, JSON.stringify(allConfig));
 
                 const statusEl = document.getElementById('profileSaveStatus');
-                statusEl.style.display = 'block';
-                setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+                if (statusEl) {
+                    statusEl.style.display = 'block';
+                    setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+                }
             });
 
+            // 1. Sélection dans le menu déroulant des zones existantes
             existingZonesSelect.addEventListener('change', () => {
                 const selectedId = existingZonesSelect.value;
+                currentZoneId = selectedId ? selectedId : null; // Synchronisation immédiate de currentZoneId
+
                 if (selectedId && SolsticeStore.getZone(selectedId)) {
                     const zone = SolsticeStore.getZone(selectedId);
                     zoneNameInput.value = zone.name || '';
@@ -478,25 +482,39 @@
                 toggleOutdoorMode();
             });
 
-            // Bouton de suppression de zone
+            // 2. Supprimer la zone sélectionnée / chargée
             deleteZoneBtn.addEventListener('click', () => {
-                if (!currentZoneId) return;
-                const targetZone = SolsticeStore.getZone(currentZoneId);
-                const zoneName = targetZone?.name || zoneNameInput.value || currentZoneId;
+                const targetId = currentZoneId || existingZonesSelect.value;
+                if (!targetId) {
+                    alert("Aucune zone à supprimer.");
+                    return;
+                }
 
-                if (confirm(`Êtes-vous sûr de vouloir supprimer définitivement la zone "${zoneName}" ?`)) {
+                const targetZone = SolsticeStore.getZone(targetId);
+                const zoneName = targetZone?.name || zoneNameInput.value || targetId;
+
+                if (confirm(`Êtes-vous sûr de vouloir supprimer définitivement la zone « ${zoneName} » ?`)) {
                     const allConfig = SolsticeStore.getAllZones();
-                    delete allConfig[currentZoneId];
+                    
+                    // Suppression effective dans l'objet global et localStorage
+                    delete allConfig[targetId];
                     localStorage.setItem(SolsticeStore.STORAGE_KEY, JSON.stringify(allConfig));
+                    SolsticeStore.config = allConfig;
 
-                    // Nettoyage de la sélection sur le tableau de bord
+                    // Suppression de la sélection sur le tableau de bord
                     try {
                         let selectedRooms = JSON.parse(localStorage.getItem('SOLSTICE_SELECTION_PIECES') || '[]');
-                        selectedRooms = selectedRooms.filter(p => p !== zoneName);
+                        selectedRooms = selectedRooms.filter(p => p !== zoneName && p !== targetId);
                         localStorage.setItem('SOLSTICE_SELECTION_PIECES', JSON.stringify(selectedRooms));
                     } catch (e) {
                         console.error("Erreur mise à jour sélection :", e);
                     }
+
+                    // Réinitialisation complète de l'interface
+                    zoneNameInput.value = "";
+                    sensorNameInput.value = "";
+                    sensorIdInput.value = "";
+                    restoreUsages([]);
 
                     refreshExistingZonesDropdown();
                     clearCurrentForm();
@@ -504,7 +522,8 @@
                     statusBadge.style.display = 'none';
                     deleteZoneBtn.style.display = 'none';
                     currentZoneId = null;
-                    alert(`✅ La zone "${zoneName}" a été supprimée avec succès.`);
+
+                    alert(`✅ La zone « ${zoneName} » a été supprimée avec succès.`);
                 }
             });
 
