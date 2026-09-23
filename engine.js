@@ -461,9 +461,12 @@ function calculateMeanRadiantTemp(zone, t_air) {
             if (wArea <= 0) return;
 
             const glassProps = {
-                'single': { U: 5.7, g: 0.85 }, 'double_old': { U: 2.8, g: 0.75 },
-                'double_recent': { U: 1.2, g: 0.60 }, 'triple': { U: 0.7, g: 0.45 }
-            };
+    'single': { U: 5.7, g: 0.85 },
+    'double_old': { U: 2.8, g: 0.75 },
+    'double_standard': { U: 1.5, g: 0.68 }, // NOUVEAU : Double standard (Argon 14-18mm)
+    'double_recent': { U: 1.2, g: 0.60 },
+    'triple': { U: 0.7, g: 0.45 }
+};
 
             const spec = glassProps[win.glass] || glassProps['double_recent'];
             let tWin = getSurfaceTemp('outside', spec.U);
@@ -664,7 +667,13 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const isSunny = sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun');
 
     if (Array.isArray(zoneConfig.windows)) {
-        const glassMap = { 'single': 0.85, 'double_old': 0.75, 'double_recent': 0.60, 'triple': 0.45 };
+        const glassMap = { 
+    'single': 0.85, 
+    'double_old': 0.75, 
+    'double_standard': 0.68, // NOUVEAU
+    'double_recent': 0.60, 
+    'triple': 0.45 
+};
         const maskMap = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 };
         const shutterMap = {
             'aucun': 1.0, 'store_interieur': 0.7, 'rideau_interieur': 0.8, 'store_banne': 0.3,
