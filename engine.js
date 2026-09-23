@@ -12,6 +12,16 @@ let SELECTION_PIECES = [];
 
 let capteursMaison = {};
 
+// Grille indicative des tarifs énergétiques (mis à jour selon les coûts réels)
+SolsticeEngine.ENERGY_COSTS = {
+    elec_direct: { pricePerKwh: 0.2516, label: "Électricité (Tarif Réglementé)" },
+    pac_air_eau: { pricePerKwh: 0.2516 / 3.2, label: "PAC Air/Eau (COP moyen 3,2)" }, // Coût thermique équivalent
+    pac_air_air: { pricePerKwh: 0.2516 / 3.0, label: "PAC Air/Air (COP moyen 3,0)" },
+    gaz_condens: { pricePerKwh: 0.1180, label: "Gaz Naturel" },
+    granules:    { pricePerKwh: 0.0890, label: "Granulés / Pellets" },
+    fioul:       { pricePerKwh: 0.1350, label: "Fioul Domestique" }
+};
+
 // ============================================================
 // CONFIGURATION DES PROFILS & SEUILS ISO 7730 (À ajouter dans engine.js)
 // ============================================================
