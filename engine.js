@@ -138,6 +138,15 @@ SolsticeEngine.evaluateSimulatedPMV = function(baseState, checkedActionKeys, env
     return { pmv: pmvSim, simTa, simTr, simVel, simRh };
 };
 
+function getClothingDescription(clo) {
+    if (clo < 0.45) return "Maillot de bain / Short & débardeur léger";
+    if (clo < 0.65) return "T-shirt, short / jupe légère & nu-pieds";
+    if (clo < 0.85) return "Pantalon léger, t-shirt manches longues";
+    if (clo < 1.15) return "Pantalon, chemise & pull léger";
+    if (clo < 1.45) return "Pull chaud, pantalon épais & chaussettes";
+    return "Gros pull / Veste d'intérieur & plaid";
+}
+
 function rafraichirCapteursDepuisConfig() {
     capteursMaison = {};
     Object.values(GLOBAL_HOUSE_CONFIG).forEach(zone => {
@@ -209,6 +218,10 @@ window.addEventListener('load', () => {
     const savedLoc = localStorage.getItem('location') || 'Reims';
     const locEl = document.getElementById('location');
     if (locEl) locEl.value = savedLoc;
+
+    const summaryCityEl = document.getElementById('summary-city-name');
+    if (summaryCityEl) summaryCityEl.textContent = savedLoc;
+
     fetchWeather(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(savedLoc)}&appid=${apiKey}&units=metric&lang=fr`);
 
     const cachedHabitat = localStorage.getItem('SOLSTICE_DONNEES_HABITAT') || sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
@@ -461,12 +474,12 @@ function calculateMeanRadiantTemp(zone, t_air) {
             if (wArea <= 0) return;
 
             const glassProps = {
-    'single': { U: 5.7, g: 0.85 },
-    'double_old': { U: 2.8, g: 0.75 },
-    'double_standard': { U: 1.5, g: 0.68 }, // NOUVEAU : Double standard (Argon 14-18mm)
-    'double_recent': { U: 1.2, g: 0.60 },
-    'triple': { U: 0.7, g: 0.45 }
-};
+                'single': { U: 5.7, g: 0.85 },
+                'double_old': { U: 2.8, g: 0.75 },
+                'double_standard': { U: 1.5, g: 0.68 },
+                'double_recent': { U: 1.2, g: 0.60 },
+                'triple': { U: 0.7, g: 0.45 }
+            };
 
             const spec = glassProps[win.glass] || glassProps['double_recent'];
             let tWin = getSurfaceTemp('outside', spec.U);
@@ -606,7 +619,7 @@ function calculateDryingPotential(ta, rh, vel = 0.1) {
 
 function calculateDailyThermalBalance(zoneConfig, ta) {
     if (!zoneConfig || (Array.isArray(zoneConfig.usages) && zoneConfig.usages.includes('outdoor'))) {
-        return { hTotalWPerK: 0, deperditionskWh: 0, gainsConductionkWh: 0, gainsSolaireskWh: 0, gainsTotauxkWh: 0, bilanNetkWh: 0 };
+        return { hTotalWPerK: 0, deperditionskWh: 0, gainsConductionkWh: 0, gainsSolaireskWh: 0, gainsTotauxkWh: 0, bilanNetkWh: 0, depKw: 0, gainsConductionKw: 0, gainsSolairesKw: 0 };
     }
 
     const area = parseFloat(zoneConfig.area) || 15;
@@ -654,26 +667,30 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
 
     let deperditionskWh = 0;
     let gainsConductionkWh = 0;
+    let depKw = 0;
+    let gainsConductionKw = 0;
 
     if (ta > outdoorTemp) {
         const deltaT_dep = ta - outdoorTemp;
-        deperditionskWh = (hTotal * deltaT_dep * 24) / 1000;
+        depKw = (hTotal * deltaT_dep) / 1000;
+        deperditionskWh = depKw * 24;
     } else {
         const deltaT_gain = outdoorTemp - ta;
-        gainsConductionkWh = (hTotal * deltaT_gain * 24) / 1000;
+        gainsConductionKw = (hTotal * deltaT_gain) / 1000;
+        gainsConductionkWh = gainsConductionKw * 24;
     }
 
-    let gainsSolaireskWh = 0;
+    let gainsSolairesKw = 0;
     const isSunny = sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun');
 
     if (Array.isArray(zoneConfig.windows)) {
         const glassMap = { 
-    'single': 0.85, 
-    'double_old': 0.75, 
-    'double_standard': 0.68, // NOUVEAU
-    'double_recent': 0.60, 
-    'triple': 0.45 
-};
+            'single': 0.85, 
+            'double_old': 0.75, 
+            'double_standard': 0.68,
+            'double_recent': 0.60, 
+            'triple': 0.45 
+        };
         const maskMap = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 };
         const shutterMap = {
             'aucun': 1.0, 'store_interieur': 0.7, 'rideau_interieur': 0.8, 'store_banne': 0.3,
@@ -696,15 +713,19 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
 
             if (!isSunny) iSolar *= 0.3;
 
-            gainsSolaireskWh += (wArea * gFactor * maskFactor * shutterFactor * iSolar);
+            gainsSolairesKw += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 24));
         });
     }
 
+    const gainsSolaireskWh = gainsSolairesKw * 24;
     const gainsTotauxkWh = gainsSolaireskWh + gainsConductionkWh;
     const bilanNetkWh = gainsTotauxkWh - deperditionskWh;
 
     return {
         hTotalWPerK: parseFloat(hTotal.toFixed(1)),
+        depKw: parseFloat(depKw.toFixed(2)),
+        gainsConductionKw: parseFloat(gainsConductionKw.toFixed(2)),
+        gainsSolairesKw: parseFloat(gainsSolairesKw.toFixed(2)),
         deperditionskWh: parseFloat(deperditionskWh.toFixed(2)),
         gainsConductionkWh: parseFloat(gainsConductionkWh.toFixed(2)),
         gainsSolaireskWh: parseFloat(gainsSolaireskWh.toFixed(2)),
@@ -795,10 +816,10 @@ function calculateGlobalHabitatMetrics() {
     let weightedTStruct = 0;
     let weightedChargePct = 0;
 
-    let totalDeperditions = 0;
-    let totalGainsConduction = 0;
-    let totalGainsSolaires = 0;
-    let totalBilanNet = 0;
+    let totalDeperditionsKw = 0;
+    let totalGainsConductionKw = 0;
+    let totalGainsSolairesKw = 0;
+    let totalBilanNetKwh = 0;
 
     for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
         if (!data || isNaN(data.ta) || isNaN(data.rh)) continue;
@@ -831,10 +852,10 @@ function calculateGlobalHabitatMetrics() {
         weightedTStruct += tStruct * volume;
         weightedChargePct += reserve.chargePercent * volume;
 
-        totalDeperditions += energy.deperditionskWh;
-        totalGainsConduction += energy.gainsConductionkWh;
-        totalGainsSolaires += energy.gainsSolaireskWh;
-        totalBilanNet += energy.bilanNetkWh;
+        totalDeperditionsKw += energy.depKw;
+        totalGainsConductionKw += energy.gainsConductionKw;
+        totalGainsSolairesKw += energy.gainsSolairesKw;
+        totalBilanNetKwh += energy.bilanNetkWh;
     }
 
     if (totalVolume === 0) return null;
@@ -846,10 +867,10 @@ function calculateGlobalHabitatMetrics() {
         avgPMV: parseFloat((weightedPMV / totalVolume).toFixed(2)),
         avgTStruct: parseFloat((weightedTStruct / totalVolume).toFixed(1)),
         avgChargePct: Math.round(weightedChargePct / totalVolume),
-        totalDeperditionskWh: parseFloat(totalDeperditions.toFixed(2)),
-        totalGainsConductionkWh: parseFloat(totalGainsConduction.toFixed(2)),
-        totalGainsSolaireskWh: parseFloat(totalGainsSolaires.toFixed(2)),
-        totalBilanNetkWh: parseFloat(totalBilanNet.toFixed(2)),
+        totalDeperditionsKw: parseFloat(totalDeperditionsKw.toFixed(2)),
+        totalGainsConductionKw: parseFloat(totalGainsConductionKw.toFixed(2)),
+        totalGainsSolairesKw: parseFloat(totalGainsSolairesKw.toFixed(2)),
+        totalBilanNetKwh: parseFloat(totalBilanNetKwh.toFixed(2)),
         totalVolumeM3: parseFloat(totalVolume.toFixed(1))
     };
 }
@@ -948,13 +969,14 @@ function actualiserCockpitGlobal() {
     const metrics = calculateGlobalHabitatMetrics();
 
     if (!metrics) {
+        if (document.getElementById('global-volume-badge')) document.getElementById('global-volume-badge').textContent = "Volume : -- m³";
         if (document.getElementById('global-avg-temp')) document.getElementById('global-avg-temp').textContent = "-- °C";
         if (document.getElementById('global-avg-rh')) document.getElementById('global-avg-rh').textContent = "-- %";
         if (document.getElementById('global-avg-ah')) document.getElementById('global-avg-ah').textContent = "-- g/m³";
         if (document.getElementById('global-pmv-val')) document.getElementById('global-pmv-val').textContent = "--";
-        if (document.getElementById('global-gains-ext')) document.getElementById('global-gains-ext').textContent = "-- kWh/j";
-        if (document.getElementById('global-dep')) document.getElementById('global-dep').textContent = "-- kWh/j";
-        if (document.getElementById('global-gains-sol')) document.getElementById('global-gains-sol').textContent = "-- kWh/j";
+        if (document.getElementById('global-gains-ext')) document.getElementById('global-gains-ext').textContent = "-- kW";
+        if (document.getElementById('global-dep')) document.getElementById('global-dep').textContent = "-- kW";
+        if (document.getElementById('global-gains-sol')) document.getElementById('global-gains-sol').textContent = "-- kW";
         if (document.getElementById('global-net')) document.getElementById('global-net').textContent = "-- kWh/j";
         if (document.getElementById('global-tstruct')) document.getElementById('global-tstruct').textContent = "-- °C";
         if (document.getElementById('global-reserve-pct')) document.getElementById('global-reserve-pct').textContent = "-- %";
@@ -987,14 +1009,14 @@ function actualiserCockpitGlobal() {
         }
     }
 
-    if (document.getElementById('global-gains-ext')) document.getElementById('global-gains-ext').textContent = `+${metrics.totalGainsConductionkWh} kWh/j`;
-    if (document.getElementById('global-dep')) document.getElementById('global-dep').textContent = `-${metrics.totalDeperditionskWh} kWh/j`;
-    if (document.getElementById('global-gains-sol')) document.getElementById('global-gains-sol').textContent = `+${metrics.totalGainsSolaireskWh} kWh/j`;
+    if (document.getElementById('global-gains-ext')) document.getElementById('global-gains-ext').textContent = `+${metrics.totalGainsConductionKw} kW`;
+    if (document.getElementById('global-dep')) document.getElementById('global-dep').textContent = `-${metrics.totalDeperditionsKw} kW`;
+    if (document.getElementById('global-gains-sol')) document.getElementById('global-gains-sol').textContent = `+${metrics.totalGainsSolairesKw} kW`;
     
     const netEl = document.getElementById('global-net');
     if (netEl) {
-        netEl.textContent = `${metrics.totalBilanNetkWh > 0 ? '+' : ''}${metrics.totalBilanNetkWh} kWh/j`;
-        netEl.style.color = metrics.totalBilanNetkWh >= 0 ? "#4ADE80" : "#F87171";
+        netEl.textContent = `${metrics.totalBilanNetKwh > 0 ? '+' : ''}${metrics.totalBilanNetKwh} kWh/j`;
+        netEl.style.color = metrics.totalBilanNetKwh >= 0 ? "#4ADE80" : "#F87171";
     }
 
     if (document.getElementById('global-tstruct')) document.getElementById('global-tstruct').textContent = `${metrics.avgTStruct} °C`;
@@ -1039,9 +1061,11 @@ window.resetClothing = function() {
 
 function updateClothingDisplay() { 
     const currentCloEl = document.getElementById('currentCloValue');
-    if (currentCloEl) {
-        currentCloEl.textContent = getBaseCloAndMet(null).totalClo.toFixed(2); 
-    }
+    const currentCloDescEl = document.getElementById('currentCloDesc');
+    const totalClo = getBaseCloAndMet(null).totalClo;
+
+    if (currentCloEl) currentCloEl.textContent = totalClo.toFixed(2); 
+    if (currentCloDescEl) currentCloDescEl.textContent = getClothingDescription(totalClo);
 }
 
 // ============================================================
@@ -1082,6 +1106,9 @@ function fetchWeather(url) {
             
             const locInput = document.getElementById('location');
             if (locInput) locInput.value = data.name;
+
+            const summaryCityEl = document.getElementById('summary-city-name');
+            if (summaryCityEl) summaryCityEl.textContent = data.name;
 
             localStorage.setItem('location', data.name);
             localStorage.setItem('outdoorTemp', outdoorTemp);
