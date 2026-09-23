@@ -228,7 +228,7 @@ window.addEventListener('load', () => {
     const summaryCityEl = document.getElementById('summary-city-name');
     if (summaryCityEl) summaryCityEl.textContent = savedLoc;
 
-    fetchWeather(`https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(savedLoc)}&appid=${apiKey}&units=metric&lang=fr`);
+    rechercherMeteoParNomVille(savedLoc);
 
     const cachedHabitat = localStorage.getItem('SOLSTICE_DONNEES_HABITAT') || sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
     if (cachedHabitat) {
@@ -1103,13 +1103,13 @@ function updateClothingDisplay() {
 }
 
 // ============================================================
-// FLUX MÉTÉO ET RENDER STATUT (API FORECAST 2.5)
+// FLUX MÉTÉO ET RENDER STATUT (API ONE CALL 3.0 / 4.0)
 // ============================================================
 
 window.rechercherMeteo = function() {
     const city = document.getElementById('location')?.value.trim();
     if (!city) return;
-    fetchWeather(`https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric&lang=fr`);
+    rechercherMeteoParNomVille(city);
 };
 
 window.geolocaliserMeteo = function() {
@@ -1117,13 +1117,32 @@ window.geolocaliserMeteo = function() {
         const summaryEl = document.getElementById('weatherSummary');
         if (summaryEl) summaryEl.innerHTML = '<span class="muted-text">📍 Géolocalisation...</span>';
         navigator.geolocation.getCurrentPosition(
-            (pos) => fetchWeather(`https://api.openweathermap.org/data/2.5/forecast?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&appid=${apiKey}&units=metric&lang=fr`),
+            (pos) => fetchOneCallWeather(pos.coords.latitude, pos.coords.longitude, "Ma position"),
             () => updateWeatherUI(false, true, "Accès GPS refusé")
         );
     }
 };
 
-function processHourlyForecastData(forecastList) {
+function rechercherMeteoParNomVille(city) {
+    const geoUrl = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(city)}&limit=1&appid=${apiKey}`;
+    
+    fetch(geoUrl)
+        .then(res => {
+            if (!res.ok) throw new Error("Erreur géocodage");
+            return res.json();
+        })
+        .then(geoData => {
+            if (!geoData || geoData.length === 0) throw new Error("Ville introuvable");
+            const { lat, lon, name } = geoData[0];
+            fetchOneCallWeather(lat, lon, name);
+        })
+        .catch(err => {
+            console.error("Erreur géocodage ville:", err);
+            updateWeatherUI(false, true, err.message);
+        });
+}
+
+function processOneCallHourlyForecast(hourlyList) {
     const hourly = [];
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime() / 1000;
@@ -1131,14 +1150,14 @@ function processHourlyForecastData(forecastList) {
     for (let h = 0; h < 24; h++) {
         const targetTs = startOfDay + (h * 3600);
         
-        let closest = forecastList[0];
-        let minDiff = Math.abs(forecastList[0].dt - targetTs);
+        let closest = hourlyList[0];
+        let minDiff = Math.abs(hourlyList[0].dt - targetTs);
 
-        for (let i = 1; i < forecastList.length; i++) {
-            const diff = Math.abs(forecastList[i].dt - targetTs);
+        for (let i = 1; i < hourlyList.length; i++) {
+            const diff = Math.abs(hourlyList[i].dt - targetTs);
             if (diff < minDiff) {
                 minDiff = diff;
-                closest = forecastList[i];
+                closest = hourlyList[i];
             }
         }
 
@@ -1148,8 +1167,8 @@ function processHourlyForecastData(forecastList) {
 
         hourly.push({
             hour: h,
-            temp: closest.main.temp,
-            humidity: closest.main.humidity,
+            temp: closest.temp,
+            humidity: closest.humidity,
             isSunny: isSunny
         });
     }
@@ -1157,26 +1176,29 @@ function processHourlyForecastData(forecastList) {
     return hourly;
 }
 
-function fetchWeather(url) {
+function fetchOneCallWeather(lat, lon, cityName = 'Reims') {
     const summaryEl = document.getElementById('weatherSummary');
-    if (summaryEl) summaryEl.innerHTML = '<span class="muted-text">⏳ Chargement de la météo...</span>';
+    if (summaryEl) summaryEl.innerHTML = '<span class="muted-text">⏳ Chargement de la météo (One Call)...</span>';
 
-    fetch(url)
+    // Note : si ton accès est sous la dénomination 3.0 ou 4.0, l'endpoint REST reste 'data/3.0/onecall' (ou 'data/3.0/onecall')
+    const oneCallUrl = `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=fr`;
+
+    fetch(oneCallUrl)
         .then(res => {
-            if (!res.ok) throw new Error("Ville introuvable");
+            if (!res.ok) throw new Error("Erreur One Call API");
             return res.json();
         })
         .then(data => {
-            const currentItem = data.list[0];
-            outdoorTemp = currentItem.main.temp; 
-            outdoorHumidity = currentItem.main.humidity;
-            outdoorWind = (currentItem.wind.speed * 3.6); 
-            sunshineStatus = currentItem.weather[0]?.main || 'Clouds'; 
+            outdoorTemp = data.current.temp; 
+            outdoorHumidity = data.current.humidity;
+            outdoorWind = (data.current.wind_speed * 3.6); 
+            sunshineStatus = data.current.weather[0]?.main || 'Clouds'; 
             
-            window.hourlyExtForecast = processHourlyForecastData(data.list);
-            localStorage.setItem('SOLSTICE_HOURLY_FORECAST', JSON.stringify(window.hourlyExtForecast));
+            if (Array.isArray(data.hourly)) {
+                window.hourlyExtForecast = processOneCallHourlyForecast(data.hourly);
+                localStorage.setItem('SOLSTICE_HOURLY_FORECAST', JSON.stringify(window.hourlyExtForecast));
+            }
 
-            const cityName = data.city ? data.city.name : 'Reims';
             const locInput = document.getElementById('location');
             if (locInput) locInput.value = cityName;
 
@@ -1194,7 +1216,7 @@ function fetchWeather(url) {
             recalculerToutLeDashboard(); 
         })
         .catch(err => {
-            console.error("Erreur météo:", err);
+            console.error("Erreur One Call:", err);
             updateWeatherUI(false, true, err.message);
         });
 }
