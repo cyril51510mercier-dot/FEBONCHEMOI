@@ -12,39 +12,101 @@ let SELECTION_PIECES = [];
 
 let capteursMaison = {};
 
-// Grille indicative des tarifs énergétiques (mis à jour selon les coûts réels)
+// ============================================================
+// SOLSTICE STORE — GESTION DU STOCKAGE CENTRALISÉ
+// ============================================================
+window.SolsticeStore = {
+    STORAGE_KEY: 'HOUSE_CONFIG',
+    init() {
+        try {
+            const raw = localStorage.getItem(this.STORAGE_KEY);
+            return raw ? JSON.parse(raw) : {};
+        } catch (e) {
+            console.error("[Solstice] Erreur Storage :", e);
+            return {};
+        }
+    },
+    saveZone(zoneId, zoneData) {
+        if (!zoneId) return false;
+        const config = this.getZones();
+        config[zoneId] = zoneData;
+        try {
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(config));
+            return true;
+        } catch (e) {
+            console.error("[Solstice] Échec sauvegarde :", e);
+            return false;
+        }
+    },
+    getZone(zoneId) { 
+        const config = this.getZones();
+        return config[zoneId] || null; 
+    },
+    getAllZones() { return this.getZones(); },
+    getZones() {
+        try {
+            const raw = localStorage.getItem(this.STORAGE_KEY);
+            return raw ? JSON.parse(raw) : {};
+        } catch (e) {
+            return {};
+        }
+    },
+    getScanData() {
+        try {
+            const cached = localStorage.getItem('SOLSTICE_DONNEES_HABITAT') || sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
+            return cached ? JSON.parse(cached) : {};
+        } catch (e) {
+            return {};
+        }
+    },
+    getEnvData() {
+        return {
+            t_ext: parseFloat(localStorage.getItem('outdoorTemp')) || outdoorTemp,
+            rh_ext: parseFloat(localStorage.getItem('outdoorHumidity')) || outdoorHumidity,
+            sun_status: localStorage.getItem('sunshineStatus') || sunshineStatus
+        };
+    },
+    getCheckedRecos() {
+        try {
+            const raw = localStorage.getItem('SOLSTICE_CHECKED_RECOS');
+            return raw ? JSON.parse(raw) : {};
+        } catch (e) {
+            return {};
+        }
+    },
+    saveCheckedRecos(data) {
+        try {
+            localStorage.setItem('SOLSTICE_CHECKED_RECOS', JSON.stringify(data));
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+};
+
+// ============================================================
+// SOLSTICE ENGINE — MOTEUR THERMIQUE & RECOMMANDATIONS
+// ============================================================
+window.SolsticeEngine = {
+    calculatePMV,
+    calculateMeanRadiantTemp,
+    calculateAirVelocity,
+    getBaseCloAndMet
+};
+
 SolsticeEngine.ENERGY_COSTS = {
     elec_direct: { pricePerKwh: 0.2516, label: "Électricité (Tarif Réglementé)" },
-    pac_air_eau: { pricePerKwh: 0.2516 / 3.2, label: "PAC Air/Eau (COP moyen 3,2)" }, // Coût thermique équivalent
+    pac_air_eau: { pricePerKwh: 0.2516 / 3.2, label: "PAC Air/Eau (COP moyen 3,2)" },
     pac_air_air: { pricePerKwh: 0.2516 / 3.0, label: "PAC Air/Air (COP moyen 3,0)" },
     gaz_condens: { pricePerKwh: 0.1180, label: "Gaz Naturel" },
     granules:    { pricePerKwh: 0.0890, label: "Granulés / Pellets" },
     fioul:       { pricePerKwh: 0.1350, label: "Fioul Domestique" }
 };
 
-// ============================================================
-// CONFIGURATION DES PROFILS & SEUILS ISO 7730 (À ajouter dans engine.js)
-// ============================================================
-
 SolsticeEngine.PROFILES = {
-    short_term: {
-        label: "Court termiste",
-        allowedLevels: [1],
-        pmvThreshold: 0.5,
-        maxDeltaPmv: 0.0
-    },
-    mid_term: {
-        label: "Moyen termiste",
-        allowedLevels: [1, 2],
-        pmvThreshold: 0.5,
-        maxDeltaPmv: 0.3
-    },
-    long_term: {
-        label: "Long termiste",
-        allowedLevels: [1, 2, 3],
-        pmvThreshold: 0.5,
-        maxDeltaPmv: 0.6
-    }
+    short_term: { label: "Court termiste", allowedLevels: [1], pmvThreshold: 0.5, maxDeltaPmv: 0.0 },
+    mid_term:   { label: "Moyen termiste", allowedLevels: [1, 2], pmvThreshold: 0.5, maxDeltaPmv: 0.3 },
+    long_term:  { label: "Long termiste", allowedLevels: [1, 2, 3], pmvThreshold: 0.5, maxDeltaPmv: 0.6 }
 };
 
 SolsticeEngine.evaluateSimulatedPMV = function(baseState, checkedActionKeys, envData) {
@@ -916,7 +978,6 @@ function actualiserCockpitGlobal() {
         }
     }
 
-    // Mise à jour Option 3 : Gains extérieurs, Déperditions, Gains solaires, Bilan net global
     if (document.getElementById('global-gains-ext')) document.getElementById('global-gains-ext').textContent = `+${metrics.totalGainsConductionkWh} kWh/j`;
     if (document.getElementById('global-dep')) document.getElementById('global-dep').textContent = `-${metrics.totalDeperditionskWh} kWh/j`;
     if (document.getElementById('global-gains-sol')) document.getElementById('global-gains-sol').textContent = `+${metrics.totalGainsSolaireskWh} kWh/j`;
@@ -1139,13 +1200,6 @@ window.voirRecommandations = function(nomPiece) {
 // ============================================================
 // SIMULATEUR DE CONSEILS ET RECOMMANDATIONS
 // ============================================================
-
-const SolsticeEngine = {
-    calculatePMV,
-    calculateMeanRadiantTemp,
-    calculateAirVelocity,
-    getBaseCloAndMet
-};
 
 SolsticeEngine.generateRecommendations = function(zone, zoneId, roomData, envData) {
     const recs = [];
