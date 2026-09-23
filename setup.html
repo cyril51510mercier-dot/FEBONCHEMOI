@@ -26,6 +26,14 @@
         <div id="profileSaveStatus" style="font-size: 0.8rem; color: #27ae60; font-weight: bold; margin-top: 5px; display: none;">✅ Profil enregistré</div>
     </div>
 
+    <div class="config-card">
+    <h3>🔥 Saison de Chauffe</h3>
+    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
+        <input type="checkbox" id="heatingSeasonActive" style="width: 18px; height: 18px;">
+        Forcer l'activation du mode "Saison de Chauffe" (sinon automatique si Text < 15 °C)
+    </label>
+</div>
+
     <!-- 1. Sélection et Identification de la Zone Thermique -->
     <div class="zone-selector-container">
         <h3>1. Définition et Identification de la Zone</h3>
@@ -170,6 +178,13 @@
         </div>
 
         <!-- SECTION B: Environnement & Adjacences des Parois -->
+        <div id="buffer-door-group" style="margin-top: 8px; padding-left: 20px;">
+    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #334155;">
+        <input type="checkbox" id="hasBufferDoor" style="width: 16px; height: 16px;">
+        Présence d'une porte d'accès directe vers ce local non chauffé (garage, cave, cellier)
+    </label>
+</div>
+        
         <div class="config-section">
             <h2>B. Environnement (Adjacences des Parois)</h2>
             <div class="form-grid">
