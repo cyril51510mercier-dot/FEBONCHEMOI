@@ -11,17 +11,17 @@
     <h1>⚙️ Console Expert Solstice</h1>
     <p class="subtitle">Modélisation Thermique Bâtiment (BEM) & Cartographie IoT</p>
 
-    <!-- Bloc à insérer dans setup.html (Configuration Globale) -->
+    <!-- Bloc à insérer dans setup.html -->
 <div class="config-card">
-    <h3>🎯 Profil de Gestion Thermique</h3>
+    <h3>🎯 Profil de Gestion Thermique & Anticipation</h3>
     <label for="userProfileSelect">Stratégie d'anticipation de l'habitant :</label>
-    <select id="userProfileSelect">
+    <select id="userProfileSelect" style="width: 100%; padding: 10px; margin-top: 8px; border-radius: 6px; font-weight: 600;">
         <option value="short_term">Court termiste — Confort immédiat strict (Dérive PMV = 0,0)</option>
         <option value="mid_term" selected>Moyen termiste — Équilibré sur 24h (Dérive PMV autorisée = ±0,3)</option>
-        <option value="long_term">Long termiste — Sobriété & Anticipation 48-72h (Dérive PMV autorisée = ±0,6)</option>
+        <option value="long_term">Long termiste — Sobriété & Anticipation Météo 48-72h (Dérive PMV autorisée = ±0,6)</option>
     </select>
-    <p class="help-text">
-        Définit si le moteur peut dégrader temporairement le confort présent pour stocker/déstocker de l'énergie dans les murs ($T_{struct}$) et effacer les consommations futures.
+    <p class="help-text" style="font-size: 0.85rem; color: #64748b; margin-top: 6px;">
+        Détermine si le moteur peut dégrader temporairement le confort présent pour charger ou décharger la masse des murs ($T_{struct}$) et effacer les consommations futures.
     </p>
 </div>
 
