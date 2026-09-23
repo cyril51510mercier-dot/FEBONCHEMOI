@@ -38,6 +38,92 @@ document.addEventListener('DOMContentLoaded', function() {
             profileIndicator.textContent = `Profil actif : ${activeProfile.label} (Tolérance PMV ±${activeProfile.maxDeltaPmv})`;
         }
 
+        // ============================================================
+// CALCULATEUR FINANCIER & CAGNOTTE ÉCO-SOLSTICE
+// ============================================================
+
+function getEnergyCostPerKwh(zoneConfig) {
+    const energyType = zoneConfig?.equipment?.heating?.energySource || 'elec_direct';
+    const energyCosts = {
+        elec_direct: 0.2516,
+        pac_air_eau: 0.2516 / 3.2,
+        pac_air_air: 0.2516 / 3.0,
+        gaz_condens: 0.1180,
+        granules: 0.0890,
+        fioul: 0.1350
+    };
+    return energyCosts[energyType] || 0.2516;
+}
+
+function calculateFinancialImpact(allRecs, checkedActions, targetZoneConfig) {
+    let savedKwhDay = 0;
+    const costPerKwh = getEnergyCostPerKwh(targetZoneConfig);
+
+    // Déperdition estimée de la zone (ou valeur de base 120 W/K)
+    const hDisp = targetZoneConfig?.hDisp || 120; 
+
+    allRecs.forEach(r => {
+        if (checkedActions[r.id]) {
+            // Estimation physique ciblée du gain selon le type d'action
+            if (r.actionKey === 'shutter_close' || r.actionKey === 'anticipate_sun') {
+                savedKwhDay += 2.5; // Blocage apports solaires surchauffe (équivalent clim évité)
+            } else if (r.actionKey === 'bedroom_temp' || r.actionKey === 'heating_cut') {
+                // Gain sur réduction de 1°C = Hdisp * 1°C * 8h / 1000
+                savedKwhDay += (hDisp * 1.0 * 8) / 1000;
+            } else if (r.actionKey === 'free_cooling' || r.actionKey === 'vmc_boost') {
+                savedKwhDay += 1.2;
+            } else if (r.actionKey === 'floor_inertia' || r.actionKey === 'sun_heat') {
+                savedKwhDay += (hDisp * 1.5 * 6) / 1000;
+            } else {
+                savedKwhDay += 0.5; // Gain forfaitaire éco-geste
+            }
+        }
+    });
+
+    const savedEurDay = savedKwhDay * costPerKwh;
+    return { savedKwhDay, savedEurDay };
+}
+
+function updateCagnotteUI(savedKwhDay, savedEurDay) {
+    // 1. Affichage gain du jour
+    const eurDayEl = document.getElementById('disp-daily-savings-eur');
+    const kwhDayEl = document.getElementById('disp-daily-savings-kwh');
+    if (eurDayEl) eurDayEl.textContent = `${savedEurDay.toFixed(2)} €`;
+    if (kwhDayEl) kwhDayEl.textContent = `${savedKwhDay.toFixed(1)} kWh/j évités`;
+
+    // 2. Gestion du cumul (Cagnotte)
+    let totalCagnotte = parseFloat(localStorage.getItem('SOLSTICE_CAGNOTTE_EUR')) || 0.0;
+    let totalKwh = parseFloat(localStorage.getItem('SOLSTICE_CAGNOTTE_KWH')) || 0.0;
+
+    // Mise à jour si de nouvelles actions ont été cochées aujourd'hui
+    const lastUpdate = localStorage.getItem('SOLSTICE_CAGNOTTE_LAST_DATE');
+    const today = new Date().toISOString().slice(0, 10);
+
+    if (lastUpdate !== today && savedEurDay > 0) {
+        totalCagnotte += savedEurDay;
+        totalKwh += savedKwhDay;
+        localStorage.setItem('SOLSTICE_CAGNOTTE_EUR', totalCagnotte.toFixed(2));
+        localStorage.setItem('SOLSTICE_CAGNOTTE_KWH', totalKwh.toFixed(1));
+        localStorage.setItem('SOLSTICE_CAGNOTTE_LAST_DATE', today);
+    }
+
+    // Affichage Cagnotte
+    const totalEurEl = document.getElementById('disp-cagnotte-total');
+    const co2El = document.getElementById('disp-cagnotte-co2');
+    if (totalEurEl) totalEurEl.textContent = `${totalCagnotte.toFixed(2)} €`;
+    if (co2El) {
+        const co2Kg = totalKwh * 0.15; // Émission moyenne 150g CO2/kWh
+        co2El.textContent = `${co2Kg.toFixed(1)} kg CO₂ évités`;
+    }
+}
+
+window.resetCagnotte = function() {
+    localStorage.removeItem('SOLSTICE_CAGNOTTE_EUR');
+    localStorage.removeItem('SOLSTICE_CAGNOTTE_KWH');
+    localStorage.removeItem('SOLSTICE_CAGNOTTE_LAST_DATE');
+    location.reload();
+};
+
         // Calcul de l'humidité absolue (g/m³)
         function getAbsoluteHumidity(ta, rh) {
             const pSat = 6.112 * Math.exp((17.67 * ta) / (ta + 243.5));
