@@ -12,26 +12,58 @@ let SELECTION_PIECES = [];
 
 let capteursMaison = {};
 
-// Définition des profils et autorisations dans SolsticeEngine
+// ============================================================
+// CONFIGURATION DES PROFILS & SEUILS ISO 7730 (À ajouter dans engine.js)
+// ============================================================
+
 SolsticeEngine.PROFILES = {
     short_term: {
         label: "Court termiste",
         allowedLevels: [1],
-        pmvThreshold: 0.5,     // Déclenchement réactif classique (|PMV| > 0,5)
-        maxDeltaPmv: 0.0       // Zéro dérive autorisée
+        pmvThreshold: 0.5,
+        maxDeltaPmv: 0.0
     },
     mid_term: {
         label: "Moyen termiste",
         allowedLevels: [1, 2],
         pmvThreshold: 0.5,
-        maxDeltaPmv: 0.3       // Tolère jusqu'à PMV ±0,8 pendant le stockage 24h
+        maxDeltaPmv: 0.3
     },
     long_term: {
         label: "Long termiste",
         allowedLevels: [1, 2, 3],
         pmvThreshold: 0.5,
-        maxDeltaPmv: 0.6       // Tolère jusqu'à PMV ±1,1 pendant la pré-charge météo 48-72h
+        maxDeltaPmv: 0.6
     }
+};
+
+SolsticeEngine.evaluateSimulatedPMV = function(baseState, checkedActionKeys, envData) {
+    let simTa = baseState.ta;
+    let simTr = baseState.tr;
+    let simVel = baseState.vel;
+    let simRh = baseState.rh;
+
+    if (checkedActionKeys.includes('shutter_close') || checkedActionKeys.includes('anticipate_sun')) {
+        simTr -= 0.6;
+        simTa -= 0.2;
+    }
+    if (checkedActionKeys.includes('free_cooling')) {
+        simTa = Math.max(envData.t_ext, simTa - 0.5);
+        simTr -= 0.4;
+    }
+    if (checkedActionKeys.includes('fan_on')) {
+        simVel += 0.25;
+    }
+    if (checkedActionKeys.includes('vmc_boost') || checkedActionKeys.includes('open_win_humidity')) {
+        simRh = Math.max(45, simRh - 6);
+    }
+    if (checkedActionKeys.includes('sun_heat')) {
+        simTr += 0.6;
+        simTa += 0.2;
+    }
+
+    const pmvSim = this.calculatePMV(simTa, simTr, simVel, simRh, baseState.met, baseState.clo);
+    return { pmv: pmvSim, simTa, simTr, simVel, simRh };
 };
 
 function rafraichirCapteursDepuisConfig() {
