@@ -11,6 +11,7 @@ let DONNEES_HABITAT = {};
 let SELECTION_PIECES = [];
 
 let capteursMaison = {};
+window.hourlyExtForecast = []; // Tableau des 24h de la journée (00h à 23h)
 
 // ============================================================
 // SOLSTICE STORE — GESTION DU STOCKAGE CENTRALISÉ
@@ -211,6 +212,11 @@ window.addEventListener('load', () => {
         bufferCheckbox.checked = includeBufferZones;
     }
 
+    const cachedForecast = localStorage.getItem('SOLSTICE_HOURLY_FORECAST');
+    if (cachedForecast) {
+        try { window.hourlyExtForecast = JSON.parse(cachedForecast); } catch(e) {}
+    }
+
     genererSelecteurPieces();
     initialiserDashboard(); 
     restoreSessionData();
@@ -222,7 +228,7 @@ window.addEventListener('load', () => {
     const summaryCityEl = document.getElementById('summary-city-name');
     if (summaryCityEl) summaryCityEl.textContent = savedLoc;
 
-    fetchWeather(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(savedLoc)}&appid=${apiKey}&units=metric&lang=fr`);
+    fetchWeather(`https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(savedLoc)}&appid=${apiKey}&units=metric&lang=fr`);
 
     const cachedHabitat = localStorage.getItem('SOLSTICE_DONNEES_HABITAT') || sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
     if (cachedHabitat) {
@@ -617,6 +623,10 @@ function calculateDryingPotential(ta, rh, vel = 0.1) {
     };
 }
 
+// ============================================================
+// BALANCEMENT THERMIQUE : INSTANTANÉ (kW) ET PROJECTION 24H (kWh)
+// ============================================================
+
 function calculateDailyThermalBalance(zoneConfig, ta) {
     if (!zoneConfig || (Array.isArray(zoneConfig.usages) && zoneConfig.usages.includes('outdoor'))) {
         return { hTotalWPerK: 0, deperditionskWh: 0, gainsConductionkWh: 0, gainsSolaireskWh: 0, gainsTotauxkWh: 0, bilanNetkWh: 0, depKw: 0, gainsConductionKw: 0, gainsSolairesKw: 0 };
@@ -665,39 +675,28 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const hVentilation = 0.34 * volume * ach;
     const hTotal = hSurfacique + hVentilation;
 
-    let deperditionskWh = 0;
-    let gainsConductionkWh = 0;
+    // --- 1. PUISSANCE INSTANTANÉE EN kW ---
     let depKw = 0;
     let gainsConductionKw = 0;
 
     if (ta > outdoorTemp) {
-        const deltaT_dep = ta - outdoorTemp;
-        depKw = (hTotal * deltaT_dep) / 1000;
-        deperditionskWh = depKw * 24;
+        depKw = (hTotal * (ta - outdoorTemp)) / 1000;
     } else {
-        const deltaT_gain = outdoorTemp - ta;
-        gainsConductionKw = (hTotal * deltaT_gain) / 1000;
-        gainsConductionkWh = gainsConductionKw * 24;
+        gainsConductionKw = (hTotal * (outdoorTemp - ta)) / 1000;
     }
 
     let gainsSolairesKw = 0;
-    const isSunny = sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun');
+    const isSunnyInstant = sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun');
 
-    if (Array.isArray(zoneConfig.windows)) {
-        const glassMap = { 
-            'single': 0.85, 
-            'double_old': 0.75, 
-            'double_standard': 0.68,
-            'double_recent': 0.60, 
-            'triple': 0.45 
-        };
-        const maskMap = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 };
-        const shutterMap = {
-            'aucun': 1.0, 'store_interieur': 0.7, 'rideau_interieur': 0.8, 'store_banne': 0.3,
-            'persienne': 0.3, 'roulant_pvc': 0.15, 'roulant_metal': 0.2, 'battant_bois': 0.15
-        };
-        const orientMap = { 'S': 3.2, 'SE': 2.5, 'SW': 2.5, 'E': 1.8, 'W': 1.8, 'N': 0.6 };
+    const glassMap = { 'single': 0.85, 'double_old': 0.75, 'double_standard': 0.68, 'double_recent': 0.60, 'triple': 0.45 };
+    const maskMap = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 };
+    const shutterMap = {
+        'aucun': 1.0, 'store_interieur': 0.7, 'rideau_interieur': 0.8, 'store_banne': 0.3,
+        'persienne': 0.3, 'roulant_pvc': 0.15, 'roulant_metal': 0.2, 'battant_bois': 0.15
+    };
+    const orientMap = { 'S': 3.2, 'SE': 2.5, 'SW': 2.5, 'E': 1.8, 'W': 1.8, 'N': 0.6 };
 
+    if (Array.isArray(zoneConfig.windows) && isSunnyInstant) {
         zoneConfig.windows.forEach(win => {
             const wArea = parseFloat(win.area) || 0;
             if (wArea <= 0) return;
@@ -711,13 +710,48 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
             orients.forEach(o => { sumI += (orientMap[o] || 1.5); });
             let iSolar = orients.length > 0 ? (sumI / orients.length) : 1.5;
 
-            if (!isSunny) iSolar *= 0.3;
-
-            gainsSolairesKw += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 24));
+            gainsSolairesKw += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 12));
         });
     }
 
-    const gainsSolaireskWh = gainsSolairesKw * 24;
+    // --- 2. CUMUL ET PROJECTION SUR 24 HEURES DE LA JOURNÉE (kWh/j) ---
+    let deperditionskWh = 0;
+    let gainsConductionkWh = 0;
+    let gainsSolaireskWh = 0;
+
+    if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length === 24) {
+        window.hourlyExtForecast.forEach(slot => {
+            const tExtHour = slot.temp;
+            if (ta > tExtHour) {
+                deperditionskWh += (hTotal * (ta - tExtHour)) / 1000;
+            } else {
+                gainsConductionkWh += (hTotal * (tExtHour - ta)) / 1000;
+            }
+
+            if (slot.isSunny && Array.isArray(zoneConfig.windows)) {
+                zoneConfig.windows.forEach(win => {
+                    const wArea = parseFloat(win.area) || 0;
+                    if (wArea <= 0) return;
+
+                    const gFactor = glassMap[win.glass] ?? 0.60;
+                    const maskFactor = maskMap[win.mask] ?? 1.0;
+                    const shutterFactor = shutterMap[win.shutter] ?? 1.0;
+
+                    const orients = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
+                    let sumI = 0;
+                    orients.forEach(o => { sumI += (orientMap[o] || 1.5); });
+                    let iSolar = orients.length > 0 ? (sumI / orients.length) : 1.5;
+
+                    gainsSolaireskWh += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 12));
+                });
+            }
+        });
+    } else {
+        deperditionskWh = depKw * 24;
+        gainsConductionkWh = gainsConductionKw * 24;
+        gainsSolaireskWh = gainsSolairesKw * 24;
+    }
+
     const gainsTotauxkWh = gainsSolaireskWh + gainsConductionkWh;
     const bilanNetkWh = gainsTotauxkWh - deperditionskWh;
 
@@ -1069,13 +1103,13 @@ function updateClothingDisplay() {
 }
 
 // ============================================================
-// FLUX MÉTÉO ET RENDER STATUT
+// FLUX MÉTÉO ET RENDER STATUT (API FORECAST 2.5)
 // ============================================================
 
 window.rechercherMeteo = function() {
     const city = document.getElementById('location')?.value.trim();
     if (!city) return;
-    fetchWeather(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric&lang=fr`);
+    fetchWeather(`https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric&lang=fr`);
 };
 
 window.geolocaliserMeteo = function() {
@@ -1083,11 +1117,45 @@ window.geolocaliserMeteo = function() {
         const summaryEl = document.getElementById('weatherSummary');
         if (summaryEl) summaryEl.innerHTML = '<span class="muted-text">📍 Géolocalisation...</span>';
         navigator.geolocation.getCurrentPosition(
-            (pos) => fetchWeather(`https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&appid=${apiKey}&units=metric&lang=fr`),
+            (pos) => fetchWeather(`https://api.openweathermap.org/data/2.5/forecast?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&appid=${apiKey}&units=metric&lang=fr`),
             () => updateWeatherUI(false, true, "Accès GPS refusé")
         );
     }
 };
+
+function processHourlyForecastData(forecastList) {
+    const hourly = [];
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime() / 1000;
+
+    for (let h = 0; h < 24; h++) {
+        const targetTs = startOfDay + (h * 3600);
+        
+        let closest = forecastList[0];
+        let minDiff = Math.abs(forecastList[0].dt - targetTs);
+
+        for (let i = 1; i < forecastList.length; i++) {
+            const diff = Math.abs(forecastList[i].dt - targetTs);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closest = forecastList[i];
+            }
+        }
+
+        const isDaytime = (h >= 7 && h <= 19);
+        const weatherMain = closest.weather[0]?.main || 'Clouds';
+        const isSunny = isDaytime && (weatherMain.toLowerCase().includes('clear') || weatherMain.toLowerCase().includes('sun'));
+
+        hourly.push({
+            hour: h,
+            temp: closest.main.temp,
+            humidity: closest.main.humidity,
+            isSunny: isSunny
+        });
+    }
+
+    return hourly;
+}
 
 function fetchWeather(url) {
     const summaryEl = document.getElementById('weatherSummary');
@@ -1099,18 +1167,23 @@ function fetchWeather(url) {
             return res.json();
         })
         .then(data => {
-            outdoorTemp = data.main.temp; 
-            outdoorHumidity = data.main.humidity;
-            outdoorWind = (data.wind.speed * 3.6); 
-            sunshineStatus = data.weather[0]?.main || 'Clouds'; 
+            const currentItem = data.list[0];
+            outdoorTemp = currentItem.main.temp; 
+            outdoorHumidity = currentItem.main.humidity;
+            outdoorWind = (currentItem.wind.speed * 3.6); 
+            sunshineStatus = currentItem.weather[0]?.main || 'Clouds'; 
             
+            window.hourlyExtForecast = processHourlyForecastData(data.list);
+            localStorage.setItem('SOLSTICE_HOURLY_FORECAST', JSON.stringify(window.hourlyExtForecast));
+
+            const cityName = data.city ? data.city.name : 'Reims';
             const locInput = document.getElementById('location');
-            if (locInput) locInput.value = data.name;
+            if (locInput) locInput.value = cityName;
 
             const summaryCityEl = document.getElementById('summary-city-name');
-            if (summaryCityEl) summaryCityEl.textContent = data.name;
+            if (summaryCityEl) summaryCityEl.textContent = cityName;
 
-            localStorage.setItem('location', data.name);
+            localStorage.setItem('location', cityName);
             localStorage.setItem('outdoorTemp', outdoorTemp);
             localStorage.setItem('outdoorHumidity', outdoorHumidity);
             localStorage.setItem('outdoorWind', outdoorWind);
