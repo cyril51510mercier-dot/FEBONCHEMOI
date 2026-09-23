@@ -53,6 +53,20 @@ document.addEventListener('DOMContentLoaded', function() {
             return zonesMap;
         }
 
+        // Filtrage appliqué dans reco.js lors de la génération
+function getFilteredRecommendations(zone, zoneId, roomData) {
+    // 1. Récupération du profil configuré (par défaut: mid_term)
+    const globalConfig = JSON.parse(localStorage.getItem('HOUSE_CONFIG'))?.global || {};
+    const userProfileKey = globalConfig.userProfile || 'mid_term';
+    const profileDef = SolsticeEngine.PROFILES[userProfileKey];
+
+    // 2. Génération de toutes les recommandations applicables
+    const rawRecs = generateRecommendationsForZone(zone, zoneId, roomData);
+
+    // 3. Filtrage selon les niveaux autorisés
+    return rawRecs.filter(rec => profileDef.allowedLevels.includes(rec.level));
+}
+        
         function setupZoneSelector() {
             if (!zoneSelect) return;
             zoneSelect.innerHTML = '';
