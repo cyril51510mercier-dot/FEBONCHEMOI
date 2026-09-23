@@ -333,36 +333,6 @@
 
     <script src="engine.js"></script>
     <script>
-        if (typeof SolsticeStore === 'undefined') {
-            window.SolsticeStore = {
-                STORAGE_KEY: 'HOUSE_CONFIG',
-                config: {},
-                init() {
-                    try {
-                        const raw = localStorage.getItem(this.STORAGE_KEY);
-                        this.config = raw ? JSON.parse(raw) : {};
-                    } catch (e) {
-                        console.error("[Solstice] Erreur Storage :", e);
-                        this.config = {};
-                    }
-                },
-                saveZone(zoneId, zoneData) {
-                    if (!zoneId) return false;
-                    this.config[zoneId] = zoneData;
-                    try {
-                        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.config));
-                        return true;
-                    } catch (e) {
-                        console.error("[Solstice] Échec sauvegarde :", e);
-                        return false;
-                    }
-                },
-                getZone(zoneId) { return this.config[zoneId] || null; },
-                getAllZones() { return this.config; },
-                getZones() { return this.config; }
-            };
-        }
-
         let currentZoneId = null;
         let windowCounter = 0;
 
