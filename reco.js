@@ -318,14 +318,14 @@ window.resetCagnotte = function() {
                 });
             }
 
-            if (needsHeat && zone?.windows?.some(w => w.glass === 'single' || w.glass === 'double_old')) {
-                recs.push({
-                    id: `${zoneId}_single_glass_thermal_curtain`, level: 1, actionKey: 'shutter_close', zoneId, zoneName, timing: 'immediate', type: 'type-heat',
-                    title: 'Rideau épais sur vitrage ancien',
-                    text: `Tirez les rideaux épais le soir pour couper le courant d'air froid convectif le long de la vitre.`,
-                    impactWeight: 12
-                });
-            }
+            if (needsHeat && zone?.windows?.some(w => w.glass === 'single' || w.glass === 'double_old' || w.glass === 'double_standard')) {
+    recs.push({
+        id: `${zoneId}_single_glass_thermal_curtain`, level: 1, actionKey: 'shutter_close', zoneId, zoneName, timing: 'immediate', type: 'type-heat',
+        title: 'Rideau épais sur vitrage ancien / standard',
+        text: `Tirez les rideaux épais le soir pour couper le courant d'air froid convectif le long de la vitre.`,
+        impactWeight: 12
+    });
+}
 
             if (roomPmv > 0.3 && zone?.equipment?.heating?.regulation?.includes('thermostatic_valve')) {
                 recs.push({
