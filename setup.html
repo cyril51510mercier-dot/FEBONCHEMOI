@@ -11,19 +11,20 @@
     <h1>⚙️ Console Expert Solstice</h1>
     <p class="subtitle">Modélisation Thermique Bâtiment (BEM) & Cartographie IoT</p>
 
-    <!-- Bloc à insérer dans setup.html -->
-<div class="config-card">
-    <h3>🎯 Profil de Gestion Thermique & Anticipation</h3>
-    <label for="userProfileSelect">Stratégie d'anticipation de l'habitant :</label>
-    <select id="userProfileSelect" style="width: 100%; padding: 10px; margin-top: 8px; border-radius: 6px; font-weight: 600;">
-        <option value="short_term">Court termiste — Confort immédiat strict (Dérive PMV = 0,0)</option>
-        <option value="mid_term" selected>Moyen termiste — Équilibré sur 24h (Dérive PMV autorisée = ±0,3)</option>
-        <option value="long_term">Long termiste — Sobriété & Anticipation Météo 48-72h (Dérive PMV autorisée = ±0,6)</option>
-    </select>
-    <p class="help-text" style="font-size: 0.85rem; color: #64748b; margin-top: 6px;">
-        Détermine si le moteur peut dégrader temporairement le confort présent pour charger ou décharger la masse des murs ($T_{struct}$) et effacer les consommations futures.
-    </p>
-</div>
+    <!-- Carte Profil de Gestion Thermique (Même largeur 940px) -->
+    <div class="config-card">
+        <h3>🎯 Profil de Gestion Thermique & Anticipation</h3>
+        <label for="userProfileSelect">Stratégie d'anticipation de l'habitant :</label>
+        <select id="userProfileSelect" style="width: 100%; padding: 10px; margin-top: 8px; border-radius: 6px; font-weight: 600;">
+            <option value="short_term">Court termiste — Confort immédiat strict (Dérive PMV = 0,0)</option>
+            <option value="mid_term" selected>Moyen termiste — Équilibré sur 24h (Dérive PMV autorisée = ±0,3)</option>
+            <option value="long_term">Long termiste — Sobriété & Anticipation Météo 48-72h (Dérive PMV autorisée = ±0,6)</option>
+        </select>
+        <p class="help-text" style="font-size: 0.85rem; color: #64748b; margin-top: 6px; margin-bottom: 0;">
+            Détermine si le moteur peut dégrader temporairement le confort présent pour charger ou décharger la masse des murs ($T_{\text{struct}}$) et effacer les consommations futures.
+        </p>
+        <div id="profileSaveStatus" style="font-size: 0.8rem; color: #27ae60; font-weight: bold; margin-top: 5px; display: none;">✅ Profil enregistré</div>
+    </div>
 
     <!-- 1. Sélection et Identification de la Zone Thermique -->
     <div class="zone-selector-container">
@@ -75,7 +76,10 @@
             <label><input type="checkbox" name="usage" value="outdoor" id="usageOutdoor"> 🌳 Extérieur</label>
         </div>
 
-        <button type="button" class="btn-load" id="loadZoneBtn" style="width: 100%;">Charger / Éditer cette Zone ↓</button>
+        <div style="display:flex; gap:10px;">
+            <button type="button" class="btn-load" id="loadZoneBtn" style="flex:2;">Charger / Éditer cette Zone ↓</button>
+            <button type="button" id="deleteZoneBtn" style="flex:1; background:#e74c3c; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; display:none;">🗑️ Supprimer cette zone</button>
+        </div>
         <div id="zoneStatus" class="status-badge" style="display:none; text-align:center; margin-top:10px; font-weight:bold;"></div>
     </div>
 
@@ -333,6 +337,36 @@
 
     <script src="engine.js"></script>
     <script>
+        if (typeof SolsticeStore === 'undefined') {
+            window.SolsticeStore = {
+                STORAGE_KEY: 'HOUSE_CONFIG',
+                config: {},
+                init() {
+                    try {
+                        const raw = localStorage.getItem(this.STORAGE_KEY);
+                        this.config = raw ? JSON.parse(raw) : {};
+                    } catch (e) {
+                        console.error("[Solstice] Erreur Storage :", e);
+                        this.config = {};
+                    }
+                },
+                saveZone(zoneId, zoneData) {
+                    if (!zoneId) return false;
+                    this.config[zoneId] = zoneData;
+                    try {
+                        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.config));
+                        return true;
+                    } catch (e) {
+                        console.error("[Solstice] Échec sauvegarde :", e);
+                        return false;
+                    }
+                },
+                getZone(zoneId) { return this.config[zoneId] || null; },
+                getAllZones() { return this.config; },
+                getZones() { return this.config; }
+            };
+        }
+
         let currentZoneId = null;
         let windowCounter = 0;
 
@@ -345,15 +379,37 @@
         const windowsContainer = document.getElementById('windowsContainer');
         const statusBadge = document.getElementById('zoneStatus');
         const usageOutdoorCb = document.getElementById('usageOutdoor');
+        const deleteZoneBtn = document.getElementById('deleteZoneBtn');
+        const userProfileSelect = document.getElementById('userProfileSelect');
 
         window.addEventListener('DOMContentLoaded', () => {
             SolsticeStore.init();
             refreshExistingZonesDropdown();
+            loadUserProfile();
             initEventListeners();
         });
 
+        function loadUserProfile() {
+            const allZones = SolsticeStore.getAllZones();
+            if (allZones.global && allZones.global.userProfile) {
+                userProfileSelect.value = allZones.global.userProfile;
+            }
+        }
+
         function initEventListeners() {
             usageOutdoorCb.addEventListener('change', toggleOutdoorMode);
+
+            // Enregistrement automatique du profil de gestion thermique
+            userProfileSelect.addEventListener('change', () => {
+                const allConfig = SolsticeStore.getAllZones();
+                allConfig.global = allConfig.global || {};
+                allConfig.global.userProfile = userProfileSelect.value;
+                localStorage.setItem(SolsticeStore.STORAGE_KEY, JSON.stringify(allConfig));
+
+                const statusEl = document.getElementById('profileSaveStatus');
+                statusEl.style.display = 'block';
+                setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+            });
 
             existingZonesSelect.addEventListener('change', () => {
                 const selectedId = existingZonesSelect.value;
@@ -363,11 +419,13 @@
                     sensorNameInput.value = zone.sensorName || '';
                     sensorIdInput.value = zone.sensorId || '';
                     restoreUsages(zone.usages);
+                    deleteZoneBtn.style.display = 'inline-block';
                 } else {
                     zoneNameInput.value = "";
                     sensorNameInput.value = "";
                     sensorIdInput.value = "";
                     restoreUsages([]);
+                    deleteZoneBtn.style.display = 'none';
                 }
                 form.style.display = 'none';
                 statusBadge.style.display = 'none';
@@ -400,6 +458,7 @@
                 const userSelectedUsages = Array.from(document.querySelectorAll('input[name="usage"]:checked')).map(cb => cb.value);
 
                 form.style.display = 'block';
+                deleteZoneBtn.style.display = 'inline-block';
 
                 const existingData = SolsticeStore.getZone(currentZoneId);
                 if (existingData) {
@@ -417,6 +476,36 @@
                 }
                 statusBadge.style.display = 'block';
                 toggleOutdoorMode();
+            });
+
+            // Bouton de suppression de zone
+            deleteZoneBtn.addEventListener('click', () => {
+                if (!currentZoneId) return;
+                const targetZone = SolsticeStore.getZone(currentZoneId);
+                const zoneName = targetZone?.name || zoneNameInput.value || currentZoneId;
+
+                if (confirm(`Êtes-vous sûr de vouloir supprimer définitivement la zone "${zoneName}" ?`)) {
+                    const allConfig = SolsticeStore.getAllZones();
+                    delete allConfig[currentZoneId];
+                    localStorage.setItem(SolsticeStore.STORAGE_KEY, JSON.stringify(allConfig));
+
+                    // Nettoyage de la sélection sur le tableau de bord
+                    try {
+                        let selectedRooms = JSON.parse(localStorage.getItem('SOLSTICE_SELECTION_PIECES') || '[]');
+                        selectedRooms = selectedRooms.filter(p => p !== zoneName);
+                        localStorage.setItem('SOLSTICE_SELECTION_PIECES', JSON.stringify(selectedRooms));
+                    } catch (e) {
+                        console.error("Erreur mise à jour sélection :", e);
+                    }
+
+                    refreshExistingZonesDropdown();
+                    clearCurrentForm();
+                    form.style.display = 'none';
+                    statusBadge.style.display = 'none';
+                    deleteZoneBtn.style.display = 'none';
+                    currentZoneId = null;
+                    alert(`✅ La zone "${zoneName}" a été supprimée avec succès.`);
+                }
             });
 
             document.getElementById('addWindowBtn').addEventListener('click', () => addWindowBlock());
@@ -482,8 +571,9 @@
                     <div>
                         <label>Type de Vitrage</label>
                         <select class="win-glass">
-                            <option value="double_recent" ${data && data.glass === 'double_recent' ? 'selected' : ''}>Double Récent (VIR avec Argon)</option>
-                            <option value="double_old" ${data && data.glass === 'double_old' ? 'selected' : ''}>Double Ancien (Air standard)</option>
+                            <option value="double_recent" ${data && data.glass === 'double_recent' ? 'selected' : ''}>Double Récent (Argon + VIR, 18-22mm)</option>
+                            <option value="double_standard" ${data && data.glass === 'double_standard' ? 'selected' : ''}>Double Standard (Argon, 14-18mm)</option>
+                            <option value="double_old" ${data && data.glass === 'double_old' ? 'selected' : ''}>Double Ancien (Air, 2-12mm)</option>
                             <option value="single" ${data && data.glass === 'single' ? 'selected' : ''}>Simple vitrage</option>
                             <option value="triple" ${data && data.glass === 'triple' ? 'selected' : ''}>Triple vitrage haute performance</option>
                         </select>
@@ -621,6 +711,7 @@
 
             const zones = SolsticeStore.getAllZones ? SolsticeStore.getAllZones() : SolsticeStore.getZones();
             for (const key in zones) {
+                if (key === 'global') continue;
                 const opt = document.createElement('option');
                 opt.value = key;
                 opt.textContent = `⚙️ ${zones[key].name || key}`;
