@@ -76,6 +76,34 @@
             </div>
         </section>
 
+        <!-- Insérer sous la section .feedback-panel dans reco.html -->
+<div class="financial-card" style="background: linear-gradient(135deg, #0f172a, #1e293b); color: white; border-radius: 12px; padding: 1.25rem; margin-bottom: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+    
+    <!-- 1. Gain instantané du plan d'action -->
+    <div style="border-right: 1px solid rgba(255,255,255,0.1); padding-right: 1rem;">
+        <div style="font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px;">Économie Instantanée du Plan</div>
+        <div style="margin-top: 6px; display: flex; align-items: baseline; gap: 8px;">
+            <strong id="disp-daily-savings-eur" style="font-size: 1.6rem; color: #4ade80;">0,00 €</strong>
+            <span style="font-size: 0.85rem; color: #cbd5e1;">/ jour</span>
+        </div>
+        <div id="disp-daily-savings-kwh" style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">0,0 kWh/j évités</div>
+    </div>
+
+    <!-- 2. La Cagnotte Cumulée -->
+    <div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.75rem; text-transform: uppercase; color: #f2994a; font-weight: 700; letter-spacing: 0.5px;">🐷 Cagnotte Cumulée Solstice</span>
+            <button onclick="resetCagnotte()" style="background: transparent; border: none; color: #64748b; cursor: pointer; font-size: 0.75rem;" title="Réinitialiser la cagnotte">🔄 Réinit.</button>
+        </div>
+        <div style="margin-top: 6px; display: flex; align-items: baseline; gap: 8px;">
+            <strong id="disp-cagnotte-total" style="font-size: 1.8rem; color: #f2994a;">0,00 €</strong>
+            <span style="font-size: 0.8rem; color: #cbd5e1;">économisés</span>
+        </div>
+        <div id="disp-cagnotte-co2" style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">0,0 kg CO₂ évités</div>
+    </div>
+
+</div>
+
         <section>
             <h2 class="section-title">⚡ Actions Immédiates (Niveau 1 — Court terme)</h2>
             <div id="container-immediate" class="reco-group"></div>
