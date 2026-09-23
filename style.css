@@ -124,6 +124,7 @@ a:hover {
 }
 
 /* Recadrage spécifique pour setup.html (Console Expert) */
+.config-card,
 .zone-selector-container,
 #expertForm,
 body > h1,
@@ -132,6 +133,15 @@ body > center {
     max-width: 940px;
     margin-left: auto;
     margin-right: auto;
+}
+
+.config-card {
+    background: var(--card-bg, #ffffff);
+    border-radius: var(--radius-lg, 12px);
+    padding: 20px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.05));
+    margin-bottom: 20px;
 }
 
 body > h1 {
