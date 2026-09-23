@@ -12,6 +12,28 @@ let SELECTION_PIECES = [];
 
 let capteursMaison = {};
 
+// Définition des profils et autorisations dans SolsticeEngine
+SolsticeEngine.PROFILES = {
+    short_term: {
+        label: "Court termiste",
+        allowedLevels: [1],
+        pmvThreshold: 0.5,     // Déclenchement réactif classique (|PMV| > 0,5)
+        maxDeltaPmv: 0.0       // Zéro dérive autorisée
+    },
+    mid_term: {
+        label: "Moyen termiste",
+        allowedLevels: [1, 2],
+        pmvThreshold: 0.5,
+        maxDeltaPmv: 0.3       // Tolère jusqu'à PMV ±0,8 pendant le stockage 24h
+    },
+    long_term: {
+        label: "Long termiste",
+        allowedLevels: [1, 2, 3],
+        pmvThreshold: 0.5,
+        maxDeltaPmv: 0.6       // Tolère jusqu'à PMV ±1,1 pendant la pré-charge météo 48-72h
+    }
+};
+
 function rafraichirCapteursDepuisConfig() {
     capteursMaison = {};
     Object.values(GLOBAL_HOUSE_CONFIG).forEach(zone => {
