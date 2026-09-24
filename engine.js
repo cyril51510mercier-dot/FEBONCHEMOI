@@ -265,17 +265,24 @@ window.toggleIncludeBuffer = function(checked) {
     actualiserCockpitGlobal();
 };
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+    // 1. Synchronisation prioritaire avec le Cloud Supabase
+    if (window.SolsticeStore && window.SolsticeStore.init) {
+        await window.SolsticeStore.init();
+    }
+
+    // 2. Chargement de la configuration expert
     const savedConfig = localStorage.getItem('HOUSE_CONFIG');
-    if (savedConfig) { 
+    if (savedConfig && Object.keys(JSON.parse(savedConfig)).length > 0) { 
         GLOBAL_HOUSE_CONFIG = JSON.parse(savedConfig); 
         rafraichirCapteursDepuisConfig();
     } else { 
-        alert("Veuillez paramétrer l'habitat dans l'espace Expert."); 
+        alert("Aucune configuration trouvée. Veuillez paramétrer l'habitat."); 
         window.location.href = 'setup.html'; 
         return; 
     }
 
+    // 3. Chargement de la sélection de pièces
     const savedSelection = localStorage.getItem('SOLSTICE_SELECTION_PIECES');
     if (savedSelection) {
         SELECTION_PIECES = JSON.parse(savedSelection);
@@ -294,10 +301,12 @@ window.addEventListener('load', () => {
         try { window.hourlyExtForecast = JSON.parse(cachedForecast); } catch(e) {}
     }
 
+    // 4. Initialisation IHM & Données
     genererSelecteurPieces();
     initialiserDashboard(); 
     restoreSessionData();
 
+    // 5. Météo
     const savedLoc = localStorage.getItem('location') || 'Reims';
     const savedLat = localStorage.getItem('SOLSTICE_LAT');
     const savedLon = localStorage.getItem('SOLSTICE_LON');
@@ -314,6 +323,7 @@ window.addEventListener('load', () => {
         rechercherMeteoParNomVille(savedLoc);
     }
 
+    // 6. Restauration des relevés capteurs
     const cachedHabitat = localStorage.getItem('SOLSTICE_DONNEES_HABITAT') || sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
     if (cachedHabitat) {
         DONNEES_HABITAT = JSON.parse(cachedHabitat);
