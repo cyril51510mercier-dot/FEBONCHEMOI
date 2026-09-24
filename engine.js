@@ -36,10 +36,11 @@ window.SolsticeStore = {
     STORAGE_KEY: 'HOUSE_CONFIG',
     
     async init() {
-        // 1. Chargement instantané depuis le cache local (Fast Boot)
-        const localData = this.getZones();
+        // 1. Récupération des données locales du PC/Téléphone
+        const localConfig = this.getZones();
+        const localScan = this.getScanData();
+        const localRecos = this.getCheckedRecos();
         
-        // 2. Synchronisation Cloud asynchrone
         if (supabaseClient) {
             try {
                 const { data, error } = await supabaseClient
@@ -49,24 +50,39 @@ window.SolsticeStore = {
                     .single();
 
                 if (data) {
-                    if (data.house_config) localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data.house_config));
-                    if (data.donnees_habitat) localStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(data.donnees_habitat));
-                    if (data.checked_recos) localStorage.setItem('SOLSTICE_CHECKED_RECOS', JSON.stringify(data.checked_recos));
-                    
-                    // Mise à jour de la configuration globale en mémoire
-                    GLOBAL_HOUSE_CONFIG = data.house_config || {};
-                    DONNEES_HABITAT = data.donnees_habitat || {};
+                    const remoteConfig = data.house_config || {};
+                    const remoteScan = data.donnees_habitat || {};
+                    const remoteRecos = data.checked_recos || {};
+
+                    // FUSION INTELLIGENTE : On garde TOUTES les pièces (Local + Cloud)
+                    const mergedConfig = { ...remoteConfig, ...localConfig };
+                    const mergedScan = { ...remoteScan, ...localScan };
+                    const mergedRecos = { ...remoteRecos, ...localRecos };
+
+                    // Mise à jour du stockage local avec la fusion
+                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(mergedConfig));
+                    localStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(mergedScan));
+                    localStorage.setItem('SOLSTICE_CHECKED_RECOS', JSON.stringify(mergedRecos));
+
+                    GLOBAL_HOUSE_CONFIG = mergedConfig;
+                    DONNEES_HABITAT = mergedScan;
+
+                    // Si le local avait plus de pièces que le cloud, on renvoie la fusion au cloud
+                    if (Object.keys(localConfig).length > Object.keys(remoteConfig).length) {
+                        await this.syncAllToCloud();
+                    }
+
                     rafraichirCapteursDepuisConfig();
                     recalculerToutLeDashboard();
                 } else if (error && error.code === 'PGRST116') {
-                    // Première initialisation si la ligne n'existe pas encore
+                    // Si aucune donnée distante, on envoie le local
                     await this.syncAllToCloud();
                 }
             } catch (e) {
                 console.warn("[Solstice Store] Mode hors-ligne activé :", e);
             }
         }
-        return localData;
+        return this.getZones();
     },
 
     async syncAllToCloud() {
@@ -84,6 +100,7 @@ window.SolsticeStore = {
             console.error("[Solstice Store] Échec de synchronisation cloud :", e);
         }
     },
+    // ... reste du code inchangé
 
     saveZone(zoneId, zoneData) {
         if (!zoneId) return false;
