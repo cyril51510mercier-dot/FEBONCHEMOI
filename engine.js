@@ -13,6 +13,10 @@ let SELECTION_PIECES = [];
 let capteursMaison = {};
 window.hourlyExtForecast = []; // Tableau des 24h de la journée (00h à 23h)
 
+// Variables d'état pour le tri du tableau
+let currentSortCol = null;
+let currentSortAsc = true;
+
 // ============================================================
 // SOLSTICE STORE — GESTION DU STOCKAGE CENTRALISÉ
 // ============================================================
@@ -222,13 +226,21 @@ window.addEventListener('load', () => {
     restoreSessionData();
 
     const savedLoc = localStorage.getItem('location') || 'Reims';
+    const savedLat = localStorage.getItem('SOLSTICE_LAT');
+    const savedLon = localStorage.getItem('SOLSTICE_LON');
+
     const locEl = document.getElementById('location');
     if (locEl) locEl.value = savedLoc;
 
     const summaryCityEl = document.getElementById('summary-city-name');
     if (summaryCityEl) summaryCityEl.textContent = savedLoc;
 
-    rechercherMeteoParNomVille(savedLoc);
+    // Si on dispose de coordonnées géographiques sauvegardées, on charge One Call directement
+    if (savedLat && savedLon) {
+        fetchOneCallWeather(parseFloat(savedLat), parseFloat(savedLon), savedLoc);
+    } else {
+        rechercherMeteoParNomVille(savedLoc);
+    }
 
     const cachedHabitat = localStorage.getItem('SOLSTICE_DONNEES_HABITAT') || sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
     if (cachedHabitat) {
@@ -314,6 +326,8 @@ function initialiserDashboard() {
             `;
             tableBody.appendChild(tr);
         });
+
+        setupTableSortHeaders();
         return;
     }
 
@@ -349,6 +363,89 @@ function initialiserDashboard() {
             grid.appendChild(tuile);
         });
     }
+}
+
+// ============================================================
+// SYSTEME DE TRI INTERACTIF DES COLONNES
+// ============================================================
+
+function getRoomMetric(nomPiece, colIndex) {
+    const data = DONNEES_HABITAT[nomPiece];
+    const zoneConfig = getZoneConfigByName(nomPiece);
+    const isOutdoor = isOutdoorZone(nomPiece, zoneConfig);
+
+    if (colIndex === 0) return nomPiece;
+    
+    const idCapteur = capteursMaison[nomPiece];
+    const statusEl = document.getElementById('status-' + idCapteur);
+    if (colIndex === 1) return statusEl ? statusEl.textContent : '';
+
+    const ta = isOutdoor ? outdoorTemp : (data?.ta || 0);
+    const rh = isOutdoor ? outdoorHumidity : (data?.rh || 0);
+
+    if (colIndex === 2) return ta;
+    if (colIndex === 3) return rh;
+    if (colIndex === 4) return calculateAbsoluteHumidity(ta, rh);
+
+    const vel = calculateAirVelocity(zoneConfig, nomPiece);
+    const tr = calculateMeanRadiantTemp(zoneConfig, ta);
+    const { met, totalClo } = getBaseCloAndMet(zoneConfig);
+
+    if (colIndex === 5) return isOutdoor ? -999 : calculatePMV(ta, tr, vel, rh, met, totalClo);
+    if (colIndex === 6) return isOutdoor ? -999 : calculateDailyThermalBalance(zoneConfig, ta).bilanNetkWh;
+    if (colIndex === 7) return isOutdoor ? -999 : updateStructureTemperature(nomPiece, ta);
+    if (colIndex === 8) return calculateDryingPotential(ta, rh, vel).dryingIndex;
+
+    return 0;
+}
+
+window.sortDashboardTable = function(colIndex) {
+    if (currentSortCol === colIndex) {
+        currentSortAsc = !currentSortAsc;
+    } else {
+        currentSortCol = colIndex;
+        currentSortAsc = true;
+    }
+
+    SELECTION_PIECES.sort((a, b) => {
+        const valA = getRoomMetric(a, colIndex);
+        const valB = getRoomMetric(b, colIndex);
+
+        if (typeof valA === 'string') {
+            return currentSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        }
+        return currentSortAsc ? (valA - valB) : (valB - valA);
+    });
+
+    initialiserDashboard();
+    recalculerToutLeDashboard();
+};
+
+function setupTableSortHeaders() {
+    const tableBody = document.getElementById('dashboard-table-body');
+    if (!tableBody) return;
+    const table = tableBody.closest('table');
+    if (!table) return;
+
+    const ths = table.querySelectorAll('thead th');
+    ths.forEach((th, index) => {
+        if (index === 9) return; // Ignorer la colonne d'action
+        th.style.cursor = 'pointer';
+        th.title = 'Cliquer pour trier cette colonne';
+        th.onclick = () => sortDashboardTable(index);
+        
+        let baseText = th.getAttribute('data-base-text');
+        if (!baseText) {
+            baseText = th.textContent.replace(/[↕▲▼]/g, '').trim();
+            th.setAttribute('data-base-text', baseText);
+        }
+
+        let icon = ' ↕';
+        if (currentSortCol === index) {
+            icon = currentSortAsc ? ' ▲' : ' ▼';
+        }
+        th.textContent = baseText + icon;
+    });
 }
 
 window.onRoomSelectionChange = function(checkbox) {
@@ -593,33 +690,33 @@ function calculateAbsoluteHumidity(ta, rh) {
 }
 
 function calculateDryingPotential(ta, rh, vel = 0.1) {
+    if (ta === undefined || rh === undefined || isNaN(ta) || isNaN(rh)) {
+        return { vpdkPa: 0, dryingIndex: 0, scorePercent: 0, score10: "0.0", status: "Inconnu", color: "#94A3B8" };
+    }
+
     const pSat = 611.2 * Math.exp((17.67 * ta) / (ta + 243.5)); 
-    const vpd = (pSat * (1 - rh / 100)) / 1000; 
+    const vpd = (pSat * (1 - rh / 100)) / 1000; // kPa
 
     const dryingIndex = vpd * (1 + 0.5 * vel);
 
-    let status = "Très Mauvais";
-    let score = 1;
+    const scorePercent = Math.min(100, Math.max(0, Math.round((dryingIndex / 1.8) * 100)));
+    const score10 = (scorePercent / 10).toFixed(1);
 
-    if (dryingIndex < 0.4) {
-        status = "Très Mauvais";
-        score = 1;
-    } else if (dryingIndex < 0.8) {
-        status = "Moyen";
-        score = 2;
-    } else if (dryingIndex < 1.3) {
-        status = "Bon";
-        score = 4;
-    } else {
-        status = "Excellent";
-        score = 5;
-    }
+    let status = "Très Lent";
+    let color = "#EF4444"; 
+
+    if (scorePercent >= 80) { status = "Ultra Rapide"; color = "#059669"; }
+    else if (scorePercent >= 60) { status = "Rapide"; color = "#10B981"; }
+    else if (scorePercent >= 40) { status = "Modéré"; color = "#F59E0B"; }
+    else if (scorePercent >= 20) { status = "Lent"; color = "#F97316"; }
 
     return {
         vpdkPa: parseFloat(vpd.toFixed(3)),
         dryingIndex: parseFloat(dryingIndex.toFixed(3)),
-        status: status,
-        score: score
+        scorePercent,
+        score10,
+        status,
+        color
     };
 }
 
@@ -914,13 +1011,10 @@ function mettreAJourTuile(nomPiece) {
 
     const data = DONNEES_HABITAT[nomPiece];
     const idCapteur = capteursMaison[nomPiece];
-    if (!data || !idCapteur) return;
+    if (!idCapteur) return;
 
     const tempEl = document.getElementById('temp-' + idCapteur);
     const humEl = document.getElementById('hum-' + idCapteur);
-
-    if (tempEl) tempEl.textContent = data.ta.toFixed(1) + " °C";
-    if (humEl) humEl.textContent = data.rh.toFixed(0) + " %";
 
     const zoneConfig = getZoneConfigByName(nomPiece) || {
         name: nomPiece,
@@ -937,6 +1031,12 @@ function mettreAJourTuile(nomPiece) {
 
     const isOutdoor = isOutdoorZone(nomPiece, zoneConfig);
 
+    const currentTa = isOutdoor ? outdoorTemp : (data?.ta || 0);
+    const currentRh = isOutdoor ? outdoorHumidity : (data?.rh || 0);
+
+    if (tempEl) tempEl.textContent = currentTa.toFixed(1) + " °C";
+    if (humEl) humEl.textContent = currentRh.toFixed(0) + " %";
+
     const ahEl = document.getElementById('ah-' + idCapteur);
     const dryingEl = document.getElementById('drying-' + idCapteur);
     const energyEl = document.getElementById('energy-' + idCapteur);
@@ -944,12 +1044,11 @@ function mettreAJourTuile(nomPiece) {
     const pmvBadge = document.getElementById('pmv-badge-' + idCapteur);
 
     if (ahEl) {
-        const ah = calculateAbsoluteHumidity(data.ta, data.rh);
+        const ah = calculateAbsoluteHumidity(currentTa, currentRh);
         ahEl.textContent = ah.toFixed(1) + " g/m³";
     }
 
     if (isOutdoor) {
-        if (dryingEl) { dryingEl.textContent = "—"; dryingEl.style.color = "#94A3B8"; }
         if (energyEl) { energyEl.textContent = "—"; energyEl.style.color = "#94A3B8"; }
         if (tStructEl) { tStructEl.textContent = "—"; tStructEl.style.color = "#94A3B8"; }
         if (pmvBadge) {
@@ -957,8 +1056,25 @@ function mettreAJourTuile(nomPiece) {
             pmvBadge.style.backgroundColor = "#F1F5F9";
             pmvBadge.style.color = "#64748B";
         }
+
+        // Calcul du séchage de linge pour les pièces extérieures
+        const velExt = outdoorWind / 3.6;
+        const dryingExt = calculateDryingPotential(outdoorTemp, outdoorHumidity, velExt);
+        if (dryingEl) {
+            dryingEl.innerHTML = `
+                <div style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                    <span style="font-weight: 700; color: ${dryingExt.color};">${dryingExt.score10}/10</span>
+                    <div style="width: 36px; height: 6px; background: #E2E8F0; border-radius: 3px; overflow: hidden; display: inline-block;">
+                        <div style="width: ${dryingExt.scorePercent}%; height: 100%; background: ${dryingExt.color}; border-radius: 3px;"></div>
+                    </div>
+                </div>
+            `;
+            dryingEl.title = `${dryingExt.status} (${dryingExt.scorePercent}%) - VPD: ${dryingExt.vpdkPa} kPa`;
+        }
         return;
     }
+
+    if (!data) return;
 
     const vel = calculateAirVelocity(zoneConfig, nomPiece);
     const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
@@ -970,8 +1086,15 @@ function mettreAJourTuile(nomPiece) {
     let pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
 
     if (dryingEl) {
-        dryingEl.textContent = drying.status;
-        dryingEl.style.color = drying.score >= 4 ? "#10B981" : (drying.score === 2 ? "#F59E0B" : "#EF4444");
+        dryingEl.innerHTML = `
+            <div style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                <span style="font-weight: 700; color: ${drying.color};">${drying.score10}/10</span>
+                <div style="width: 36px; height: 6px; background: #E2E8F0; border-radius: 3px; overflow: hidden; display: inline-block;">
+                    <div style="width: ${drying.scorePercent}%; height: 100%; background: ${drying.color}; border-radius: 3px;"></div>
+                </div>
+            </div>
+        `;
+        dryingEl.title = `${drying.status} (${drying.scorePercent}%) - VPD: ${drying.vpdkPa} kPa`;
     }
 
     if (energyEl) {
@@ -1117,13 +1240,28 @@ window.geolocaliserMeteo = function() {
         const summaryEl = document.getElementById('weatherSummary');
         if (summaryEl) summaryEl.innerHTML = '<span class="muted-text">📍 Géolocalisation...</span>';
         navigator.geolocation.getCurrentPosition(
-            (pos) => fetchOneCallWeather(pos.coords.latitude, pos.coords.longitude, "Ma position"),
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                localStorage.setItem('SOLSTICE_LAT', lat);
+                localStorage.setItem('SOLSTICE_LON', lon);
+                fetchOneCallWeather(lat, lon, "Ma position");
+            },
             () => updateWeatherUI(false, true, "Accès GPS refusé")
         );
     }
 };
 
 function rechercherMeteoParNomVille(city) {
+    if (!city || city === "Ma position") {
+        const savedLat = localStorage.getItem('SOLSTICE_LAT');
+        const savedLon = localStorage.getItem('SOLSTICE_LON');
+        if (savedLat && savedLon) {
+            fetchOneCallWeather(parseFloat(savedLat), parseFloat(savedLon), localStorage.getItem('location') || 'Ma position');
+            return;
+        }
+    }
+
     const geoUrl = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(city)}&limit=1&appid=${apiKey}`;
     
     fetch(geoUrl)
@@ -1134,6 +1272,8 @@ function rechercherMeteoParNomVille(city) {
         .then(geoData => {
             if (!geoData || geoData.length === 0) throw new Error("Ville introuvable");
             const { lat, lon, name } = geoData[0];
+            localStorage.setItem('SOLSTICE_LAT', lat);
+            localStorage.setItem('SOLSTICE_LON', lon);
             fetchOneCallWeather(lat, lon, name);
         })
         .catch(err => {
@@ -1180,7 +1320,6 @@ function fetchOneCallWeather(lat, lon, cityName = 'Reims') {
     const summaryEl = document.getElementById('weatherSummary');
     if (summaryEl) summaryEl.innerHTML = '<span class="muted-text">⏳ Chargement de la météo (One Call)...</span>';
 
-    // Note : si ton accès est sous la dénomination 3.0 ou 4.0, l'endpoint REST reste 'data/3.0/onecall' (ou 'data/3.0/onecall')
     const oneCallUrl = `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=fr`;
 
     fetch(oneCallUrl)
