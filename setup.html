@@ -427,11 +427,19 @@
         });
 
         function loadUserProfile() {
-            const allZones = SolsticeStore.getAllZones();
-            if (allZones.global && allZones.global.userProfile) {
-                userProfileSelect.value = allZones.global.userProfile;
-            }
-        }
+    const allZones = SolsticeStore.getAllZones();
+    const globalCfg = allZones.global || {};
+
+    if (globalCfg.userProfile) {
+        userProfileSelect.value = globalCfg.userProfile;
+    }
+
+    // Restauration de l'état de la saison de chauffe
+    const heatingCb = document.getElementById('heatingSeasonActive');
+    if (heatingCb) {
+        heatingCb.checked = (globalCfg.forcedSeason === 'heating' || globalCfg.heatingSeasonActive === true);
+    }
+}
 
         function initEventListeners() {
             usageOutdoorCb.addEventListener('change', toggleOutdoorMode);
@@ -448,6 +456,18 @@
                     setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
                 }
             });
+
+            const heatingCb = document.getElementById('heatingSeasonActive');
+if (heatingCb) {
+    heatingCb.addEventListener('change', () => {
+        const allConfig = SolsticeStore.getAllZones();
+        allConfig.global = allConfig.global || {};
+        const isChecked = heatingCb.checked;
+        allConfig.global.forcedSeason = isChecked ? 'heating' : 'auto';
+        allConfig.global.heatingSeasonActive = isChecked;
+        localStorage.setItem(SolsticeStore.STORAGE_KEY, JSON.stringify(allConfig));
+    });
+}
 
             // 1. Sélection dans le menu déroulant des zones existantes
             existingZonesSelect.addEventListener('change', () => {
