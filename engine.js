@@ -1132,6 +1132,45 @@ function mettreAJourTuile(nomPiece) {
     }
 }
 
+// ============================================================
+// DÉTECTION ET AFFICHAGE STATUT SAISON DE CHAUFFE
+// ============================================================
+
+function isHeatingSeasonActive() {
+    // Mode manuel configuré dans l'espace Expert (ON / OFF / AUTO)
+    const modeExpert = localStorage.getItem('SOLSTICE_HEATING_MODE') || 'AUTO';
+    
+    if (modeExpert === 'ON') return true;
+    if (modeExpert === 'OFF') return false;
+
+    // Mode AUTO : bascule si la température extérieure moyenne du jour est < 15.5 °C
+    const tDay = getDailyOutdoorTemp();
+    return tDay < 15.5;
+}
+
+function updateHeatingSeasonDisplay() {
+    const badgeEl = document.getElementById('heating-season-badge');
+    if (!badgeEl) return;
+
+    const isActive = isHeatingSeasonActive();
+    const modeExpert = localStorage.getItem('SOLSTICE_HEATING_MODE') || 'AUTO';
+    const tagAuto = modeExpert === 'AUTO' ? ' (Auto)' : '';
+
+    if (isActive) {
+        badgeEl.innerHTML = `🔥 Saison de chauffe active${tagAuto}`;
+        badgeEl.style.backgroundColor = '#FEE2E2';
+        badgeEl.style.color = '#991B1B';
+        badgeEl.style.border = '1px solid #FCA5A5';
+        badgeEl.title = "La température extérieure du jour justifie le maintien du chauffage.";
+    } else {
+        badgeEl.innerHTML = `🌱 Hors saison de chauffe${tagAuto}`;
+        badgeEl.style.backgroundColor = '#E0F2FE';
+        badgeEl.style.color = '#075985';
+        badgeEl.style.border = '1px solid #7DD3FC';
+        badgeEl.title = "Les apports thermiques naturels sont suffisants.";
+    }
+}
+
 function actualiserCockpitGlobal() {
     const metrics = calculateGlobalHabitatMetrics();
 
@@ -1210,6 +1249,7 @@ function recalculerToutLeDashboard() {
         mettreAJourTuile(nomPiece); 
     } 
     actualiserCockpitGlobal();
+    updateHeatingSeasonDisplay()
 }
 
 window.adjustClothing = function(amount) { 
