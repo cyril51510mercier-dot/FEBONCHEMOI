@@ -11,7 +11,7 @@
     <h1>⚙️ Console Expert Solstice</h1>
     <p class="subtitle">Modélisation Thermique Bâtiment (BEM) & Cartographie IoT</p>
 
-    <!-- Carte Profil de Gestion Thermique (Même largeur 940px) -->
+    <!-- Carte Profil de Gestion Thermique -->
     <div class="config-card">
         <h3>🎯 Profil de Gestion Thermique & Anticipation</h3>
         <label for="userProfileSelect">Stratégie d'anticipation de l'habitant :</label>
@@ -27,12 +27,12 @@
     </div>
 
     <div class="config-card">
-    <h3>🔥 Saison de Chauffe</h3>
-    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
-        <input type="checkbox" id="heatingSeasonActive" style="width: 18px; height: 18px;">
-        Forcer l'activation du mode "Saison de Chauffe" (sinon automatique si Text < 15 °C)
-    </label>
-</div>
+        <h3>🔥 Saison de Chauffe</h3>
+        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
+            <input type="checkbox" id="heatingSeasonActive" style="width: 18px; height: 18px;">
+            Forcer l'activation du mode "Saison de Chauffe" (sinon automatique si Text < 15 °C)
+        </label>
+    </div>
 
     <!-- 1. Sélection et Identification de la Zone Thermique -->
     <div class="zone-selector-container">
@@ -178,90 +178,90 @@
         </div>
 
         <!-- SECTION B: Environnement & Adjacences des Parois -->
-<div class="config-section">
-    <h2>B. Environnement (Adjacences des Parois)</h2>
-    <div class="form-grid">
-        <!-- Mur 1 -->
-        <div>
-            <label for="adjWall1">Mur 1</label>
-            <select id="adjWall1">
-                <option value="outside">Extérieur</option>
-                <option value="unheated">Pièce non chauffée</option>
-                <option value="heated">Pièce chauffée</option>
-            </select>
-            <div id="doorContainerWall1" style="display:none; margin-top:8px;">
-                <label style="font-size:0.85em; font-weight:normal; cursor:pointer; color:#334155;">
-                    <input type="checkbox" id="doorWall1"> 🚪 Présence d'une porte vers cette pièce
-                </label>
-            </div>
-        </div>
+        <div class="config-section">
+            <h2>B. Environnement (Adjacences des Parois)</h2>
+            <div class="form-grid">
+                <!-- Mur 1 -->
+                <div>
+                    <label for="adjWall1">Mur 1</label>
+                    <select id="adjWall1">
+                        <option value="outside">Extérieur</option>
+                        <option value="unheated">Pièce non chauffée</option>
+                        <option value="heated">Pièce chauffée</option>
+                    </select>
+                    <div id="doorContainerWall1" style="display:none; margin-top:8px;">
+                        <label style="font-size:0.85em; font-weight:normal; cursor:pointer; color:#334155;">
+                            <input type="checkbox" id="doorWall1"> 🚪 Présence d'une porte vers cette pièce
+                        </label>
+                    </div>
+                </div>
 
-        <!-- Mur 2 -->
-        <div>
-            <label for="adjWall2">Mur 2</label>
-            <select id="adjWall2">
-                <option value="outside">Extérieur</option>
-                <option value="unheated">Pièce non chauffée</option>
-                <option value="heated" selected>Pièce chauffée</option>
-            </select>
-            <div id="doorContainerWall2" style="display:none; margin-top:8px;">
-                <label style="font-size:0.85em; font-weight:normal; cursor:pointer; color:#334155;">
-                    <input type="checkbox" id="doorWall2"> 🚪 Présence d'une porte vers cette pièce
-                </label>
-            </div>
-        </div>
+                <!-- Mur 2 -->
+                <div>
+                    <label for="adjWall2">Mur 2</label>
+                    <select id="adjWall2">
+                        <option value="outside">Extérieur</option>
+                        <option value="unheated">Pièce non chauffée</option>
+                        <option value="heated" selected>Pièce chauffée</option>
+                    </select>
+                    <div id="doorContainerWall2" style="display:none; margin-top:8px;">
+                        <label style="font-size:0.85em; font-weight:normal; cursor:pointer; color:#334155;">
+                            <input type="checkbox" id="doorWall2"> 🚪 Présence d'une porte vers cette pièce
+                        </label>
+                    </div>
+                </div>
 
-        <!-- Mur 3 -->
-        <div>
-            <label for="adjWall3">Mur 3</label>
-            <select id="adjWall3">
-                <option value="outside">Extérieur</option>
-                <option value="unheated">Pièce non chauffée</option>
-                <option value="heated" selected>Pièce chauffée</option>
-            </select>
-            <div id="doorContainerWall3" style="display:none; margin-top:8px;">
-                <label style="font-size:0.85em; font-weight:normal; cursor:pointer; color:#334155;">
-                    <input type="checkbox" id="doorWall3"> 🚪 Présence d'une porte vers cette pièce
-                </label>
-            </div>
-        </div>
+                <!-- Mur 3 -->
+                <div>
+                    <label for="adjWall3">Mur 3</label>
+                    <select id="adjWall3">
+                        <option value="outside">Extérieur</option>
+                        <option value="unheated">Pièce non chauffée</option>
+                        <option value="heated" selected>Pièce chauffée</option>
+                    </select>
+                    <div id="doorContainerWall3" style="display:none; margin-top:8px;">
+                        <label style="font-size:0.85em; font-weight:normal; cursor:pointer; color:#334155;">
+                            <input type="checkbox" id="doorWall3"> 🚪 Présence d'une porte vers cette pièce
+                        </label>
+                    </div>
+                </div>
 
-        <!-- Mur 4 -->
-        <div>
-            <label for="adjWall4">Mur 4</label>
-            <select id="adjWall4">
-                <option value="outside">Extérieur</option>
-                <option value="unheated">Pièce non chauffée</option>
-                <option value="heated" selected>Pièce chauffée</option>
-            </select>
-            <div id="doorContainerWall4" style="display:none; margin-top:8px;">
-                <label style="font-size:0.85em; font-weight:normal; cursor:pointer; color:#334155;">
-                    <input type="checkbox" id="doorWall4"> 🚪 Présence d'une porte vers cette pièce
-                </label>
-            </div>
-        </div>
+                <!-- Mur 4 -->
+                <div>
+                    <label for="adjWall4">Mur 4</label>
+                    <select id="adjWall4">
+                        <option value="outside">Extérieur</option>
+                        <option value="unheated">Pièce non chauffée</option>
+                        <option value="heated" selected>Pièce chauffée</option>
+                    </select>
+                    <div id="doorContainerWall4" style="display:none; margin-top:8px;">
+                        <label style="font-size:0.85em; font-weight:normal; cursor:pointer; color:#334155;">
+                            <input type="checkbox" id="doorWall4"> 🚪 Présence d'une porte vers cette pièce
+                        </label>
+                    </div>
+                </div>
 
-        <!-- Plafond -->
-        <div class="full-width" style="margin-top:10px;">
-            <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plafond :</label>
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
-                <label><input type="checkbox" name="adjCeiling" value="outside"> Extérieur (Toit / Terrasse / Rampant)</label>
-                <label><input type="checkbox" name="adjCeiling" value="unheated"> Pièce non chauffée (Combles perdus)</label>
-                <label><input type="checkbox" name="adjCeiling" value="heated" checked> Pièce chauffée (Étage supérieur)</label>
-            </div>
-        </div>
+                <!-- Plafond -->
+                <div class="full-width" style="margin-top:10px;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plafond :</label>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
+                        <label><input type="checkbox" name="adjCeiling" value="outside"> Extérieur (Toit / Terrasse / Rampant)</label>
+                        <label><input type="checkbox" name="adjCeiling" value="unheated"> Pièce non chauffée (Combles perdus)</label>
+                        <label><input type="checkbox" name="adjCeiling" value="heated" checked> Pièce chauffée (Étage supérieur)</label>
+                    </div>
+                </div>
 
-        <!-- Plancher -->
-        <div class="full-width" style="margin-top:10px;">
-            <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plancher :</label>
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
-                <label><input type="checkbox" name="adjFloor" value="outside"> Extérieur / Sol (Terre-plein / Vide sanitaire)</label>
-                <label><input type="checkbox" name="adjFloor" value="unheated"> Pièce non chauffée (Cave / Sous-sol)</label>
-                <label><input type="checkbox" name="adjFloor" value="heated" checked> Pièce chauffée (Étage inférieur)</label>
+                <!-- Plancher -->
+                <div class="full-width" style="margin-top:10px;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plancher :</label>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
+                        <label><input type="checkbox" name="adjFloor" value="outside"> Extérieur / Sol (Terre-plein / Vide sanitaire)</label>
+                        <label><input type="checkbox" name="adjFloor" value="unheated"> Pièce non chauffée (Cave / Sous-sol)</label>
+                        <label><input type="checkbox" name="adjFloor" value="heated" checked> Pièce chauffée (Étage inférieur)</label>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-</div>
 
         <!-- SECTION C: Apports Solaires & Vitrages -->
         <div class="config-section">
@@ -424,22 +424,23 @@
             refreshExistingZonesDropdown();
             loadUserProfile();
             initEventListeners();
+            updateDoorVisibility();
         });
 
         function loadUserProfile() {
-    const allZones = SolsticeStore.getAllZones();
-    const globalCfg = allZones.global || {};
+            const allZones = SolsticeStore.getAllZones();
+            const globalCfg = allZones.global || {};
 
-    if (globalCfg.userProfile) {
-        userProfileSelect.value = globalCfg.userProfile;
-    }
+            if (globalCfg.userProfile) {
+                userProfileSelect.value = globalCfg.userProfile;
+            }
 
-    // Restauration de l'état de la saison de chauffe
-    const heatingCb = document.getElementById('heatingSeasonActive');
-    if (heatingCb) {
-        heatingCb.checked = (globalCfg.forcedSeason === 'heating' || globalCfg.heatingSeasonActive === true);
-    }
-}
+            // Restauration de l'état de la saison de chauffe
+            const heatingCb = document.getElementById('heatingSeasonActive');
+            if (heatingCb) {
+                heatingCb.checked = (globalCfg.forcedSeason === 'heating' || globalCfg.heatingSeasonActive === true);
+            }
+        }
 
         function initEventListeners() {
             usageOutdoorCb.addEventListener('change', toggleOutdoorMode);
@@ -455,29 +456,33 @@
                     statusEl.style.display = 'block';
                     setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
                 }
-                [1, 2, 3, 4].forEach(i => {
-    const wallSelect = document.getElementById(`adjWall${i}`);
-    if (wallSelect) {
-        wallSelect.addEventListener('change', updateDoorVisibility);
-    }
             });
 
+            // Écouteurs pour la visibilité dynamique des portes
+            [1, 2, 3, 4].forEach(i => {
+                const wallSelect = document.getElementById(`adjWall${i}`);
+                if (wallSelect) {
+                    wallSelect.addEventListener('change', updateDoorVisibility);
+                }
+            });
+
+            // Écouteur pour la saison de chauffe
             const heatingCb = document.getElementById('heatingSeasonActive');
-if (heatingCb) {
-    heatingCb.addEventListener('change', () => {
-        const allConfig = SolsticeStore.getAllZones();
-        allConfig.global = allConfig.global || {};
-        const isChecked = heatingCb.checked;
-        allConfig.global.forcedSeason = isChecked ? 'heating' : 'auto';
-        allConfig.global.heatingSeasonActive = isChecked;
-        localStorage.setItem(SolsticeStore.STORAGE_KEY, JSON.stringify(allConfig));
-    });
-}
+            if (heatingCb) {
+                heatingCb.addEventListener('change', () => {
+                    const allConfig = SolsticeStore.getAllZones();
+                    allConfig.global = allConfig.global || {};
+                    const isChecked = heatingCb.checked;
+                    allConfig.global.forcedSeason = isChecked ? 'heating' : 'auto';
+                    allConfig.global.heatingSeasonActive = isChecked;
+                    localStorage.setItem(SolsticeStore.STORAGE_KEY, JSON.stringify(allConfig));
+                });
+            }
 
             // 1. Sélection dans le menu déroulant des zones existantes
             existingZonesSelect.addEventListener('change', () => {
                 const selectedId = existingZonesSelect.value;
-                currentZoneId = selectedId ? selectedId : null; // Synchronisation immédiate de currentZoneId
+                currentZoneId = selectedId ? selectedId : null;
 
                 if (selectedId && SolsticeStore.getZone(selectedId)) {
                     const zone = SolsticeStore.getZone(selectedId);
@@ -558,12 +563,10 @@ if (heatingCb) {
                 if (confirm(`Êtes-vous sûr de vouloir supprimer définitivement la zone « ${zoneName} » ?`)) {
                     const allConfig = SolsticeStore.getAllZones();
                     
-                    // Suppression effective dans l'objet global et localStorage
                     delete allConfig[targetId];
                     localStorage.setItem(SolsticeStore.STORAGE_KEY, JSON.stringify(allConfig));
                     SolsticeStore.config = allConfig;
 
-                    // Suppression de la sélection sur le tableau de bord
                     try {
                         let selectedRooms = JSON.parse(localStorage.getItem('SOLSTICE_SELECTION_PIECES') || '[]');
                         selectedRooms = selectedRooms.filter(p => p !== zoneName && p !== targetId);
@@ -572,7 +575,6 @@ if (heatingCb) {
                         console.error("Erreur mise à jour sélection :", e);
                     }
 
-                    // Réinitialisation complète de l'interface
                     zoneNameInput.value = "";
                     sensorNameInput.value = "";
                     sensorIdInput.value = "";
@@ -708,22 +710,6 @@ if (heatingCb) {
             if (!currentZoneId) {
                 alert("Erreur : Aucune zone n'est chargée.");
                 return;
-                adj: {
-    wall1: document.getElementById('adjWall1').value,
-    wall2: document.getElementById('adjWall2').value,
-    wall3: document.getElementById('adjWall3').value,
-    wall4: document.getElementById('adjWall4').value,
-    doorWall1: document.getElementById('doorWall1').checked,
-    doorWall2: document.getElementById('doorWall2').checked,
-    doorWall3: document.getElementById('doorWall3').checked,
-    doorWall4: document.getElementById('doorWall4').checked,
-    hasBufferDoor: document.getElementById('doorWall1').checked || 
-                   document.getElementById('doorWall2').checked || 
-                   document.getElementById('doorWall3').checked || 
-                   document.getElementById('doorWall4').checked,
-    ceiling: adjCeilingCoches,
-    floor: adjFloorCoches
-},
             }
 
             const usagesCoches = Array.from(document.querySelectorAll('input[name="usage"]:checked')).map(cb => cb.value);
@@ -751,6 +737,11 @@ if (heatingCb) {
             const ceilingHeightVal = parseFloat(document.getElementById('ceilingHeight').value);
             const wallThicknessVal = parseFloat(document.getElementById('wallThickness').value);
 
+            const door1 = document.getElementById('doorWall1')?.checked || false;
+            const door2 = document.getElementById('doorWall2')?.checked || false;
+            const door3 = document.getElementById('doorWall3')?.checked || false;
+            const door4 = document.getElementById('doorWall4')?.checked || false;
+
             const zoneConfig = {
                 id: currentZoneId,
                 name: zoneNameInput.value.trim(),
@@ -771,6 +762,11 @@ if (heatingCb) {
                     wall2: document.getElementById('adjWall2').value,
                     wall3: document.getElementById('adjWall3').value,
                     wall4: document.getElementById('adjWall4').value,
+                    doorWall1: door1,
+                    doorWall2: door2,
+                    doorWall3: door3,
+                    doorWall4: door4,
+                    hasBufferDoor: door1 || door2 || door3 || door4,
                     ceiling: adjCeilingCoches,
                     floor: adjFloorCoches
                 },
@@ -837,25 +833,25 @@ if (heatingCb) {
             document.getElementById('floorInsulation').value = data.floorInsulation || 'iti_recent';
 
             if (data.adj) {
-    document.getElementById('adjWall1').value = data.adj.wall1 || 'outside';
-    document.getElementById('adjWall2').value = data.adj.wall2 || 'heated';
-    document.getElementById('adjWall3').value = data.adj.wall3 || 'heated';
-    document.getElementById('adjWall4').value = data.adj.wall4 || 'heated';
+                document.getElementById('adjWall1').value = data.adj.wall1 || 'outside';
+                document.getElementById('adjWall2').value = data.adj.wall2 || 'heated';
+                document.getElementById('adjWall3').value = data.adj.wall3 || 'heated';
+                document.getElementById('adjWall4').value = data.adj.wall4 || 'heated';
 
-    document.getElementById('doorWall1').checked = !!data.adj.doorWall1;
-    document.getElementById('doorWall2').checked = !!data.adj.doorWall2;
-    document.getElementById('doorWall3').checked = !!data.adj.doorWall3;
-    document.getElementById('doorWall4').checked = !!data.adj.doorWall4;
+                document.getElementById('doorWall1').checked = !!data.adj.doorWall1;
+                document.getElementById('doorWall2').checked = !!data.adj.doorWall2;
+                document.getElementById('doorWall3').checked = !!data.adj.doorWall3;
+                document.getElementById('doorWall4').checked = !!data.adj.doorWall4;
 
-    updateDoorVisibility();
+                updateDoorVisibility();
 
-    document.querySelectorAll('input[name="adjCeiling"]').forEach(cb => {
-        cb.checked = Array.isArray(data.adj.ceiling) && data.adj.ceiling.includes(cb.value);
-    });
-    document.querySelectorAll('input[name="adjFloor"]').forEach(cb => {
-        cb.checked = Array.isArray(data.adj.floor) && data.adj.floor.includes(cb.value);
-    });
-}
+                document.querySelectorAll('input[name="adjCeiling"]').forEach(cb => {
+                    cb.checked = Array.isArray(data.adj.ceiling) && data.adj.ceiling.includes(cb.value);
+                });
+                document.querySelectorAll('input[name="adjFloor"]').forEach(cb => {
+                    cb.checked = Array.isArray(data.adj.floor) && data.adj.floor.includes(cb.value);
+                });
+            }
 
             if (data.equipment) {
                 document.getElementById('heatingSystem').value = data.equipment.heating?.system || 'none';
@@ -882,21 +878,20 @@ if (heatingCb) {
         }
 
         function updateDoorVisibility() {
-    [1, 2, 3, 4].forEach(i => {
-        const wallSelect = document.getElementById(`adjWall${i}`);
-        const doorContainer = document.getElementById(`doorContainerWall${i}`);
-        if (wallSelect && doorContainer) {
-            // Affiche la case si le mur donne sur une pièce non chauffée ou chauffée
-            if (wallSelect.value === 'unheated' || wallSelect.value === 'heated') {
-                doorContainer.style.display = 'block';
-            } else {
-                doorContainer.style.display = 'none';
-                const cb = document.getElementById(`doorWall${i}`);
-                if (cb) cb.checked = false;
-            }
+            [1, 2, 3, 4].forEach(i => {
+                const wallSelect = document.getElementById(`adjWall${i}`);
+                const doorContainer = document.getElementById(`doorContainerWall${i}`);
+                if (wallSelect && doorContainer) {
+                    if (wallSelect.value === 'unheated' || wallSelect.value === 'heated') {
+                        doorContainer.style.display = 'block';
+                    } else {
+                        doorContainer.style.display = 'none';
+                        const cb = document.getElementById(`doorWall${i}`);
+                        if (cb) cb.checked = false;
+                    }
+                }
+            });
         }
-    });
-}
 
         function clearCurrentForm() {
             document.getElementById('roomArea').value = '';
@@ -906,6 +901,11 @@ if (heatingCb) {
             document.getElementById('adjWall2').value = 'heated';
             document.getElementById('adjWall3').value = 'heated';
             document.getElementById('adjWall4').value = 'heated';
+
+            [1, 2, 3, 4].forEach(i => {
+                const cb = document.getElementById(`doorWall${i}`);
+                if (cb) cb.checked = false;
+            });
 
             document.querySelectorAll('input[name="adjCeiling"]').forEach(cb => cb.checked = (cb.value === 'heated'));
             document.querySelectorAll('input[name="adjFloor"]').forEach(cb => cb.checked = (cb.value === 'heated'));
@@ -921,6 +921,7 @@ if (heatingCb) {
             windowsContainer.innerHTML = '';
             windowCounter = 0;
             addWindowBlock();
+            updateDoorVisibility();
         }
     </script>
 </body>
