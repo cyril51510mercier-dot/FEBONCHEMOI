@@ -146,10 +146,10 @@ SolsticeEngine.evaluateSimulatedPMV = function(baseState, checkedActionKeys, env
 function getClothingDescription(clo) {
     if (clo < 0.45) return "Maillot de bain / Short & débardeur léger";
     if (clo < 0.65) return "T-shirt, short / jupe légère & nu-pieds";
-    if (clo < 0.85) return "Pantalon léger, t-shirt manches longues";
-    if (clo < 1.15) return "Pantalon, chemise & pull léger";
-    if (clo < 1.45) return "Pull chaud, pantalon épais & chaussettes";
-    return "Gros pull / Veste d'intérieur & plaid";
+    if (clo < 0.85) return "Pantalon léger & t-shirt manches longues";
+    if (clo < 1.05) return "Pantalon, chemise ou pull léger";
+    if (clo < 1.25) return "Pull chaud, pantalon épais & chaussettes";
+    return "Gros pull, veste d'intérieur & plaid";
 }
 
 function rafraichirCapteursDepuisConfig() {
@@ -235,7 +235,6 @@ window.addEventListener('load', () => {
     const summaryCityEl = document.getElementById('summary-city-name');
     if (summaryCityEl) summaryCityEl.textContent = savedLoc;
 
-    // Si on dispose de coordonnées géographiques sauvegardées, on charge One Call directement
     if (savedLat && savedLon) {
         fetchOneCallWeather(parseFloat(savedLat), parseFloat(savedLon), savedLoc);
     } else {
@@ -292,22 +291,19 @@ function initialiserDashboard() {
     const tableBody = document.getElementById('dashboard-table-body');
     const grid = document.getElementById('dashboard-grid');
 
-    const zones = Object.values(GLOBAL_HOUSE_CONFIG);
-
     if (tableBody) {
         tableBody.innerHTML = '';
-        if (zones.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: #7f8c8d; padding: 20px;">Aucune zone paramétrée dans l'Espace Expert.</td></tr>`;
+        if (SELECTION_PIECES.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: #7f8c8d; padding: 20px;">Aucune zone sélectionnée.</td></tr>`;
             return;
         }
 
-        zones.forEach(zone => {
-            const nomPiece = zone.name;
-            if (!SELECTION_PIECES.includes(nomPiece)) return;
-
-            const idCapteur = zone.sensorId || zone.id;
+        SELECTION_PIECES.forEach(nomPiece => {
+            const zone = getZoneConfigByName(nomPiece) || {};
+            const idCapteur = zone.sensorId || zone.id || capteursMaison[nomPiece];
             const tr = document.createElement('tr');
             tr.style.cssText = 'border-bottom: 1px solid #E2E8F0;';
+            tr.setAttribute('data-room-name', nomPiece);
             const safeName = nomPiece.replace(/'/g, "\\'");
 
             tr.innerHTML = `
@@ -333,15 +329,14 @@ function initialiserDashboard() {
 
     if (grid) {
         grid.innerHTML = '';
-        if (zones.length === 0) {
-            grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #7f8c8d; padding: 20px;">Aucune zone paramétrée dans l'Espace Expert.</p>`;
+        if (SELECTION_PIECES.length === 0) {
+            grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #7f8c8d; padding: 20px;">Aucune zone sélectionnée.</p>`;
             return;
         }
 
-        zones.forEach(zone => {
-            const nomPiece = zone.name;
-            if (!SELECTION_PIECES.includes(nomPiece)) return;
-            const idCapteur = zone.sensorId || zone.id;
+        SELECTION_PIECES.forEach(nomPiece => {
+            const zone = getZoneConfigByName(nomPiece) || {};
+            const idCapteur = zone.sensorId || zone.id || capteursMaison[nomPiece];
             const safeName = nomPiece.replace(/'/g, "\\'");
 
             const tuile = document.createElement('div');
@@ -417,8 +412,19 @@ window.sortDashboardTable = function(colIndex) {
         return currentSortAsc ? (valA - valB) : (valB - valA);
     });
 
-    initialiserDashboard();
-    recalculerToutLeDashboard();
+    const tableBody = document.getElementById('dashboard-table-body');
+    if (tableBody) {
+        const rows = Array.from(tableBody.querySelectorAll('tr[data-room-name]'));
+        const rowMap = new Map();
+        rows.forEach(r => rowMap.set(r.getAttribute('data-room-name'), r));
+
+        SELECTION_PIECES.forEach(nomPiece => {
+            const row = rowMap.get(nomPiece);
+            if (row) tableBody.appendChild(row);
+        });
+    }
+
+    setupTableSortHeaders();
 };
 
 function setupTableSortHeaders() {
@@ -429,7 +435,7 @@ function setupTableSortHeaders() {
 
     const ths = table.querySelectorAll('thead th');
     ths.forEach((th, index) => {
-        if (index === 9) return; // Ignorer la colonne d'action
+        if (index === 9) return;
         th.style.cursor = 'pointer';
         th.title = 'Cliquer pour trier cette colonne';
         th.onclick = () => sortDashboardTable(index);
@@ -505,14 +511,21 @@ function getUValueParoi(typeParoi, materiau, isolation) {
     return 1 / (rSurface + (epaisseurMetre / lambda) + rIns);
 }
 
+function getDailyOutdoorTemp() {
+    if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length > 0) {
+        const activeHours = window.hourlyExtForecast.filter(slot => slot.hour >= 7 && slot.hour <= 22);
+        const listToUse = activeHours.length > 0 ? activeHours : window.hourlyExtForecast;
+        const sumTemp = listToUse.reduce((acc, slot) => acc + slot.temp, 0);
+        return sumTemp / listToUse.length;
+    }
+    return outdoorTemp;
+}
+
 function getBaseCloAndMet(zoneConfig) {
     let met = 1.2; 
-    let baseClo = 1.0; 
-
-    if (outdoorTemp >= 26) baseClo = 0.4;
-    else if (outdoorTemp >= 20) baseClo = 0.6;
-    else if (outdoorTemp >= 15) baseClo = 0.85;
-    else if (outdoorTemp < 5) baseClo = 1.25;
+    
+    const tDay = getDailyOutdoorTemp();
+    let baseClo = Math.max(0.35, Math.min(1.30, 1.20 - 0.035 * (tDay - 5)));
 
     if (zoneConfig && Array.isArray(zoneConfig.usages)) {
         if (zoneConfig.usages.includes('kitchen')) met = 1.6;
@@ -521,9 +534,9 @@ function getBaseCloAndMet(zoneConfig) {
         else if (zoneConfig.usages.includes('bedroom')) {
             met = 0.9;
             const currentMonth = new Date().getMonth();
-            if ([11, 0, 1].includes(currentMonth)) baseClo = 2.0;
+            if ([11, 0, 1].includes(currentMonth)) baseClo = 1.8;
             else if ([5, 6, 7].includes(currentMonth)) baseClo = 0.5;
-            else baseClo = 1.2;
+            else baseClo = 1.1;
         }
     }
 
@@ -695,7 +708,7 @@ function calculateDryingPotential(ta, rh, vel = 0.1) {
     }
 
     const pSat = 611.2 * Math.exp((17.67 * ta) / (ta + 243.5)); 
-    const vpd = (pSat * (1 - rh / 100)) / 1000; // kPa
+    const vpd = (pSat * (1 - rh / 100)) / 1000; 
 
     const dryingIndex = vpd * (1 + 0.5 * vel);
 
@@ -772,7 +785,6 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const hVentilation = 0.34 * volume * ach;
     const hTotal = hSurfacique + hVentilation;
 
-    // --- 1. PUISSANCE INSTANTANÉE EN kW ---
     let depKw = 0;
     let gainsConductionKw = 0;
 
@@ -811,7 +823,6 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
         });
     }
 
-    // --- 2. CUMUL ET PROJECTION SUR 24 HEURES DE LA JOURNÉE (kWh/j) ---
     let deperditionskWh = 0;
     let gainsConductionkWh = 0;
     let gainsSolaireskWh = 0;
@@ -1057,7 +1068,6 @@ function mettreAJourTuile(nomPiece) {
             pmvBadge.style.color = "#64748B";
         }
 
-        // Calcul du séchage de linge pour les pièces extérieures
         const velExt = outdoorWind / 3.6;
         const dryingExt = calculateDryingPotential(outdoorTemp, outdoorHumidity, velExt);
         if (dryingEl) {
@@ -1384,7 +1394,14 @@ function updateWeatherUI(loading = false, error = false, errorMsg = "") {
 // SUPER SCAN MAKE.COM
 // ============================================================
 
-window.synchroniserTouteLaMaison = async function() {
+window.synchroniserTouteLaMaison = async function(event) {
+    if (event && event.target) {
+        const btn = document.getElementById('btn-sync-all');
+        if (btn && !btn.contains(event.target) && event.target !== btn) {
+            return;
+        }
+    }
+
     if (SELECTION_PIECES.length === 0) {
         alert("⚠️ Sélectionnez au moins une pièce à scanner !");
         return;
