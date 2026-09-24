@@ -29,9 +29,43 @@ document.addEventListener('DOMContentLoaded', function() {
         const activeProfileKey = globalConfig.userProfile || 'mid_term';
         
         // Détermination de la Saison de Chauffe (Manuel OU Automatique si Text < 15 °C)
+        const forcedSeason = globalConfig.forcedSeason;
         const manualHeating = globalConfig.heatingSeasonActive;
         const autoHeating = envDataGlobal.t_ext < 15;
-        const isHeatingSeasonActive = (manualHeating !== undefined && manualHeating !== null) ? manualHeating : autoHeating;
+        const isHeatingSeasonActive = (forcedSeason === 'heating') ? true : ((forcedSeason === 'auto') ? autoHeating : (manualHeating !== undefined && manualHeating !== null ? manualHeating : autoHeating));
+
+        // Synchronisation du bouton de saison de chauffe si présent sur reco.html
+        const heatingBtn = document.getElementById('btnToggleHeating');
+        if (heatingBtn) {
+            const applyUI = (state) => {
+                if (state === 'heating') {
+                    heatingBtn.textContent = '🔥 Saison de chauffe : FORCÉE';
+                    heatingBtn.style.backgroundColor = '#e74c3c';
+                    heatingBtn.style.borderColor = '#c0392b';
+                    heatingBtn.style.color = '#ffffff';
+                } else {
+                    heatingBtn.textContent = '🌐 Saison de chauffe : AUTO';
+                    heatingBtn.style.backgroundColor = '#1E293B';
+                    heatingBtn.style.borderColor = '#334155';
+                    heatingBtn.style.color = '#F8FAFC';
+                }
+            };
+
+            const currentState = globalConfig.forcedSeason || (globalConfig.heatingSeasonActive ? 'heating' : 'auto');
+            applyUI(currentState);
+
+            heatingBtn.addEventListener('click', () => {
+                const raw = localStorage.getItem('HOUSE_CONFIG');
+                const cfg = raw ? JSON.parse(raw) : {};
+                cfg.global = cfg.global || {};
+                const newState = (cfg.global.forcedSeason === 'heating') ? 'auto' : 'heating';
+                cfg.global.forcedSeason = newState;
+                cfg.global.heatingSeasonActive = (newState === 'heating');
+                localStorage.setItem('HOUSE_CONFIG', JSON.stringify(cfg));
+                applyUI(newState);
+                render();
+            });
+        }
 
         const profilesDef = engine.PROFILES || {
             short_term: { label: "Court termiste", allowedLevels: [1], maxDeltaPmv: 0.0 },
