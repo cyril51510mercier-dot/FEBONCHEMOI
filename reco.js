@@ -24,52 +24,39 @@ document.addEventListener('DOMContentLoaded', function() {
         const containerCompleted = document.getElementById('container-completed');
         const profileIndicator = document.getElementById('profileIndicator');
 
-// Configuration Globale & Saison de chauffe
-const globalConfig = houseConfig.global || {};
-const activeProfileKey = globalConfig.userProfile || 'mid_term';
+        // Configuration Globale & Saison de chauffe
+        const globalConfig = houseConfig.global || {};
+        const activeProfileKey = globalConfig.userProfile || 'mid_term';
 
-// Détermination de la Saison de Chauffe (Prise en compte du forçage 'heating' / 'auto')
-const forcedSeason = globalConfig.forcedSeason;
-const manualHeating = globalConfig.heatingSeasonActive;
-const autoHeating = envDataGlobal.t_ext < 15;
-const isHeatingSeasonActive = (forcedSeason === 'heating') 
-    ? true 
-    : ((forcedSeason === 'auto') 
-        ? autoHeating 
-        : (manualHeating !== undefined && manualHeating !== null ? manualHeating : autoHeating));
+        // Détermination de la Saison de Chauffe (Prise en compte du forçage 'heating' / 'auto')
+        const forcedSeason = globalConfig.forcedSeason;
+        const manualHeating = globalConfig.heatingSeasonActive;
+        const autoHeating = envDataGlobal.t_ext < 15;
+        const isHeatingSeasonActive = (forcedSeason === 'heating') 
+            ? true 
+            : ((forcedSeason === 'auto') 
+                ? autoHeating 
+                : (manualHeating !== undefined && manualHeating !== null ? manualHeating : autoHeating));
 
-// Synchronisation du bouton si présent sur la page de recommandations
-const heatingBtn = document.getElementById('btnToggleHeating');
-if (heatingBtn) {
-    const applyUI = (state) => {
-        if (state === 'heating') {
-            heatingBtn.textContent = '🔥 Saison de chauffe : FORCÉE';
-            heatingBtn.style.backgroundColor = '#e74c3c';
-            heatingBtn.style.borderColor = '#c0392b';
-            heatingBtn.style.color = '#ffffff';
-        } else {
-            heatingBtn.textContent = '🌐 Saison de chauffe : AUTO';
-            heatingBtn.style.backgroundColor = '#1E293B';
-            heatingBtn.style.borderColor = '#334155';
-            heatingBtn.style.color = '#F8FAFC';
-        }
-    };
+        // Synchronisation du bouton si présent sur la page de recommandations
+        const heatingBtn = document.getElementById('btnToggleHeating');
+        if (heatingBtn) {
+            const applyUI = (state) => {
+                if (state === 'heating') {
+                    heatingBtn.textContent = '🔥 Saison de chauffe : FORCÉE';
+                    heatingBtn.style.backgroundColor = '#e74c3c';
+                    heatingBtn.style.borderColor = '#c0392b';
+                    heatingBtn.style.color = '#ffffff';
+                } else {
+                    heatingBtn.textContent = '🌐 Saison de chauffe : AUTO';
+                    heatingBtn.style.backgroundColor = '#1E293B';
+                    heatingBtn.style.borderColor = '#334155';
+                    heatingBtn.style.color = '#F8FAFC';
+                }
+            };
 
-    const currentState = forcedSeason || (manualHeating ? 'heating' : 'auto');
-    applyUI(currentState);
-
-    heatingBtn.addEventListener('click', () => {
-        const raw = localStorage.getItem('HOUSE_CONFIG');
-        const cfg = raw ? JSON.parse(raw) : {};
-        cfg.global = cfg.global || {};
-        const newState = (cfg.global.forcedSeason === 'heating') ? 'auto' : 'heating';
-        cfg.global.forcedSeason = newState;
-        cfg.global.heatingSeasonActive = (newState === 'heating');
-        localStorage.setItem('HOUSE_CONFIG', JSON.stringify(cfg));
-        applyUI(newState);
-        render();
-    });
-}
+            const currentState = forcedSeason || (manualHeating ? 'heating' : 'auto');
+            applyUI(currentState);
 
             heatingBtn.addEventListener('click', () => {
                 const raw = localStorage.getItem('HOUSE_CONFIG');
@@ -89,6 +76,7 @@ if (heatingBtn) {
             mid_term: { label: "Moyen termiste", allowedLevels: [1, 2], maxDeltaPmv: 0.3 },
             long_term: { label: "Long termiste", allowedLevels: [1, 2, 3], maxDeltaPmv: 0.6 }
         };
+        
         const activeProfile = profilesDef[activeProfileKey] || profilesDef.mid_term;
 
         if (profileIndicator) {
