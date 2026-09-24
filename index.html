@@ -3,6 +3,18 @@
 <head>
     <!-- SDK Supabase Client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Configuration PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F172A">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/869/869869.png">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js');
+    });
+  }
+</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Solstice - Tableau de Bord Thermal</title>
