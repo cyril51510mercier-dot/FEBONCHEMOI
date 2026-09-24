@@ -16,9 +16,9 @@
             </div>
             <div class="header-actions" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <!-- Bouton de Forçage de la Saison de Chauffe -->
-                <button id="btnToggleHeating" class="btn-secondary" style="background: #1E293B; color: #F8FAFC; border: 1px solid #334155; padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
-                    🌐 Saison de chauffe : AUTO
-                </button>
+                <span id="heating-season-badge" style="padding: 6px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; background: #1E293B; color: #F8FAFC; border: 1px solid #334155;">
+    ⏳ Analyse saison...
+</span>
                 <button class="btn-primary" onclick="voirToutesLesRecommandations()" style="background: #D96B43; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">
                     📋 Plan d'Action Global
                 </button>
@@ -217,36 +217,18 @@
     </footer>
 
     <script src="engine.js?v=3.0" defer></script>
-    <script>
-        function voirToutesLesRecommandations() {
-            sessionStorage.setItem('currentZoneId', 'all');
-            window.location.href = 'reco.html';
-        }
-
-        // --- GESTION DU FORÇAGE DE LA SAISON DE CHAUFFE ---
-// --- AFFICHAGE DU STATUT SAISON DE CHAUFFE ---
-document.addEventListener('DOMContentLoaded', () => {
-    if (typeof updateHeatingSeasonDisplay === 'function') {
-        updateHeatingSeasonDisplay();
+<script>
+    function voirToutesLesRecommandations() {
+        sessionStorage.setItem('currentZoneId', 'all');
+        window.location.href = 'reco.html';
     }
-});
 
-        function applyHeatingSeasonStyle(state) {
-            const heatingBtn = document.getElementById('btnToggleHeating');
-            if (!heatingBtn) return;
-
-            if (state === 'heating') {
-                heatingBtn.textContent = '🔥 Saison de chauffe : FORCÉE';
-                heatingBtn.style.backgroundColor = '#e74c3c';
-                heatingBtn.style.borderColor = '#c0392b';
-                heatingBtn.style.color = '#ffffff';
-            } else {
-                heatingBtn.textContent = '🌐 Saison de chauffe : AUTO';
-                heatingBtn.style.backgroundColor = '#1E293B';
-                heatingBtn.style.borderColor = '#334155';
-                heatingBtn.style.color = '#F8FAFC';
-            }
+    // --- AFFICHAGE DU STATUT SAISON DE CHAUFFE ---
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof updateHeatingSeasonDisplay === 'function') {
+            updateHeatingSeasonDisplay();
         }
-    </script>
+    });
+</script>
 </body>
 </html>
