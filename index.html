@@ -14,7 +14,11 @@
                 <h1 style="margin: 0; font-size: 1.4rem; font-weight: 800;">☀️ SOLSTICE</h1>
                 <p class="subtitle" style="margin: 2px 0 0 0; font-size: 0.82rem; color: #94A3B8;">Diagnostic & Suivi Thera-Aéraulique de l'Habitat</p>
             </div>
-            <div class="header-actions" style="display: flex; gap: 10px;">
+            <div class="header-actions" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <!-- Bouton de Forçage de la Saison de Chauffe -->
+                <button id="btnToggleHeating" class="btn-secondary" style="background: #1E293B; color: #F8FAFC; border: 1px solid #334155; padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+                    🌐 Saison de chauffe : AUTO
+                </button>
                 <button class="btn-primary" onclick="voirToutesLesRecommandations()" style="background: #D96B43; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">
                     📋 Plan d'Action Global
                 </button>
@@ -217,6 +221,58 @@
         function voirToutesLesRecommandations() {
             sessionStorage.setItem('currentZoneId', 'all');
             window.location.href = 'reco.html';
+        }
+
+        // --- GESTION DU FORÇAGE DE LA SAISON DE CHAUFFE ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const heatingBtn = document.getElementById('btnToggleHeating');
+            if (heatingBtn) {
+                restoreHeatingSeasonUI();
+                heatingBtn.addEventListener('click', toggleHeatingSeason);
+            }
+        });
+
+        function toggleHeatingSeason() {
+            const raw = localStorage.getItem('HOUSE_CONFIG');
+            const houseConfig = raw ? JSON.parse(raw) : {};
+            houseConfig.global = houseConfig.global || {};
+
+            const currentState = houseConfig.global.forcedSeason || 'auto';
+            const newState = (currentState === 'heating') ? 'auto' : 'heating';
+
+            houseConfig.global.forcedSeason = newState;
+            houseConfig.global.heatingSeasonActive = (newState === 'heating');
+            localStorage.setItem('HOUSE_CONFIG', JSON.stringify(houseConfig));
+
+            applyHeatingSeasonStyle(newState);
+
+            if (typeof synchroniserTouteLaMaison === 'function') {
+                synchroniserTouteLaMaison();
+            }
+        }
+
+        function restoreHeatingSeasonUI() {
+            const raw = localStorage.getItem('HOUSE_CONFIG');
+            const houseConfig = raw ? JSON.parse(raw) : {};
+            const currentState = houseConfig.global?.forcedSeason || (houseConfig.global?.heatingSeasonActive ? 'heating' : 'auto');
+            applyHeatingSeasonStyle(currentState);
+        }
+
+        function applyHeatingSeasonStyle(state) {
+            const heatingBtn = document.getElementById('btnToggleHeating');
+            if (!heatingBtn) return;
+
+            if (state === 'heating') {
+                heatingBtn.textContent = '🔥 Saison de chauffe : FORCÉE';
+                heatingBtn.style.backgroundColor = '#e74c3c';
+                heatingBtn.style.borderColor = '#c0392b';
+                heatingBtn.style.color = '#ffffff';
+            } else {
+                heatingBtn.textContent = '🌐 Saison de chauffe : AUTO';
+                heatingBtn.style.backgroundColor = '#1E293B';
+                heatingBtn.style.borderColor = '#334155';
+                heatingBtn.style.color = '#F8FAFC';
+            }
         }
     </script>
 </body>
