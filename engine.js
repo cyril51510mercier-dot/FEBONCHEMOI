@@ -1137,7 +1137,6 @@ function mettreAJourTuile(nomPiece) {
 // ============================================================
 
 function isHeatingSeasonActive() {
-    // 1. Lecture de la configuration sauvegardée par l'Espace Expert
     const raw = localStorage.getItem('HOUSE_CONFIG');
     const houseConfig = raw ? JSON.parse(raw) : {};
     const forcedSeason = houseConfig.global?.forcedSeason || localStorage.getItem('SOLSTICE_HEATING_MODE') || 'auto';
@@ -1145,7 +1144,7 @@ function isHeatingSeasonActive() {
     if (forcedSeason === 'heating' || forcedSeason === 'ON') return true;
     if (forcedSeason === 'off' || forcedSeason === 'OFF') return false;
 
-    // 2. Mode AUTO : bascule si la température extérieure moyenne du jour est < 15.5 °C
+    // Mode AUTO : bascule si la température extérieure moyenne du jour est < 15.5 °C
     const tDay = getDailyOutdoorTemp();
     return tDay < 15.5;
 }
@@ -1154,16 +1153,19 @@ function updateHeatingSeasonDisplay() {
     const badgeEl = document.getElementById('heating-season-badge');
     if (!badgeEl) return;
 
+    const raw = localStorage.getItem('HOUSE_CONFIG');
+    const houseConfig = raw ? JSON.parse(raw) : {};
+    const forcedSeason = houseConfig.global?.forcedSeason || localStorage.getItem('SOLSTICE_HEATING_MODE') || 'auto';
+
     const isActive = isHeatingSeasonActive();
-    const modeExpert = localStorage.getItem('SOLSTICE_HEATING_MODE') || 'AUTO';
-    const tagAuto = modeExpert === 'AUTO' ? ' (Auto)' : '';
+    const tagAuto = forcedSeason.toLowerCase() === 'auto' ? ' (Auto)' : '';
 
     if (isActive) {
         badgeEl.innerHTML = `🔥 Saison de chauffe active${tagAuto}`;
         badgeEl.style.backgroundColor = '#FEE2E2';
         badgeEl.style.color = '#991B1B';
         badgeEl.style.border = '1px solid #FCA5A5';
-        badgeEl.title = "La température extérieure du jour justifie le maintien du chauffage.";
+        badgeEl.title = "La température extérieure du jour ou la configuration Expert maintient la saison de chauffe active.";
     } else {
         badgeEl.innerHTML = `🌱 Hors saison de chauffe${tagAuto}`;
         badgeEl.style.backgroundColor = '#E0F2FE';
@@ -1251,7 +1253,7 @@ function recalculerToutLeDashboard() {
         mettreAJourTuile(nomPiece); 
     } 
     actualiserCockpitGlobal();
-    updateHeatingSeasonDisplay()
+    updateHeatingSeasonDisplay();
 }
 
 window.adjustClothing = function(amount) { 
