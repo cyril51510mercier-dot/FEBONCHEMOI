@@ -178,68 +178,90 @@
         </div>
 
         <!-- SECTION B: Environnement & Adjacences des Parois -->
-        <div id="buffer-door-group" style="margin-top: 8px; padding-left: 20px;">
-    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #334155;">
-        <input type="checkbox" id="hasBufferDoor" style="width: 16px; height: 16px;">
-        Présence d'une porte d'accès directe vers ce local non chauffé (garage, cave, cellier)
-    </label>
-</div>
-        
-        <div class="config-section">
-            <h2>B. Environnement (Adjacences des Parois)</h2>
-            <div class="form-grid">
-                <div>
-                    <label for="adjWall1">Mur 1</label>
-                    <select id="adjWall1">
-                        <option value="outside">Extérieur</option>
-                        <option value="unheated">Pièce non chauffée</option>
-                        <option value="heated">Pièce chauffée</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="adjWall2">Mur 2</label>
-                    <select id="adjWall2">
-                        <option value="outside">Extérieur</option>
-                        <option value="unheated">Pièce non chauffée</option>
-                        <option value="heated" selected>Pièce chauffée</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="adjWall3">Mur 3</label>
-                    <select id="adjWall3">
-                        <option value="outside">Extérieur</option>
-                        <option value="unheated">Pièce non chauffée</option>
-                        <option value="heated" selected>Pièce chauffée</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="adjWall4">Mur 4</label>
-                    <select id="adjWall4">
-                        <option value="outside">Extérieur</option>
-                        <option value="unheated">Pièce non chauffée</option>
-                        <option value="heated" selected>Pièce chauffée</option>
-                    </select>
-                </div>
-
-                <div class="full-width" style="margin-top:10px;">
-                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plafond :</label>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
-                        <label><input type="checkbox" name="adjCeiling" value="outside"> Extérieur (Toit / Terrasse / Rampant)</label>
-                        <label><input type="checkbox" name="adjCeiling" value="unheated"> Pièce non chauffée (Combles perdus)</label>
-                        <label><input type="checkbox" name="adjCeiling" value="heated" checked> Pièce chauffée (Étage supérieur)</label>
-                    </div>
-                </div>
-
-                <div class="full-width" style="margin-top:10px;">
-                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plancher :</label>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
-                        <label><input type="checkbox" name="adjFloor" value="outside"> Extérieur / Sol (Terre-plein / Vide sanitaire)</label>
-                        <label><input type="checkbox" name="adjFloor" value="unheated"> Pièce non chauffée (Cave / Sous-sol)</label>
-                        <label><input type="checkbox" name="adjFloor" value="heated" checked> Pièce chauffée (Étage inférieur)</label>
-                    </div>
-                </div>
+<div class="config-section">
+    <h2>B. Environnement (Adjacences des Parois)</h2>
+    <div class="form-grid">
+        <!-- Mur 1 -->
+        <div>
+            <label for="adjWall1">Mur 1</label>
+            <select id="adjWall1">
+                <option value="outside">Extérieur</option>
+                <option value="unheated">Pièce non chauffée</option>
+                <option value="heated">Pièce chauffée</option>
+            </select>
+            <div id="doorContainerWall1" style="display:none; margin-top:8px;">
+                <label style="font-size:0.85em; font-weight:normal; cursor:pointer; color:#334155;">
+                    <input type="checkbox" id="doorWall1"> 🚪 Présence d'une porte vers cette pièce
+                </label>
             </div>
         </div>
+
+        <!-- Mur 2 -->
+        <div>
+            <label for="adjWall2">Mur 2</label>
+            <select id="adjWall2">
+                <option value="outside">Extérieur</option>
+                <option value="unheated">Pièce non chauffée</option>
+                <option value="heated" selected>Pièce chauffée</option>
+            </select>
+            <div id="doorContainerWall2" style="display:none; margin-top:8px;">
+                <label style="font-size:0.85em; font-weight:normal; cursor:pointer; color:#334155;">
+                    <input type="checkbox" id="doorWall2"> 🚪 Présence d'une porte vers cette pièce
+                </label>
+            </div>
+        </div>
+
+        <!-- Mur 3 -->
+        <div>
+            <label for="adjWall3">Mur 3</label>
+            <select id="adjWall3">
+                <option value="outside">Extérieur</option>
+                <option value="unheated">Pièce non chauffée</option>
+                <option value="heated" selected>Pièce chauffée</option>
+            </select>
+            <div id="doorContainerWall3" style="display:none; margin-top:8px;">
+                <label style="font-size:0.85em; font-weight:normal; cursor:pointer; color:#334155;">
+                    <input type="checkbox" id="doorWall3"> 🚪 Présence d'une porte vers cette pièce
+                </label>
+            </div>
+        </div>
+
+        <!-- Mur 4 -->
+        <div>
+            <label for="adjWall4">Mur 4</label>
+            <select id="adjWall4">
+                <option value="outside">Extérieur</option>
+                <option value="unheated">Pièce non chauffée</option>
+                <option value="heated" selected>Pièce chauffée</option>
+            </select>
+            <div id="doorContainerWall4" style="display:none; margin-top:8px;">
+                <label style="font-size:0.85em; font-weight:normal; cursor:pointer; color:#334155;">
+                    <input type="checkbox" id="doorWall4"> 🚪 Présence d'une porte vers cette pièce
+                </label>
+            </div>
+        </div>
+
+        <!-- Plafond -->
+        <div class="full-width" style="margin-top:10px;">
+            <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plafond :</label>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
+                <label><input type="checkbox" name="adjCeiling" value="outside"> Extérieur (Toit / Terrasse / Rampant)</label>
+                <label><input type="checkbox" name="adjCeiling" value="unheated"> Pièce non chauffée (Combles perdus)</label>
+                <label><input type="checkbox" name="adjCeiling" value="heated" checked> Pièce chauffée (Étage supérieur)</label>
+            </div>
+        </div>
+
+        <!-- Plancher -->
+        <div class="full-width" style="margin-top:10px;">
+            <label style="font-weight:bold; display:block; margin-bottom:5px;">Adjacence(s) du Plancher :</label>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
+                <label><input type="checkbox" name="adjFloor" value="outside"> Extérieur / Sol (Terre-plein / Vide sanitaire)</label>
+                <label><input type="checkbox" name="adjFloor" value="unheated"> Pièce non chauffée (Cave / Sous-sol)</label>
+                <label><input type="checkbox" name="adjFloor" value="heated" checked> Pièce chauffée (Étage inférieur)</label>
+            </div>
+        </div>
+    </div>
+</div>
 
         <!-- SECTION C: Apports Solaires & Vitrages -->
         <div class="config-section">
