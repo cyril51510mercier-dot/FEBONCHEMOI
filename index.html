@@ -224,39 +224,12 @@
         }
 
         // --- GESTION DU FORÇAGE DE LA SAISON DE CHAUFFE ---
-        document.addEventListener('DOMContentLoaded', () => {
-            const heatingBtn = document.getElementById('btnToggleHeating');
-            if (heatingBtn) {
-                restoreHeatingSeasonUI();
-                heatingBtn.addEventListener('click', toggleHeatingSeason);
-            }
-        });
-
-        function toggleHeatingSeason() {
-            const raw = localStorage.getItem('HOUSE_CONFIG');
-            const houseConfig = raw ? JSON.parse(raw) : {};
-            houseConfig.global = houseConfig.global || {};
-
-            const currentState = houseConfig.global.forcedSeason || 'auto';
-            const newState = (currentState === 'heating') ? 'auto' : 'heating';
-
-            houseConfig.global.forcedSeason = newState;
-            houseConfig.global.heatingSeasonActive = (newState === 'heating');
-            localStorage.setItem('HOUSE_CONFIG', JSON.stringify(houseConfig));
-
-            applyHeatingSeasonStyle(newState);
-
-            if (typeof synchroniserTouteLaMaison === 'function') {
-                synchroniserTouteLaMaison();
-            }
-        }
-
-        function restoreHeatingSeasonUI() {
-            const raw = localStorage.getItem('HOUSE_CONFIG');
-            const houseConfig = raw ? JSON.parse(raw) : {};
-            const currentState = houseConfig.global?.forcedSeason || (houseConfig.global?.heatingSeasonActive ? 'heating' : 'auto');
-            applyHeatingSeasonStyle(currentState);
-        }
+// --- AFFICHAGE DU STATUT SAISON DE CHAUFFE ---
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof updateHeatingSeasonDisplay === 'function') {
+        updateHeatingSeasonDisplay();
+    }
+});
 
         function applyHeatingSeasonStyle(state) {
             const heatingBtn = document.getElementById('btnToggleHeating');
