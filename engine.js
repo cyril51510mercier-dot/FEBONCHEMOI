@@ -18,36 +18,94 @@ let currentSortCol = null;
 let currentSortAsc = true;
 
 // ============================================================
-// SOLSTICE STORE — GESTION DU STOCKAGE CENTRALISÉ
+// CONFIGURATION ET CLIENT SUPABASE
+// ============================================================
+const SUPABASE_URL = 'https://hgmvwaehgedudklftltb.supabase.co'; 
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhnbXZ3YWVoZ2VkdWRrbGZ0bHRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyNTczMDEsImV4cCI6MjEwNTgzMzMwMX0.-w01Tc3baMZ0gCc4DMIH3VKI7P32m1wSifiWsruDKps';
+const HOUSE_ID = 'foyer_principal'; // Identifiant unique de ta maison pour tous tes appareils
+
+let supabaseClient = null;
+if (typeof supabase !== 'undefined') {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+// ============================================================
+// SOLSTICE STORE — GESTION DU STOCKAGE CENTRALISÉ & CLOUD
 // ============================================================
 window.SolsticeStore = {
     STORAGE_KEY: 'HOUSE_CONFIG',
-    init() {
+    
+    async init() {
+        // 1. Chargement instantané depuis le cache local (Fast Boot)
+        const localData = this.getZones();
+        
+        // 2. Synchronisation Cloud asynchrone
+        if (supabaseClient) {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('solstice_store')
+                    .select('*')
+                    .eq('house_id', HOUSE_ID)
+                    .single();
+
+                if (data) {
+                    if (data.house_config) localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data.house_config));
+                    if (data.donnees_habitat) localStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(data.donnees_habitat));
+                    if (data.checked_recos) localStorage.setItem('SOLSTICE_CHECKED_RECOS', JSON.stringify(data.checked_recos));
+                    
+                    // Mise à jour de la configuration globale en mémoire
+                    GLOBAL_HOUSE_CONFIG = data.house_config || {};
+                    DONNEES_HABITAT = data.donnees_habitat || {};
+                    rafraichirCapteursDepuisConfig();
+                    recalculerToutLeDashboard();
+                } else if (error && error.code === 'PGRST116') {
+                    // Première initialisation si la ligne n'existe pas encore
+                    await this.syncAllToCloud();
+                }
+            } catch (e) {
+                console.warn("[Solstice Store] Mode hors-ligne activé :", e);
+            }
+        }
+        return localData;
+    },
+
+    async syncAllToCloud() {
+        if (!supabaseClient) return;
         try {
-            const raw = localStorage.getItem(this.STORAGE_KEY);
-            return raw ? JSON.parse(raw) : {};
+            const payload = {
+                house_id: HOUSE_ID,
+                house_config: this.getZones(),
+                donnees_habitat: this.getScanData(),
+                checked_recos: this.getCheckedRecos(),
+                updated_at: new Date().toISOString()
+            };
+            await supabaseClient.from('solstice_store').upsert(payload);
         } catch (e) {
-            console.error("[Solstice] Erreur Storage :", e);
-            return {};
+            console.error("[Solstice Store] Échec de synchronisation cloud :", e);
         }
     },
+
     saveZone(zoneId, zoneData) {
         if (!zoneId) return false;
         const config = this.getZones();
         config[zoneId] = zoneData;
         try {
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(config));
+            this.syncAllToCloud(); // Push vers Supabase
             return true;
         } catch (e) {
             console.error("[Solstice] Échec sauvegarde :", e);
             return false;
         }
     },
+
     getZone(zoneId) { 
         const config = this.getZones();
         return config[zoneId] || null; 
     },
+    
     getAllZones() { return this.getZones(); },
+    
     getZones() {
         try {
             const raw = localStorage.getItem(this.STORAGE_KEY);
@@ -56,6 +114,7 @@ window.SolsticeStore = {
             return {};
         }
     },
+
     getScanData() {
         try {
             const cached = localStorage.getItem('SOLSTICE_DONNEES_HABITAT') || sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
@@ -64,6 +123,17 @@ window.SolsticeStore = {
             return {};
         }
     },
+
+    saveScanData(data) {
+        try {
+            localStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(data));
+            sessionStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(data));
+            this.syncAllToCloud();
+        } catch (e) {
+            console.error("[Solstice] Erreur sauvegarde scan :", e);
+        }
+    },
+
     getEnvData() {
         return {
             t_ext: parseFloat(localStorage.getItem('outdoorTemp')) || outdoorTemp,
@@ -71,6 +141,7 @@ window.SolsticeStore = {
             sun_status: localStorage.getItem('sunshineStatus') || sunshineStatus
         };
     },
+
     getCheckedRecos() {
         try {
             const raw = localStorage.getItem('SOLSTICE_CHECKED_RECOS');
@@ -79,9 +150,11 @@ window.SolsticeStore = {
             return {};
         }
     },
+
     saveCheckedRecos(data) {
         try {
             localStorage.setItem('SOLSTICE_CHECKED_RECOS', JSON.stringify(data));
+            this.syncAllToCloud();
             return true;
         } catch (e) {
             return false;
