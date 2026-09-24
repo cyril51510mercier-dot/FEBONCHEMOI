@@ -455,6 +455,11 @@
                     statusEl.style.display = 'block';
                     setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
                 }
+                [1, 2, 3, 4].forEach(i => {
+    const wallSelect = document.getElementById(`adjWall${i}`);
+    if (wallSelect) {
+        wallSelect.addEventListener('change', updateDoorVisibility);
+    }
             });
 
             const heatingCb = document.getElementById('heatingSeasonActive');
@@ -703,6 +708,22 @@ if (heatingCb) {
             if (!currentZoneId) {
                 alert("Erreur : Aucune zone n'est chargée.");
                 return;
+                adj: {
+    wall1: document.getElementById('adjWall1').value,
+    wall2: document.getElementById('adjWall2').value,
+    wall3: document.getElementById('adjWall3').value,
+    wall4: document.getElementById('adjWall4').value,
+    doorWall1: document.getElementById('doorWall1').checked,
+    doorWall2: document.getElementById('doorWall2').checked,
+    doorWall3: document.getElementById('doorWall3').checked,
+    doorWall4: document.getElementById('doorWall4').checked,
+    hasBufferDoor: document.getElementById('doorWall1').checked || 
+                   document.getElementById('doorWall2').checked || 
+                   document.getElementById('doorWall3').checked || 
+                   document.getElementById('doorWall4').checked,
+    ceiling: adjCeilingCoches,
+    floor: adjFloorCoches
+},
             }
 
             const usagesCoches = Array.from(document.querySelectorAll('input[name="usage"]:checked')).map(cb => cb.value);
@@ -816,18 +837,25 @@ if (heatingCb) {
             document.getElementById('floorInsulation').value = data.floorInsulation || 'iti_recent';
 
             if (data.adj) {
-                document.getElementById('adjWall1').value = data.adj.wall1 || 'outside';
-                document.getElementById('adjWall2').value = data.adj.wall2 || 'heated';
-                document.getElementById('adjWall3').value = data.adj.wall3 || 'heated';
-                document.getElementById('adjWall4').value = data.adj.wall4 || 'heated';
+    document.getElementById('adjWall1').value = data.adj.wall1 || 'outside';
+    document.getElementById('adjWall2').value = data.adj.wall2 || 'heated';
+    document.getElementById('adjWall3').value = data.adj.wall3 || 'heated';
+    document.getElementById('adjWall4').value = data.adj.wall4 || 'heated';
 
-                document.querySelectorAll('input[name="adjCeiling"]').forEach(cb => {
-                    cb.checked = Array.isArray(data.adj.ceiling) && data.adj.ceiling.includes(cb.value);
-                });
-                document.querySelectorAll('input[name="adjFloor"]').forEach(cb => {
-                    cb.checked = Array.isArray(data.adj.floor) && data.adj.floor.includes(cb.value);
-                });
-            }
+    document.getElementById('doorWall1').checked = !!data.adj.doorWall1;
+    document.getElementById('doorWall2').checked = !!data.adj.doorWall2;
+    document.getElementById('doorWall3').checked = !!data.adj.doorWall3;
+    document.getElementById('doorWall4').checked = !!data.adj.doorWall4;
+
+    updateDoorVisibility();
+
+    document.querySelectorAll('input[name="adjCeiling"]').forEach(cb => {
+        cb.checked = Array.isArray(data.adj.ceiling) && data.adj.ceiling.includes(cb.value);
+    });
+    document.querySelectorAll('input[name="adjFloor"]').forEach(cb => {
+        cb.checked = Array.isArray(data.adj.floor) && data.adj.floor.includes(cb.value);
+    });
+}
 
             if (data.equipment) {
                 document.getElementById('heatingSystem').value = data.equipment.heating?.system || 'none';
@@ -852,6 +880,23 @@ if (heatingCb) {
                 data.windows.forEach(win => addWindowBlock(win));
             }
         }
+
+        function updateDoorVisibility() {
+    [1, 2, 3, 4].forEach(i => {
+        const wallSelect = document.getElementById(`adjWall${i}`);
+        const doorContainer = document.getElementById(`doorContainerWall${i}`);
+        if (wallSelect && doorContainer) {
+            // Affiche la case si le mur donne sur une pièce non chauffée ou chauffée
+            if (wallSelect.value === 'unheated' || wallSelect.value === 'heated') {
+                doorContainer.style.display = 'block';
+            } else {
+                doorContainer.style.display = 'none';
+                const cb = document.getElementById(`doorWall${i}`);
+                if (cb) cb.checked = false;
+            }
+        }
+    });
+}
 
         function clearCurrentForm() {
             document.getElementById('roomArea').value = '';
