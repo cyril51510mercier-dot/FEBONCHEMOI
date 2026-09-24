@@ -1137,13 +1137,15 @@ function mettreAJourTuile(nomPiece) {
 // ============================================================
 
 function isHeatingSeasonActive() {
-    // Mode manuel configuré dans l'espace Expert (ON / OFF / AUTO)
-    const modeExpert = localStorage.getItem('SOLSTICE_HEATING_MODE') || 'AUTO';
-    
-    if (modeExpert === 'ON') return true;
-    if (modeExpert === 'OFF') return false;
+    // 1. Lecture de la configuration sauvegardée par l'Espace Expert
+    const raw = localStorage.getItem('HOUSE_CONFIG');
+    const houseConfig = raw ? JSON.parse(raw) : {};
+    const forcedSeason = houseConfig.global?.forcedSeason || localStorage.getItem('SOLSTICE_HEATING_MODE') || 'auto';
 
-    // Mode AUTO : bascule si la température extérieure moyenne du jour est < 15.5 °C
+    if (forcedSeason === 'heating' || forcedSeason === 'ON') return true;
+    if (forcedSeason === 'off' || forcedSeason === 'OFF') return false;
+
+    // 2. Mode AUTO : bascule si la température extérieure moyenne du jour est < 15.5 °C
     const tDay = getDailyOutdoorTemp();
     return tDay < 15.5;
 }
