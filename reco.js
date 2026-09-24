@@ -71,9 +71,6 @@ if (heatingBtn) {
     });
 }
 
-            const currentState = globalConfig.forcedSeason || (globalConfig.heatingSeasonActive ? 'heating' : 'auto');
-            applyUI(currentState);
-
             heatingBtn.addEventListener('click', () => {
                 const raw = localStorage.getItem('HOUSE_CONFIG');
                 const cfg = raw ? JSON.parse(raw) : {};
