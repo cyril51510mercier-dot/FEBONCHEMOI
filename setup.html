@@ -1,8 +1,22 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <!-- SDK Supabase Client -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- 1. Charger d'abord le SDK Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- 2. Exécuter la vérification dans une balise <script> -->
+    <script>
+        const SUPABASE_URL = 'https://hgmvwaehgedudklftltb.supabase.co';
+        const SUPABASE_ANON_KEY = 'TA_CLE_ANON_SUPABASE';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        (async function verifierAuthentification() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) {
+                window.location.href = 'login.html';
+            }
+        })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Solstice - Configuration Expert BEM</title>
