@@ -1344,6 +1344,8 @@ function actualiserCockpitGlobal() {
         if (document.getElementById('global-tstruct')) document.getElementById('global-tstruct').textContent = "-- °C";
         if (document.getElementById('global-reserve-pct')) document.getElementById('global-reserve-pct').textContent = "-- %";
         if (document.getElementById('global-flux-status')) document.getElementById('global-flux-status').textContent = "--";
+        if (document.getElementById('global-reserve-mode')) document.getElementById('global-reserve-mode').textContent = "Mode --";
+        if (document.getElementById('global-reserve-qualif')) document.getElementById('global-reserve-qualif').textContent = "--";
         return;
     }
 
@@ -1382,20 +1384,23 @@ function actualiserCockpitGlobal() {
         netEl.style.color = metrics.totalBilanNetKwh >= 0 ? "#4ADE80" : "#F87171";
     }
 
+    // Réserve et inertie globales
+    const globalReserve = calculateStructureReserve(metrics.avgTStruct, metrics.avgTemp);
+
     if (document.getElementById('global-tstruct')) document.getElementById('global-tstruct').textContent = `${metrics.avgTStruct} °C`;
-    if (document.getElementById('global-reserve-pct')) document.getElementById('global-reserve-pct').textContent = `${metrics.avgChargePct} %`;
+    if (document.getElementById('global-reserve-pct')) document.getElementById('global-reserve-pct').textContent = `${globalReserve.chargePercent} %`;
+    if (document.getElementById('global-reserve-mode')) document.getElementById('global-reserve-mode').textContent = `(${globalReserve.modeLabel})`;
+    if (document.getElementById('global-reserve-qualif')) document.getElementById('global-reserve-qualif').textContent = globalReserve.qualification;
 
     const globalFluxEl = document.getElementById('global-flux-status');
     if (globalFluxEl) {
+        globalFluxEl.textContent = globalReserve.fluxIcon;
         const diffGlobal = metrics.avgTStruct - metrics.avgTemp;
         if (diffGlobal > 0.3) {
-            globalFluxEl.textContent = "🔥 Restitution";
             globalFluxEl.style.color = "#FDBA74";
         } else if (diffGlobal < -0.3) {
-            globalFluxEl.textContent = "❄️ Imbibition";
             globalFluxEl.style.color = "#38BDF8";
         } else {
-            globalFluxEl.textContent = "⚖️ Stabile";
             globalFluxEl.style.color = "#4ADE80";
         }
     }
