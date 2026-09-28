@@ -179,6 +179,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // GENERATION DES RECOMMANDATIONS CONDITIONNEES
         // ============================================================
         function generateRecommendationsForZone(zone, zoneId, roomData) {
+            // --- CALCUL DE LA STRUCTURE ET DES STOCKS THERMIQUES ---
+const tStruct = engine.updateStructureTemperature ? engine.updateStructureTemperature(zoneName, ta) : ta;
+const reserve = engine.calculateStructureReserve ? engine.calculateStructureReserve(tStruct, ta, zone) : { chargeCalories: 50, chargeFrigories: 50 };
             const recs = [];
             if (isExteriorZone(zoneId, zone)) return recs;
 
@@ -319,6 +322,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 recs.push({ id: `${zoneId}_attic_thermal_lag_ventilation`, level: 2, actionKey: 'free_cooling', zoneId, zoneName, timing: 'anticipated', type: 'type-cool', title: 'Évacuation du déphasage sous toiture', text: `Surventilez en fin de journée pour évacuer la chaleur restituée par l'isolant du plafond.`, impactWeight: 14 });
             }
 
+            if (isHeatingSeasonActive && needsHeat && reserve.chargeCalories < 35) {
+    recs.push({
+        id: `${zoneId}_low_calorie_stock`,
+        level: 2,
+        actionKey: 'floor_inertia',
+        zoneId,
+        zoneName,
+        timing: 'anticipated',
+        type: 'type-heat',
+        title: 'Recharge de la masse thermique (Calories < 35 %)',
+        text: `La réserve de chaleur des murs est faible (${reserve.chargeCalories} %). Anticipez la relance du chauffage pour éviter l'effet de paroi froide.`,
+        impactWeight: 18
+    });
+}
+
             // --- NIVEAU 3 : STRATÉGIE MÉTÉO (48h-72h) ---
             if (needsCooling && isHeavyStructure && isNight) {
                 recs.push({ id: `${zoneId}_heavy_wall_night_purge`, level: 3, actionKey: 'free_cooling', zoneId, zoneName, timing: 'strategic', type: 'type-cool', title: 'Décharge nocturne des parois lourdes', text: `Maintenez la surventilation nocturne pour refroidir le cœur des murs lourds.`, impactWeight: 18 });
@@ -331,6 +349,35 @@ document.addEventListener('DOMContentLoaded', function() {
             if (needsCooling && isHeavyStructure && isNight) {
                 recs.push({ id: `${zoneId}_deep_precooling_heatwave`, level: 3, actionKey: 'free_cooling', zoneId, zoneName, timing: 'strategic', type: 'type-cool', title: 'Sur-rafraîchissement de masse pré-canicule (48h)', text: `Canicule durable prévue sous 48h : Surventilez au maximum la nuit prochaine pour geler la masse des murs porteurs.`, impactWeight: 22 });
             }
+
+            if (isHeatingSeasonActive && reserve.chargeCalories >= 75) {
+    recs.push({
+        id: `${zoneId}_high_calorie_stock_eco`,
+        level: 1,
+        actionKey: 'heating_cut',
+        zoneId,
+        zoneName,
+        timing: 'immediate',
+        type: 'type-eco',
+        title: 'Valorisation de l\'inertie chaude (Calories > 75 %)',
+        text: `Les murs sont gorgés de chaleur (${reserve.chargeCalories} %). Vous pouvez baisser la consigne d'un degré : la structure prendra le relais sans perte de confort.`,
+        impactWeight: 16
+    });
+}
+            if ((needsCooling || tExtMaxDay > ta) && reserve.chargeFrigories < 35) {
+    recs.push({
+        id: `${zoneId}_low_frigorie_stock`,
+        level: 3,
+        actionKey: 'free_cooling',
+        zoneId,
+        zoneName,
+        timing: 'strategic',
+        type: 'type-cool',
+        title: 'Décharge nocturne prioritaire (Fraîcheur < 35 %)',
+        text: `La structure est saturée en chaleur (stock de fraîcheur à ${reserve.chargeFrigories} %). Ouvrez les fenêtres cette nuit pour refroidir le cœur des murs porteurs.`,
+        impactWeight: 22
+    });
+}
 
             return recs.filter(rec => activeProfile.allowedLevels.includes(rec.level));
         }
