@@ -6,12 +6,14 @@
 
     <!-- 2. Exécuter la vérification dans une balise <script> -->
     <script>
-        const SUPABASE_URL = 'https://hgmvwaehgedudklftltb.supabase.co';
-        const SUPABASE_ANON_KEY = 'TA_CLE_ANON_SUPABASE';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
         (async function verifierAuthentification() {
-            const { data: { session } } = await supabaseClient.auth.getSession();
+            const SUPABASE_URL = 'https://hgmvwaehgedudklftltb.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhnbXZ3YWVoZ2VkdWRrbGZ0bHRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyNTczMDEsImV4cCI6MjEwNTgzMzMwMX0.-w01Tc3baMZ0gCc4DMIH3VKI7P32m1wSifiWsruDKps';
+            
+            // Client local à la fonction pour le contrôle d'accès
+            const authClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            const { data: { session } } = await authClient.auth.getSession();
+            
             if (!session) {
                 window.location.href = 'login.html';
             }
