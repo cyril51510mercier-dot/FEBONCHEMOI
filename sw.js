@@ -1,4 +1,5 @@
-const CACHE_NAME = 'solstice-v1';
+// Dans sw.js
+const CACHE_NAME = 'solstice-v2'; // Passé de v1 à v2
 const ASSETS = [
   './',
   './index.html',
