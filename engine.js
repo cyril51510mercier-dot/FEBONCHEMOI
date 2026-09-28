@@ -31,7 +31,6 @@ if (typeof supabase !== 'undefined') {
 // ============================================================
 // SOLSTICE STORE — GESTION DU STOCKAGE CENTRALISÉ & CLOUD
 // ============================================================
-// Récupère l'UUID de la maison de l'utilisateur connecté
 async function getConnectedHouseId() {
     if (!supabaseClient) return 'foyer_principal';
     try {
@@ -109,8 +108,6 @@ window.SolsticeStore = {
             console.error("[Solstice Store] Échec synchro cloud :", e);
         }
     },
-    
-    // ... garder le reste des méthodes identiques (saveZone, getZones, etc.)
 
     saveZone(zoneId, zoneData) {
         if (!zoneId) return false;
@@ -118,7 +115,7 @@ window.SolsticeStore = {
         config[zoneId] = zoneData;
         try {
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(config));
-            this.syncAllToCloud(); // Push vers Supabase
+            this.syncAllToCloud();
             return true;
         } catch (e) {
             console.error("[Solstice] Échec sauvegarde :", e);
@@ -190,52 +187,8 @@ window.SolsticeStore = {
 };
 
 // ============================================================
-// SOLSTICE ENGINE — MOTEUR THERMIQUE & RECOMMANDATIONS
+// HELPER ET COMPORTEMENTS DE L'APPLICATION
 // ============================================================
-
-SolsticeEngine.ENERGY_COSTS = {
-    elec_direct: { pricePerKwh: 0.2516, label: "Électricité (Tarif Réglementé)" },
-    pac_air_eau: { pricePerKwh: 0.2516 / 3.2, label: "PAC Air/Eau (COP moyen 3,2)" },
-    pac_air_air: { pricePerKwh: 0.2516 / 3.0, label: "PAC Air/Air (COP moyen 3,0)" },
-    gaz_condens: { pricePerKwh: 0.1180, label: "Gaz Naturel" },
-    granules:    { pricePerKwh: 0.0890, label: "Granulés / Pellets" },
-    fioul:       { pricePerKwh: 0.1350, label: "Fioul Domestique" }
-};
-
-SolsticeEngine.PROFILES = {
-    short_term: { label: "Court termiste", allowedLevels: [1], pmvThreshold: 0.5, maxDeltaPmv: 0.0 },
-    mid_term:   { label: "Moyen termiste", allowedLevels: [1, 2], pmvThreshold: 0.5, maxDeltaPmv: 0.3 },
-    long_term:  { label: "Long termiste", allowedLevels: [1, 2, 3], pmvThreshold: 0.5, maxDeltaPmv: 0.6 }
-};
-
-SolsticeEngine.evaluateSimulatedPMV = function(baseState, checkedActionKeys, envData) {
-    let simTa = baseState.ta;
-    let simTr = baseState.tr;
-    let simVel = baseState.vel;
-    let simRh = baseState.rh;
-
-    if (checkedActionKeys.includes('shutter_close') || checkedActionKeys.includes('anticipate_sun')) {
-        simTr -= 0.6;
-        simTa -= 0.2;
-    }
-    if (checkedActionKeys.includes('free_cooling')) {
-        simTa = Math.max(envData.t_ext, simTa - 0.5);
-        simTr -= 0.4;
-    }
-    if (checkedActionKeys.includes('fan_on')) {
-        simVel += 0.25;
-    }
-    if (checkedActionKeys.includes('vmc_boost') || checkedActionKeys.includes('open_win_humidity')) {
-        simRh = Math.max(45, simRh - 6);
-    }
-    if (checkedActionKeys.includes('sun_heat')) {
-        simTr += 0.6;
-        simTa += 0.2;
-    }
-
-    const pmvSim = this.calculatePMV(simTa, simTr, simVel, simRh, baseState.met, baseState.clo);
-    return { pmv: pmvSim, simTa, simTr, simVel, simRh };
-};
 
 function getClothingDescription(clo) {
     if (clo < 0.45) return "Maillot de bain / Short & débardeur léger";
@@ -1633,97 +1586,139 @@ window.voirRecommandations = function(nomPiece) {
 };
 
 // ============================================================
-// SIMULATEUR DE CONSEILS ET RECOMMANDATIONS
+// OBJET SOLSTICE ENGINE — DECLARATION ET METHODES
 // ============================================================
 
-SolsticeEngine.generateRecommendations = function(zone, zoneId, roomData, envData) {
-    const recs = [];
-    const zoneName = zone ? (zone.name || zoneId) : zoneId;
-
-    if (isOutdoorZone(zoneName, zone)) return recs;
-
-    const ta = roomData.ta || 20;
-    const rh = roomData.rh || 50;
-
-    const tr = this.calculateMeanRadiantTemp(zone, ta);
-    const vel = this.calculateAirVelocity(zone, zoneName);
-    const { met, totalClo } = this.getBaseCloAndMet(zone);
-
-    const roomPmv = this.calculatePMV(ta, tr, vel, rh, met, totalClo);
-    const needsHeat = roomPmv < -0.4;
-    const needsCooling = roomPmv > 0.4;
-    const isSunny = envData.sun_status.toLowerCase().includes('clear') || envData.sun_status.toLowerCase().includes('sun');
-
-    const hasWindows = !zone || !zone.windows || zone.windows.length === 0 || zone.windows.some(w => w.vent !== 'fixed' && w.vent !== 'fixe');
-    const hasShutters = !zone || !zone.windows || zone.windows.some(w => !w.shutter || w.shutter !== 'aucun');
-
-    if (rh > 65) {
-        if (zone?.equipment?.vmcSystem === 'marche_forcee' || zone?.equipment?.vmcSystem === 'continue_non_pilotable') {
-            recs.push({
-                id: `${zoneId}_vmc_boost`,
-                actionKey: 'vmc_boost',
-                zoneId, zoneName, timing: 'immediate', type: 'type-air',
-                title: 'Activer la VMC en mode renforcé',
-                text: `L'humidité atteint ${rh} %. Basculez la ventilation en vitesse rapide.`,
-                impactWeight: 15
-            });
-        } else if (hasWindows) {
-            recs.push({
-                id: `${zoneId}_open_win_humidity`,
-                actionKey: 'open_win_humidity',
-                zoneId, zoneName, timing: 'immediate', type: 'type-air',
-                title: 'Aération flash ciblée',
-                text: `Ouvrez la fenêtre pendant 5 minutes pour évacuer l'humidité accumulée.`,
-                impactWeight: 12
-            });
-        }
-    }
-
-    if (needsCooling) {
-        if (envData.t_ext < ta && hasWindows) {
-            recs.push({
-                id: `${zoneId}_free_cooling`,
-                actionKey: 'free_cooling',
-                zoneId, zoneName, timing: 'immediate', type: 'type-cool',
-                title: 'Ventilation traversante (Free-cooling)',
-                text: `Il fait plus frais dehors (${envData.t_ext} °C). Ouvrez pour décharger la chaleur.`,
-                impactWeight: 20
-            });
-        }
-
-        if (isSunny && hasShutters) {
-            recs.push({
-                id: `${zoneId}_shutter_close`,
-                actionKey: 'shutter_close',
-                zoneId, zoneName, timing: 'immediate', type: 'type-sun',
-                title: 'Fermer les occultations extérieures',
-                text: `Baissez les volets ou stores pour bloquer le rayonnement solaire direct.`,
-                impactWeight: 25
-            });
-        }
-    }
-
-    if (needsHeat) {
-        if (isSunny && envData.t_ext < ta) {
-            recs.push({
-                id: `${zoneId}_sun_heat`,
-                actionKey: 'sun_heat',
-                zoneId, zoneName, timing: 'immediate', type: 'type-sun',
-                title: 'Ouvrir les protections solaires',
-                text: `Laissez pénétrer les rayons du soleil pour réchauffer les parois.`,
-                impactWeight: 20
-            });
-        }
-    }
-
-    return recs;
-};
-// ============================================================
-// EXPORT DU MOTEUR (À Placer à la toute fin du fichier)
-// ============================================================
 window.SolsticeEngine = {
+    ENERGY_COSTS: {
+        elec_direct: { pricePerKwh: 0.2516, label: "Électricité (Tarif Réglementé)" },
+        pac_air_eau: { pricePerKwh: 0.2516 / 3.2, label: "PAC Air/Eau (COP moyen 3,2)" },
+        pac_air_air: { pricePerKwh: 0.2516 / 3.0, label: "PAC Air/Air (COP moyen 3,0)" },
+        gaz_condens: { pricePerKwh: 0.1180, label: "Gaz Naturel" },
+        granules:    { pricePerKwh: 0.0890, label: "Granulés / Pellets" },
+        fioul:       { pricePerKwh: 0.1350, label: "Fioul Domestique" }
+    },
+
+    PROFILES: {
+        short_term: { label: "Court termiste", allowedLevels: [1], pmvThreshold: 0.5, maxDeltaPmv: 0.0 },
+        mid_term:   { label: "Moyen termiste", allowedLevels: [1, 2], pmvThreshold: 0.5, maxDeltaPmv: 0.3 },
+        long_term:  { label: "Long termiste", allowedLevels: [1, 2, 3], pmvThreshold: 0.5, maxDeltaPmv: 0.6 }
+    },
+
     calculatePMV: typeof calculatePMV !== 'undefined' ? calculatePMV : null,
     calculateMeanRadiantTemp: typeof calculateMeanRadiantTemp !== 'undefined' ? calculateMeanRadiantTemp : null,
     calculateAirVelocity: typeof calculateAirVelocity !== 'undefined' ? calculateAirVelocity : null,
-    getBaseCloAndMet: typeof getBaseCloAndMet !== 'undefined' ? getBaseCloAndMet : null
+    getBaseCloAndMet: typeof getBaseCloAndMet !== 'undefined' ? getBaseCloAndMet : null,
+
+    evaluateSimulatedPMV(baseState, checkedActionKeys, envData) {
+        let simTa = baseState.ta;
+        let simTr = baseState.tr;
+        let simVel = baseState.vel;
+        let simRh = baseState.rh;
+
+        if (checkedActionKeys.includes('shutter_close') || checkedActionKeys.includes('anticipate_sun')) {
+            simTr -= 0.6;
+            simTa -= 0.2;
+        }
+        if (checkedActionKeys.includes('free_cooling')) {
+            simTa = Math.max(envData.t_ext, simTa - 0.5);
+            simTr -= 0.4;
+        }
+        if (checkedActionKeys.includes('fan_on')) {
+            simVel += 0.25;
+        }
+        if (checkedActionKeys.includes('vmc_boost') || checkedActionKeys.includes('open_win_humidity')) {
+            simRh = Math.max(45, simRh - 6);
+        }
+        if (checkedActionKeys.includes('sun_heat')) {
+            simTr += 0.6;
+            simTa += 0.2;
+        }
+
+        const pmvSim = this.calculatePMV(simTa, simTr, simVel, simRh, baseState.met, baseState.clo);
+        return { pmv: pmvSim, simTa, simTr, simVel, simRh };
+    },
+
+    generateRecommendations(zone, zoneId, roomData, envData) {
+        const recs = [];
+        const zoneName = zone ? (zone.name || zoneId) : zoneId;
+
+        if (isOutdoorZone(zoneName, zone)) return recs;
+
+        const ta = roomData.ta || 20;
+        const rh = roomData.rh || 50;
+
+        const tr = this.calculateMeanRadiantTemp(zone, ta);
+        const vel = this.calculateAirVelocity(zone, zoneName);
+        const { met, totalClo } = this.getBaseCloAndMet(zone);
+
+        const roomPmv = this.calculatePMV(ta, tr, vel, rh, met, totalClo);
+        const needsHeat = roomPmv < -0.4;
+        const needsCooling = roomPmv > 0.4;
+        const isSunny = envData.sun_status.toLowerCase().includes('clear') || envData.sun_status.toLowerCase().includes('sun');
+
+        const hasWindows = !zone || !zone.windows || zone.windows.length === 0 || zone.windows.some(w => w.vent !== 'fixed' && w.vent !== 'fixe');
+        const hasShutters = !zone || !zone.windows || zone.windows.some(w => !w.shutter || w.shutter !== 'aucun');
+
+        if (rh > 65) {
+            if (zone?.equipment?.vmcSystem === 'marche_forcee' || zone?.equipment?.vmcSystem === 'continue_non_pilotable') {
+                recs.push({
+                    id: `${zoneId}_vmc_boost`,
+                    actionKey: 'vmc_boost',
+                    zoneId, zoneName, timing: 'immediate', type: 'type-air',
+                    title: 'Activer la VMC en mode renforcé',
+                    text: `L'humidité atteint ${rh} %. Basculez la ventilation en vitesse rapide.`,
+                    impactWeight: 15
+                });
+            } else if (hasWindows) {
+                recs.push({
+                    id: `${zoneId}_open_win_humidity`,
+                    actionKey: 'open_win_humidity',
+                    zoneId, zoneName, timing: 'immediate', type: 'type-air',
+                    title: 'Aération flash ciblée',
+                    text: `Ouvrez la fenêtre pendant 5 minutes pour évacuer l'humidité accumulée.`,
+                    impactWeight: 12
+                });
+            }
+        }
+
+        if (needsCooling) {
+            if (envData.t_ext < ta && hasWindows) {
+                recs.push({
+                    id: `${zoneId}_free_cooling`,
+                    actionKey: 'free_cooling',
+                    zoneId, zoneName, timing: 'immediate', type: 'type-cool',
+                    title: 'Ventilation traversante (Free-cooling)',
+                    text: `Il fait plus frais dehors (${envData.t_ext} °C). Ouvrez pour décharger la chaleur.`,
+                    impactWeight: 20
+                });
+            }
+
+            if (isSunny && hasShutters) {
+                recs.push({
+                    id: `${zoneId}_shutter_close`,
+                    actionKey: 'shutter_close',
+                    zoneId, zoneName, timing: 'immediate', type: 'type-sun',
+                    title: 'Fermer les occultations extérieures',
+                    text: `Baissez les volets ou stores pour bloquer le rayonnement solaire direct.`,
+                    impactWeight: 25
+                });
+            }
+        }
+
+        if (needsHeat) {
+            if (isSunny && envData.t_ext < ta) {
+                recs.push({
+                    id: `${zoneId}_sun_heat`,
+                    actionKey: 'sun_heat',
+                    zoneId, zoneName, timing: 'immediate', type: 'type-sun',
+                    title: 'Ouvrir les protections solaires',
+                    text: `Laissez pénétrer les rayons du soleil pour réchauffer les parois.`,
+                    impactWeight: 20
+                });
+            }
+        }
+
+        return recs;
+    }
 };
