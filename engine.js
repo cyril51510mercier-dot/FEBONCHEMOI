@@ -192,12 +192,6 @@ window.SolsticeStore = {
 // ============================================================
 // SOLSTICE ENGINE — MOTEUR THERMIQUE & RECOMMANDATIONS
 // ============================================================
-window.SolsticeEngine = {
-    calculatePMV,
-    calculateMeanRadiantTemp,
-    calculateAirVelocity,
-    getBaseCloAndMet
-};
 
 SolsticeEngine.ENERGY_COSTS = {
     elec_direct: { pricePerKwh: 0.2516, label: "Électricité (Tarif Réglementé)" },
@@ -1723,4 +1717,13 @@ SolsticeEngine.generateRecommendations = function(zone, zoneId, roomData, envDat
     }
 
     return recs;
+};
+// ============================================================
+// EXPORT DU MOTEUR (À Placer à la toute fin du fichier)
+// ============================================================
+window.SolsticeEngine = {
+    calculatePMV: typeof calculatePMV !== 'undefined' ? calculatePMV : null,
+    calculateMeanRadiantTemp: typeof calculateMeanRadiantTemp !== 'undefined' ? calculateMeanRadiantTemp : null,
+    calculateAirVelocity: typeof calculateAirVelocity !== 'undefined' ? calculateAirVelocity : null,
+    getBaseCloAndMet: typeof getBaseCloAndMet !== 'undefined' ? getBaseCloAndMet : null
 };
