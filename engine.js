@@ -1044,45 +1044,51 @@ function updateStructureTemperature(nomPiece, currentTa) {
 }
 
 /**
- * Évaluation saisonnière de la réserve thermique (Chaleur vs Fraîcheur)
+ * Évaluation dynamique de la réserve thermique (Indépendante de la saison)
+ * Mesure simultanément le Stock de Calories (chaud) et le Stock de Frigories (frais).
  */
 function calculateStructureReserve(tStruct, tAir, zoneConfig = null) {
-    const isHeating = typeof isHeatingSeasonActive === 'function' ? isHeatingSeasonActive() : true;
+    const tPivot = 21.0; // Température de consigne neutre
 
+    // 1. Calcul des deux réserves physiques réelles
+    // Stock Calories (0 % à 18 °C / 50 % à 21 °C / 100 % à 24 °C)
+    const rawCalories = ((tStruct - 18.0) / 6.0) * 100;
+    const chargeCalories = Math.max(0, Math.min(100, Math.round(rawCalories)));
+
+    // Stock Frigories / Fraîcheur (100 % à 18 °C / 50 % à 21 °C / 0 % à 24 °C)
+    const rawFrigories = ((24.0 - tStruct) / 6.0) * 100;
+    const chargeFrigories = Math.max(0, Math.min(100, Math.round(rawFrigories)));
+
+    // 2. Détermination de la dominance thermique
+    let modeLabel = "";
     let chargePercent = 0;
     let qualification = "";
-    let modeLabel = "";
 
-    if (isHeating) {
-        // SAISON DE CHAUFFE : Réserve de CHALEUR
-        modeLabel = "Chaleur";
-        const rawPct = ((tStruct - 18.0) / 6.0) * 100;
-        chargePercent = Math.max(0, Math.min(100, Math.round(rawPct)));
-
-        if (chargePercent >= 75) qualification = "Excellente réserve de chaleur";
-        else if (chargePercent >= 45) qualification = "Réserve thermique équilibrée";
-        else qualification = "Réserve faible (parois froides)";
+    if (tStruct >= tPivot) {
+        modeLabel = "Stock Calories";
+        chargePercent = chargeCalories;
+        if (chargePercent >= 75) qualification = "Inertie fortement chargée en chaleur";
+        else if (chargePercent >= 40) qualification = "Inertie chaude modérée";
+        else qualification = "Stock calorifique faible";
     } else {
-        // SAISON ESTIVALE : Réserve de FRAÎCHEUR (Calcul inversé)
-        modeLabel = "Fraîcheur";
-        const rawPct = ((26.0 - tStruct) / 8.0) * 100;
-        chargePercent = Math.max(0, Math.min(100, Math.round(rawPct)));
-
-        if (chargePercent >= 75) qualification = "Excellente réserve de fraîcheur";
-        else if (chargePercent >= 45) qualification = "Inertie fraîche modérée";
-        else qualification = "Surchauffe de masse (surventilation requise)";
+        modeLabel = "Stock Frigories";
+        chargePercent = chargeFrigories;
+        if (chargePercent >= 75) qualification = "Inertie fortement chargée en fraîcheur";
+        else if (chargePercent >= 40) qualification = "Inertie fraîche modérée";
+        else qualification = "Stock de fraîcheur faible";
     }
 
+    // 3. Flux thermique instantané Air / Structure
     const deltaFlux = tStruct - tAir;
     const diffAbs = Math.abs(deltaFlux).toFixed(1);
     let fluxDirection = "";
     let fluxIcon = "";
 
     if (deltaFlux > 0.3) {
-        fluxDirection = `La structure cède des calories à l'air (+${diffAbs} °C)`;
+        fluxDirection = `La structure cède du chaud à l'air (+${diffAbs} °C)`;
         fluxIcon = "🔥 Restitution";
     } else if (deltaFlux < -0.3) {
-        fluxDirection = `La structure absorbe les calories de l'air (-${diffAbs} °C)`;
+        fluxDirection = `La structure absorbe du chaud / cède du frais (-${diffAbs} °C)`;
         fluxIcon = "❄️ Imbibition";
     } else {
         fluxDirection = "Équilibre thermique air / parois";
@@ -1092,6 +1098,8 @@ function calculateStructureReserve(tStruct, tAir, zoneConfig = null) {
     return {
         tStruct: parseFloat(tStruct.toFixed(1)),
         chargePercent,
+        chargeCalories,
+        chargeFrigories,
         qualification,
         fluxIcon,
         fluxDirection,
@@ -1331,23 +1339,7 @@ function updateHeatingSeasonDisplay() {
 function actualiserCockpitGlobal() {
     const metrics = calculateGlobalHabitatMetrics();
 
-    if (!metrics) {
-        if (document.getElementById('global-volume-badge')) document.getElementById('global-volume-badge').textContent = "Volume : -- m³";
-        if (document.getElementById('global-avg-temp')) document.getElementById('global-avg-temp').textContent = "-- °C";
-        if (document.getElementById('global-avg-rh')) document.getElementById('global-avg-rh').textContent = "-- %";
-        if (document.getElementById('global-avg-ah')) document.getElementById('global-avg-ah').textContent = "-- g/m³";
-        if (document.getElementById('global-pmv-val')) document.getElementById('global-pmv-val').textContent = "--";
-        if (document.getElementById('global-gains-ext')) document.getElementById('global-gains-ext').textContent = "-- kW";
-        if (document.getElementById('global-dep')) document.getElementById('global-dep').textContent = "-- kW";
-        if (document.getElementById('global-gains-sol')) document.getElementById('global-gains-sol').textContent = "-- kW";
-        if (document.getElementById('global-net')) document.getElementById('global-net').textContent = "-- kWh/j";
-        if (document.getElementById('global-tstruct')) document.getElementById('global-tstruct').textContent = "-- °C";
-        if (document.getElementById('global-reserve-pct')) document.getElementById('global-reserve-pct').textContent = "-- %";
-        if (document.getElementById('global-flux-status')) document.getElementById('global-flux-status').textContent = "--";
-        if (document.getElementById('global-reserve-mode')) document.getElementById('global-reserve-mode').textContent = "Mode --";
-        if (document.getElementById('global-reserve-qualif')) document.getElementById('global-reserve-qualif').textContent = "--";
-        return;
-    }
+    if (!metrics) return;
 
     if (document.getElementById('global-volume-badge')) document.getElementById('global-volume-badge').textContent = `Volume : ${metrics.totalVolumeM3} m³`;
     if (document.getElementById('global-avg-temp')) document.getElementById('global-avg-temp').textContent = `${metrics.avgTemp} °C`;
@@ -1384,13 +1376,15 @@ function actualiserCockpitGlobal() {
         netEl.style.color = metrics.totalBilanNetKwh >= 0 ? "#4ADE80" : "#F87171";
     }
 
-    // Réserve et inertie globales
+    // Réserve et inertie globales agnostiques
     const globalReserve = calculateStructureReserve(metrics.avgTStruct, metrics.avgTemp);
 
     if (document.getElementById('global-tstruct')) document.getElementById('global-tstruct').textContent = `${metrics.avgTStruct} °C`;
     if (document.getElementById('global-reserve-pct')) document.getElementById('global-reserve-pct').textContent = `${globalReserve.chargePercent} %`;
     if (document.getElementById('global-reserve-mode')) document.getElementById('global-reserve-mode').textContent = `(${globalReserve.modeLabel})`;
-    if (document.getElementById('global-reserve-qualif')) document.getElementById('global-reserve-qualif').textContent = globalReserve.qualification;
+    if (document.getElementById('global-reserve-qualif')) {
+        document.getElementById('global-reserve-qualif').textContent = `🔥 Chaud : ${globalReserve.chargeCalories} % | ❄️ Frais : ${globalReserve.chargeFrigories} %`;
+    }
 
     const globalFluxEl = document.getElementById('global-flux-status');
     if (globalFluxEl) {
@@ -1405,7 +1399,6 @@ function actualiserCockpitGlobal() {
         }
     }
 }
-
 function recalculerToutLeDashboard() { 
     for (const nomPiece of SELECTION_PIECES) { 
         mettreAJourTuile(nomPiece); 
