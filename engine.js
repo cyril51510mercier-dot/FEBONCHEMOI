@@ -32,34 +32,51 @@ if (typeof supabase !== 'undefined') {
 // ============================================================
 // SOLSTICE STORE — GESTION DU STOCKAGE CENTRALISÉ & CLOUD
 // ============================================================
+// Récupère l'UUID de la maison de l'utilisateur connecté
+async function getConnectedHouseId() {
+    if (!supabaseClient) return 'foyer_principal';
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return 'foyer_principal';
+
+        const { data } = await supabaseClient
+            .from('house_members')
+            .select('house_id')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+        return data?.house_id || 'foyer_principal';
+    } catch (e) {
+        return 'foyer_principal';
+    }
+}
+
 window.SolsticeStore = {
     STORAGE_KEY: 'HOUSE_CONFIG',
     
     async init() {
-        // 1. Récupération des données locales du PC/Téléphone
         const localConfig = this.getZones();
         const localScan = this.getScanData();
         const localRecos = this.getCheckedRecos();
         
         if (supabaseClient) {
             try {
+                const houseId = await getConnectedHouseId();
                 const { data, error } = await supabaseClient
                     .from('solstice_store')
                     .select('*')
-                    .eq('house_id', HOUSE_ID)
-                    .single();
+                    .eq('house_id', houseId)
+                    .maybeSingle();
 
                 if (data) {
                     const remoteConfig = data.house_config || {};
                     const remoteScan = data.donnees_habitat || {};
                     const remoteRecos = data.checked_recos || {};
 
-                    // FUSION INTELLIGENTE : On garde TOUTES les pièces (Local + Cloud)
                     const mergedConfig = { ...remoteConfig, ...localConfig };
                     const mergedScan = { ...remoteScan, ...localScan };
                     const mergedRecos = { ...remoteRecos, ...localRecos };
 
-                    // Mise à jour du stockage local avec la fusion
                     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(mergedConfig));
                     localStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(mergedScan));
                     localStorage.setItem('SOLSTICE_CHECKED_RECOS', JSON.stringify(mergedRecos));
@@ -67,19 +84,11 @@ window.SolsticeStore = {
                     GLOBAL_HOUSE_CONFIG = mergedConfig;
                     DONNEES_HABITAT = mergedScan;
 
-                    // Si le local avait plus de pièces que le cloud, on renvoie la fusion au cloud
-                    if (Object.keys(localConfig).length > Object.keys(remoteConfig).length) {
-                        await this.syncAllToCloud();
-                    }
-
                     rafraichirCapteursDepuisConfig();
                     recalculerToutLeDashboard();
-                } else if (error && error.code === 'PGRST116') {
-                    // Si aucune donnée distante, on envoie le local
-                    await this.syncAllToCloud();
                 }
             } catch (e) {
-                console.warn("[Solstice Store] Mode hors-ligne activé :", e);
+                console.warn("[Solstice Store] Mode hors-ligne :", e);
             }
         }
         return this.getZones();
@@ -88,8 +97,9 @@ window.SolsticeStore = {
     async syncAllToCloud() {
         if (!supabaseClient) return;
         try {
+            const houseId = await getConnectedHouseId();
             const payload = {
-                house_id: HOUSE_ID,
+                house_id: houseId,
                 house_config: this.getZones(),
                 donnees_habitat: this.getScanData(),
                 checked_recos: this.getCheckedRecos(),
@@ -97,10 +107,11 @@ window.SolsticeStore = {
             };
             await supabaseClient.from('solstice_store').upsert(payload);
         } catch (e) {
-            console.error("[Solstice Store] Échec de synchronisation cloud :", e);
+            console.error("[Solstice Store] Échec synchro cloud :", e);
         }
     },
-    // ... reste du code inchangé
+    
+    // ... garder le reste des méthodes identiques (saveZone, getZones, etc.)
 
     saveZone(zoneId, zoneData) {
         if (!zoneId) return false;
