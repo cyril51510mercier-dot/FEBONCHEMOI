@@ -22,7 +22,6 @@ let currentSortAsc = true;
 // ============================================================
 const SUPABASE_URL = 'https://hgmvwaehgedudklftltb.supabase.co'; 
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhnbXZ3YWVoZ2VkdWRrbGZ0bHRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyNTczMDEsImV4cCI6MjEwNTgzMzMwMX0.-w01Tc3baMZ0gCc4DMIH3VKI7P32m1wSifiWsruDKps';
-const HOUSE_ID = 'foyer_principal'; // Identifiant unique de ta maison pour tous tes appareils
 
 let supabaseClient = null;
 if (typeof supabase !== 'undefined') {
