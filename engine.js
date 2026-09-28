@@ -445,7 +445,7 @@ function getRoomMetric(nomPiece, colIndex) {
 
     if (colIndex === 5) return isOutdoor ? -999 : calculatePMV(ta, tr, vel, rh, met, totalClo);
     if (colIndex === 6) return isOutdoor ? -999 : calculateDailyThermalBalance(zoneConfig, ta).bilanNetkWh;
-    if (colIndex === 7) return isOutdoor ? -999 : updateStructureTemperature(nomPiece, ta);
+    if (colIndex === 7) return isOutdoor ? -999 : (nomPiece, ta);
     if (colIndex === 8) return calculateDryingPotential(ta, rh, vel).dryingIndex;
 
     return 0;
@@ -934,72 +934,168 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
 }
 
 // ============================================================
-// MODÈLE D'INERTIE ET RÉSERVE THERMIQUE (LISSAGE PASSE-BAS)
+// MODÈLE D'INERTIE ET RÉSERVE THERMIQUE AVANCÉ (BEM & RATTRAPAGE)
 // ============================================================
 
+/**
+ * Calcul dynamique de la constante de temps (Tau) de la zone en heures
+ */
+function calculateDynamicTau(zoneConfig) {
+    if (!zoneConfig) return 18.0;
+    let tau = 18.0;
+
+    // 1. Matériau de structure
+    const wallMat = zoneConfig.wallMat || 'cinderblock';
+    if (['concrete', 'stone'].includes(wallMat)) tau += 12.0;
+    else if (wallMat === 'wood') tau -= 6.0;
+
+    // 2. Emplacement de l'isolation
+    const ins = zoneConfig.insulation || 'iti_recent';
+    if (ins.startsWith('ite')) tau += 10.0;     // ITE : masse lourde à l'intérieur
+    else if (ins.startsWith('iti')) tau -= 4.0; // ITI : masse isolée de l'intérieur
+
+    // 3. Inertie des planchers et plafonds
+    if (zoneConfig.floorMat === 'lourd') tau += 4.0;
+    if (zoneConfig.ceilingMat === 'lourd') tau += 4.0;
+
+    return Math.max(6.0, Math.min(48.0, tau));
+}
+
+/**
+ * Calcul de la température d'équilibre physique théorique (Solution 1)
+ */
+function calculateEquilibriumTstruct(zoneConfig, tOp, tExt24h) {
+    if (!zoneConfig) return tOp;
+
+    const ins = zoneConfig.insulation || 'iti_recent';
+    let rInt = 0.13;
+    let rExt = 0.04;
+
+    if (ins === 'iti_recent') { rInt += 3.2; rExt += 0.2; }
+    else if (ins === 'iti_old') { rInt += 1.4; rExt += 0.2; }
+    else if (ins === 'ite_heavy') { rInt += 0.2; rExt += 3.8; }
+    else if (ins === 'ite_old') { rInt += 0.2; rExt += 1.8; }
+    else { rInt += 0.1; rExt += 0.1; }
+
+    return (rExt * tOp + rInt * tExt24h) / (rInt + rExt);
+}
+
+/**
+ * Mise à jour de la température de structure avec rattrapage heure par heure
+ */
 function updateStructureTemperature(nomPiece, currentTa) {
     const storageKey = `SOLSTICE_TSTRUCT_${nomPiece}`;
     const lastDataRaw = localStorage.getItem(storageKey);
     const now = Date.now();
 
+    const zoneConfig = getZoneConfigByName(nomPiece);
+    const tMr = calculateMeanRadiantTemp(zoneConfig, currentTa);
+    const currentTop = (currentTa + tMr) / 2; // Température opérative
+    const tExt24h = getDailyOutdoorTemp();
+    const tau = calculateDynamicTau(zoneConfig);
+
     if (!lastDataRaw) {
-        const initialData = { tStruct: currentTa, lastTimestamp: now };
+        const initialTstruct = calculateEquilibriumTstruct(zoneConfig, currentTop, tExt24h);
+        const initialData = { tStruct: initialTstruct, lastTop: currentTop, lastTimestamp: now };
         localStorage.setItem(storageKey, JSON.stringify(initialData));
-        return currentTa;
+        return initialTstruct;
     }
 
     const lastData = JSON.parse(lastDataRaw);
     const dtHours = (now - lastData.lastTimestamp) / (1000 * 3600);
 
-    if (dtHours < 0.016) return lastData.tStruct;
+    if (dtHours < 0.016) return lastData.tStruct; // Seuil < 1 min
 
-    const tau = 18.0;
-    const alpha = 1 - Math.exp(-dtHours / tau);
-    const newTstruct = lastData.tStruct + alpha * (currentTa - lastData.tStruct);
+    let newTstruct = lastData.tStruct;
+    const lastTop = lastData.lastTop !== undefined ? lastData.lastTop : currentTop;
+
+    if (dtHours > 24) {
+        // SOLUTION 1 : Longue absence (> 24h) -> Réalignement physique BEM direct
+        newTstruct = calculateEquilibriumTstruct(zoneConfig, currentTop, tExt24h);
+    } else if (dtHours > 2) {
+        // SOLUTION 2 : Absence modérée (2h à 24h) -> Boucle de rattrapage (Backfilling)
+        const steps = Math.floor(dtHours);
+        const alphaStep = 1 - Math.exp(-1 / tau);
+        const tTopStep = (currentTop - lastTop) / steps;
+
+        for (let i = 1; i <= steps; i++) {
+            const interpolatedTop = lastTop + (tTopStep * i);
+            newTstruct = newTstruct + alphaStep * (interpolatedTop - newTstruct);
+        }
+
+        const remainder = dtHours - steps;
+        if (remainder > 0.01) {
+            const alphaRem = 1 - Math.exp(-remainder / tau);
+            newTstruct = newTstruct + alphaRem * (currentTop - newTstruct);
+        }
+    } else {
+        // Mise à jour continue (<= 2h)
+        const alpha = 1 - Math.exp(-dtHours / tau);
+        newTstruct = lastData.tStruct + alpha * (currentTop - lastData.tStruct);
+    }
 
     localStorage.setItem(storageKey, JSON.stringify({
         tStruct: parseFloat(newTstruct.toFixed(2)),
+        lastTop: parseFloat(currentTop.toFixed(2)),
         lastTimestamp: now
     }));
 
     return newTstruct;
 }
 
-function calculateStructureReserve(tStruct, tAir, tConfort = 21.0) {
-    const deltaConfort = tStruct - tConfort;
+/**
+ * Évaluation saisonnière de la réserve thermique (Chaleur vs Fraîcheur)
+ */
+function calculateStructureReserve(tStruct, tAir, zoneConfig = null) {
+    const isHeating = typeof isHeatingSeasonActive === 'function' ? isHeatingSeasonActive() : true;
 
-    const rawPercent = ((deltaConfort + 3.0) / 6.0) * 100;
-    const chargePercent = Math.max(0, Math.min(100, Math.round(rawPercent)));
+    let chargePercent = 0;
+    let qualification = "";
+    let modeLabel = "";
+
+    if (isHeating) {
+        // SAISON DE CHAUFFE : Réserve de CHALEUR
+        modeLabel = "Chaleur";
+        const rawPct = ((tStruct - 18.0) / 6.0) * 100;
+        chargePercent = Math.max(0, Math.min(100, Math.round(rawPct)));
+
+        if (chargePercent >= 75) qualification = "Excellente réserve de chaleur";
+        else if (chargePercent >= 45) qualification = "Réserve thermique équilibrée";
+        else qualification = "Réserve faible (parois froides)";
+    } else {
+        // SAISON ESTIVALE : Réserve de FRAÎCHEUR (Calcul inversé)
+        modeLabel = "Fraîcheur";
+        const rawPct = ((26.0 - tStruct) / 8.0) * 100;
+        chargePercent = Math.max(0, Math.min(100, Math.round(rawPct)));
+
+        if (chargePercent >= 75) qualification = "Excellente réserve de fraîcheur";
+        else if (chargePercent >= 45) qualification = "Inertie fraîche modérée";
+        else qualification = "Surchauffe de masse (surventilation requise)";
+    }
 
     const deltaFlux = tStruct - tAir;
     const diffAbs = Math.abs(deltaFlux).toFixed(1);
-    
     let fluxDirection = "";
     let fluxIcon = "";
 
     if (deltaFlux > 0.3) {
-        fluxDirection = `La structure réchauffe l'air (+${diffAbs} °C)`;
+        fluxDirection = `La structure cède des calories à l'air (+${diffAbs} °C)`;
         fluxIcon = "🔥 Restitution";
     } else if (deltaFlux < -0.3) {
-        fluxDirection = `La structure absorbe la chaleur (-${diffAbs} °C)`;
+        fluxDirection = `La structure absorbe les calories de l'air (-${diffAbs} °C)`;
         fluxIcon = "❄️ Imbibition";
     } else {
-        fluxDirection = `Équilibre thermique air / parois`;
+        fluxDirection = "Équilibre thermique air / parois";
         fluxIcon = "⚖️ Stabile";
     }
 
-    let qualification = "Neutre";
-    if (deltaConfort >= 1.5) qualification = "Fortement chargée en chaleur";
-    else if (deltaConfort >= 0.5) qualification = "Modérément chaude";
-    else if (deltaConfort <= -1.5) qualification = "Fortement chargée en fraîcheur";
-    else if (deltaConfort <= -0.5) qualification = "Modérément fraîche";
-
     return {
         tStruct: parseFloat(tStruct.toFixed(1)),
-        chargePercent: chargePercent,
-        qualification: qualification,
-        fluxIcon: fluxIcon,
-        fluxDirection: fluxDirection
+        chargePercent,
+        qualification,
+        fluxIcon,
+        fluxDirection,
+        modeLabel
     };
 }
 
