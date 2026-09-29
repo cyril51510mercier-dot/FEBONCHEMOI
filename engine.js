@@ -186,10 +186,14 @@ window.SolsticeStore = {
     }
 };
 
-// A. Synchronisation automatique dès qu'on reprend le téléphone en main
+// A. Synchronisation automatique au premier plan
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-        chargerDonneesDepuisSupabase(); // Ta fonction qui lit Supabase
+        if (typeof chargerDonneesDepuisSupabase === 'function') {
+            chargerDonneesDepuisSupabase();
+        } else if (window.SolsticeStore && window.SolsticeStore.init) {
+            window.SolsticeStore.init();
+        }
     }
 });
 
