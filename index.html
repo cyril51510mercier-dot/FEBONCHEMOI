@@ -110,8 +110,8 @@
 <!-- SYNTHÈSE GLOBALE DE L'HABITAT -->
 <div class="card" style="background: #0F172A; color: white; border-radius: 12px; padding: 20px; margin-bottom: 25px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #1E293B; padding-bottom: 10px;">
-        <h2 style="margin: 0; font-size: 1.1rem; color: #F8FAFC;">🏠 Synthèse Globale de l'Habitat</h2>
-        <label style="font-size: 0.85rem; color: #94A3B8; cursor: pointer;">
+        <h2 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #F8FAFC;">🏠 Synthèse Globale de l'Habitat</h2>
+        <label style="font-size: 0.82rem; color: #94A3B8; cursor: pointer;">
             <input type="checkbox" id="include-buffer-checkbox" onchange="toggleIncludeBuffer(this.checked)"> Inclure pièces tampons
         </label>
     </div>
@@ -119,106 +119,107 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 15px;">
         
         <!-- CARTE 1 : CONFORT & RESSENTI -->
-        <div style="background: #1E293B; padding: 15px; border-radius: 8px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <span style="font-size: 0.72rem; text-transform: uppercase; color: #94A3B8; font-weight: 700;">CONFORT & RESSENTI</span>
-                <span style="font-size: 0.75rem; color: #CBD5E1; font-weight: 600;"><span id="global-avg-temp">--</span> °C • <span id="global-avg-rh">--</span>%</span>
+        <div style="background: #1E293B; padding: 14px 16px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; min-height: 175px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94A3B8; font-weight: 700;">CONFORT & RESSENTI</span>
+                <span style="font-size: 0.82rem; color: #F8FAFC; font-weight: 600;"><span id="global-avg-temp">--</span> °C • <span id="global-avg-rh">--</span>%</span>
             </div>
             
-            <div style="margin: 8px 0;">
-                <div style="font-size: 1.8rem; font-weight: 800; color: #F8FAFC; line-height: 1;">
-                    <span style="font-size: 1.1rem; color: #94A3B8; font-weight: 600;">PMV :</span> <span id="global-pmv-val">--</span>
+            <div style="text-align: center; margin: 10px 0;">
+                <div style="font-size: 1.4rem; font-weight: 800; color: #F8FAFC; line-height: 1.1;">
+                    <span style="font-size: 0.9rem; color: #94A3B8; font-weight: 600;">PMV :</span> <span id="global-pmv-val">--</span>
                 </div>
-                <div style="margin-top: 8px;">
+                <div style="margin-top: 6px;">
                     <span id="global-pmv-status" style="display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; background: #334155;">--</span>
                 </div>
             </div>
 
-            <div id="global-pmv-subtext" style="font-size: 0.78rem; color: #94A3B8; font-weight: 500; border-top: 1px dashed #334155; padding-top: 6px;">
+            <div id="global-pmv-subtext" style="font-size: 0.75rem; color: #94A3B8; text-align: center; border-top: 1px dashed #334155; padding-top: 6px;">
                 --
             </div>
         </div>
 
         <!-- CARTE 2 : AIR & SÉCHAGE -->
-        <div style="background: #1E293B; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div style="background: #1E293B; padding: 14px 16px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; min-height: 175px;">
             <div>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <div class="solstice-tooltip-container" style="position: relative; display: inline-block; cursor: help;">
-                        <span style="font-size: 0.72rem; text-transform: uppercase; color: #94A3B8; font-weight: 700;">
+                        <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94A3B8; font-weight: 700;">
                             AIR & SÉCHAGE <span style="color: #D96B43;">ℹ️</span>
                         </span>
                         <div class="solstice-tooltip-popup" style="visibility: hidden; width: 170px; background-color: #334155; color: #fff; text-align: center; border-radius: 6px; padding: 6px; position: absolute; z-index: 10; bottom: 125%; left: 0; opacity: 0; transition: opacity 0.2s; font-size: 0.75rem; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
                             Volume analysé : <strong id="global-volume-tooltip">-- m³</strong>
                         </div>
                     </div>
-                    <span id="global-avg-ah" style="font-size: 0.85rem; font-weight: 700; color: #38BDF8;">-- g/m³</span>
+                    <strong id="global-avg-ah" style="font-size: 0.85rem; font-weight: 700; color: #38BDF8;">-- g/m³</strong>
                 </div>
 
-                <div id="global-microclimate-desc" style="font-size: 0.8rem; font-weight: 600; color: #38BDF8; margin-bottom: 10px;">
+                <div id="global-microclimate-desc" style="font-size: 0.82rem; font-weight: 600; color: #38BDF8; line-height: 1.2;">
                     --
                 </div>
             </div>
 
-            <!-- Double Potentiel de Séchage (Uniquement la note /10) -->
-            <div style="border-top: 1px dashed #334155; padding-top: 8px;">
-                <div style="font-size: 0.68rem; text-transform: uppercase; color: #64748B; font-weight: 700; margin-bottom: 4px;">Potentiel de Séchage</div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 3px;">
+            <div style="border-top: 1px dashed #334155; padding-top: 6px;">
+                <div style="font-size: 0.70rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748B; font-weight: 700; margin-bottom: 4px;">POTENTIEL DE SÉCHAGE</div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 2px;">
                     <span style="color: #94A3B8;">🏠 Intérieur :</span>
                     <strong id="global-drying-indoor" style="color: #F8FAFC;">--/10</strong>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
                     <span style="color: #94A3B8;">🌳 Extérieur :</span>
                     <strong id="global-drying-outdoor" style="color: #F8FAFC;">--/10</strong>
                 </div>
             </div>
         </div>
 
-        <!-- CARTE 3 : BILAN THERMIQUE (Conforme maquette initiale) -->
-        <div style="background: #1E293B; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between;">
+        <!-- CARTE 3 : BILAN THERMIQUE -->
+        <div style="background: #1E293B; padding: 14px 16px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; min-height: 175px;">
             <div>
-                <span style="font-size: 0.72rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; display: block; margin-bottom: 6px;">☀️ BILAN THERMIQUE</span>
-                <div id="global-ephemeris" style="font-size: 0.8rem; color: #F59E0B; font-weight: 600; text-align: center; margin-bottom: 8px;">☀️ --:-- ── 🌙 --:--</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94A3B8; font-weight: 700;">BILAN THERMIQUE</span>
+                    <span id="global-ephemeris" style="font-size: 0.75rem; color: #F59E0B; font-weight: 600;">☀️ --:-- ── 🌙 --:--</span>
+                </div>
 
-                <div style="text-align: center; margin: 6px 0;">
-                    <div id="global-net-main" style="font-size: 1.25rem; font-weight: 800; color: #4ADE80; line-height: 1.2;">-- kWh aujourd'hui</div>
-                    <div id="global-net-status" style="font-size: 0.78rem; color: #94A3B8; margin-top: 2px;">(Maison en gain)</div>
+                <div style="text-align: center; margin: 4px 0;">
+                    <div id="global-net-main" style="font-size: 1.35rem; font-weight: 800; color: #4ADE80; line-height: 1.1;">-- kWh aujourd'hui</div>
+                    <div id="global-net-status" style="font-size: 0.75rem; color: #94A3B8; margin-top: 2px;">(Maison en gain)</div>
                 </div>
             </div>
 
-            <div style="border-top: 1px dashed #334155; padding-top: 8px;">
-                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 3px;">
+            <div style="border-top: 1px dashed #334155; padding-top: 6px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 2px;">
                     <span style="color: #94A3B8;">☀️ Jour :</span>
                     <strong id="global-net-day" style="color: #F8FAFC;">-- kWh</strong>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
                     <span style="color: #94A3B8;">🌙 Nuit :</span>
                     <strong id="global-net-night" style="color: #F8FAFC;">-- kWh</strong>
                 </div>
             </div>
         </div>
 
-        <!-- CARTE 4 : MASSE & INERTIE (Conforme maquette initiale + Autonomie) -->
-        <div style="background: #1E293B; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between;">
+        <!-- CARTE 4 : MASSE & INERTIE -->
+        <div style="background: #1E293B; padding: 14px 16px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; min-height: 175px;">
             <div>
-                <span style="font-size: 0.72rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; display: block; margin-bottom: 8px;">🧱 MASSE & INERTIE</span>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94A3B8; font-weight: 700; display: block; margin-bottom: 6px;">MASSE & INERTIE</span>
                 
-                <div style="margin-bottom: 8px;">
-                    <div style="font-size: 0.9rem; color: #F8FAFC; font-weight: 700;">Murs : <span id="global-tstruct" style="color: #F59E0B;">-- °C</span></div>
-                    <div style="font-size: 0.72rem; color: #64748B;">(Température moyenne)</div>
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                    <span style="font-size: 0.85rem; color: #F8FAFC; font-weight: 700;">Murs : <span id="global-tstruct" style="color: #F59E0B;">-- °C</span></span>
+                    <span style="font-size: 0.70rem; color: #64748B;">(Temp. moyenne)</span>
                 </div>
 
-                <div style="margin-bottom: 8px;">
-                    <div id="global-wall-state-title" style="font-size: 0.85rem; font-weight: 700; color: #38BDF8;">🧱 Parois en recharge</div>
-                    <div id="global-flux-power-detail" style="font-size: 0.75rem; color: #94A3B8;">(-0.00 kW d'absorption)</div>
+                <div style="margin-bottom: 4px;">
+                    <span id="global-wall-state-title" style="font-size: 0.82rem; font-weight: 700; color: #38BDF8;">🧱 Parois en recharge</span>
+                    <span id="global-flux-power-detail" style="font-size: 0.75rem; color: #94A3B8;">(-0.00 kW)</span>
                 </div>
 
-                <div style="font-size: 0.78rem; color: #CBD5E1; margin-bottom: 4px;">
+                <div style="font-size: 0.78rem; color: #CBD5E1;">
                     ⏱️ Autonomie (~19°C) : <strong id="global-autonomy" style="color: #38BDF8;">-- h</strong>
                 </div>
             </div>
 
-            <div style="border-top: 1px dashed #334155; padding-top: 8px; text-align: center;">
-                <span id="global-reserve-action" style="font-size: 0.85rem; font-weight: 700; color: #4ADE80;">--</span>
+            <div style="border-top: 1px dashed #334155; padding-top: 6px; text-align: center;">
+                <span id="global-reserve-action" style="font-size: 0.82rem; font-weight: 700; color: #4ADE80;">--</span>
             </div>
         </div>
 
