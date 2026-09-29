@@ -1073,38 +1073,37 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
         fluxColor = "#4ADE80";
     }
 
-    // 2. Calcul de l'autonomie thermique estimée (maintien > 19 °C sans chauffage)
-    const tExt = getDailyOutdoorTemp();
-    const tauMoyen = 18.0; // Constante de temps moyenne
-    let autonomyHours = 0;
+// 2. Calcul de l'autonomie thermique estimée (maintien > 19 °C)
+// On utilise la température extérieure instantanée (outdoorTemp)
+const deltaExt = tAir - outdoorTemp; // ex: 22.1 - 21.0 = 1.1 °C
+let autonomyHours = 0;
 
-    if (tAir > 19.0 && tAir > tExt) {
-        const deltaMarge = Math.max(0, tStruct - 19.0);
-        const deltaPerte = Math.max(0.1, tAir - tExt);
-        autonomyHours = (tauMoyen * deltaMarge) / deltaPerte;
-    }
+if (tAir > 19.0 && deltaExt > 0.1) {
+    const deltaMarge = Math.max(0, tStruct - 19.0); // ex: 21.4 - 19.0 = 2.4 °C
+    const tauMoyen = 18.0; // Constante de temps
+    autonomyHours = (tauMoyen * deltaMarge) / deltaExt;
+}
 
-// 3. Action comportementale recommandée (7 scénarios)
+// 3. Action comportementale recommandée
     let actionText = "";
-    
-    // Tendance météo moyenne (basée sur les prévisions de la journée)
+    const isHeating = isHeatingSeasonActive();
     const tDay = getDailyOutdoorTemp(); 
     
-    // Seuils d'évaluation arbitraires (ajustables selon ton bâti)
     const mursChauds = tStruct > 22.0;
     const mursFroids = tStruct < 20.0;
     
-    const meteoChaude = tDay > 22.0;
+    // En saison de chauffe / automne, on hausse le seuil de météo chaude
+    const thresholdHot = isHeating ? 24.0 : 22.0;
+    const meteoChaude = tDay > thresholdHot;
     const meteoFroide = tDay < 18.0;
 
-    // Logique croisée : État de la masse VS Météo à venir
     if (mursChauds) {
         actionText = meteoChaude ? "🌙 Décharger chaleur" : "🛡️ Conserver chaleur";
     } else if (mursFroids) {
         actionText = meteoChaude ? "🛡️ Conserver fraîcheur" : "☀️ Stocker chaleur";
     } else { 
-        // Murs à l'équilibre (entre 20.0 et 22.0 °C)
-        if (meteoFroide) {
+        // Murs à l'équilibre (20.0 °C à 22.0 °C)
+        if (meteoFroide || isHeating) {
             actionText = "☀️ Stocker chaleur";
         } else if (meteoChaude) {
             actionText = "🌙 Stocker fraîcheur";
@@ -1413,12 +1412,16 @@ function actualiserCockpitGlobal() {
         fluxPowerEl.style.color = globalReserve.fluxColor;
     }
 
-    const autonomyEl = document.getElementById('global-autonomy');
-    if (autonomyEl) {
-        autonomyEl.textContent = globalReserve.autonomyHours > 0 
-            ? `~${globalReserve.autonomyHours} h` 
-            : "N/A (T° < 19°C)";
+const autonomyEl = document.getElementById('global-autonomy');
+if (autonomyEl) {
+    if (globalReserve.autonomyHours > 0) {
+        autonomyEl.textContent = `~${globalReserve.autonomyHours} h`;
+    } else if (metrics.avgTemp <= 19.0) {
+        autonomyEl.textContent = "N/A (T° ≤ 19°C)";
+    } else {
+        autonomyEl.textContent = "N/A (Pas de déperdition)";
     }
+}
 
 const actionEl = document.getElementById('global-reserve-action');
     if (actionEl) {
