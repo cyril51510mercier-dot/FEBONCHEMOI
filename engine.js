@@ -28,6 +28,33 @@ if (typeof supabase !== 'undefined') {
     supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
+// ------------------------------------------------------------
+// HELPER : APPLICATION DU CONTEXTE GLOBAL (MÉTÉO & TAMPON)
+// ------------------------------------------------------------
+function applySharedEnvironment(data) {
+    if (!data) return;
+    
+    // Aligner la météo pour que le PMV et les bilans thermiques soient identiques
+    if (data['__ENV__']) {
+        const env = data['__ENV__'];
+        outdoorTemp = env.outdoorTemp ?? outdoorTemp;
+        outdoorHumidity = env.outdoorHumidity ?? outdoorHumidity;
+        outdoorWind = env.outdoorWind ?? outdoorWind;
+        sunshineStatus = env.sunshineStatus ?? sunshineStatus;
+        if (env.hourlyExtForecast) window.hourlyExtForecast = env.hourlyExtForecast;
+        
+        if (typeof updateWeatherUI === 'function') updateWeatherUI();
+    }
+    
+    // Aligner l'option d'inclusion des zones tampons
+    if (typeof data['__BUFFER_TOGGLE__'] === 'boolean') {
+        includeBufferZones = data['__BUFFER_TOGGLE__'];
+        const cb = document.getElementById('include-buffer-checkbox');
+        if (cb && cb.checked !== includeBufferZones) cb.checked = includeBufferZones;
+        localStorage.setItem('SOLSTICE_INCLUDE_BUFFER', includeBufferZones ? 'true' : 'false');
+    }
+}
+
 // ============================================================
 // SOLSTICE STORE — GESTION DU STOCKAGE CENTRALISÉ & CLOUD
 // ============================================================
@@ -81,6 +108,8 @@ window.SolsticeStore = {
 
                     GLOBAL_HOUSE_CONFIG = mergedConfig;
                     DONNEES_HABITAT = mergedScan;
+
+                    applySharedEnvironment(DONNEES_HABITAT);
 
                     rafraichirCapteursDepuisConfig();
                     recalculerToutLeDashboard();
@@ -240,6 +269,13 @@ function isBufferZone(nomPiece, zoneConfig) {
 window.toggleIncludeBuffer = function(checked) {
     includeBufferZones = checked;
     localStorage.setItem('SOLSTICE_INCLUDE_BUFFER', checked ? 'true' : 'false');
+    
+    // Partage du toggle avec les autres appareils via Cloud
+    DONNEES_HABITAT['__BUFFER_TOGGLE__'] = checked;
+    if (window.SolsticeStore && window.SolsticeStore.saveScanData) {
+        window.SolsticeStore.saveScanData(DONNEES_HABITAT);
+    }
+    
     actualiserCockpitGlobal();
 };
 
@@ -306,6 +342,7 @@ window.addEventListener('load', async () => {
     const cachedHabitat = localStorage.getItem('SOLSTICE_DONNEES_HABITAT') || sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
     if (cachedHabitat) {
         DONNEES_HABITAT = JSON.parse(cachedHabitat);
+        applySharedEnvironment(DONNEES_HABITAT);
         recalculerToutLeDashboard();
         for (const nomPiece of SELECTION_PIECES) {
             const idCapteur = capteursMaison[nomPiece];
@@ -1144,7 +1181,7 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
         }
     } else if (profileKey === 'long_term') {
         if (nuitsFraichesAvenir) {
-            actionText = (tStruct <= 22.0) ? "☀️ Anticiper & stocker" : "🛡️ Conserver chaleur";
+            actionText = (tStruct <= 22.0) ? "☀️️ Anticiper & stocker" : "🛡️ Conserver chaleur";
         } else if (mursChauds) {
             actionText = "🌙 Décharger chaleur";
         } else {
@@ -1198,8 +1235,13 @@ function calculateGlobalHabitatMetrics() {
     let totalBilanNocturnekWh = 0;
 
     for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
+        // Ignorer les métadonnées de synchronisation
+        if (nomPiece === '__ENV__' || nomPiece === '__BUFFER_TOGGLE__') continue;
+        
         if (!data || isNaN(data.ta) || isNaN(data.rh)) continue;
-        if (!SELECTION_PIECES.includes(nomPiece)) continue;
+        
+        // LA LIGNE QUI FAISAIT VARIER LA SYNTHÈSE A ÉTÉ SUPPRIMÉE ICI.
+        // Désormais la maison entière est calculée sans dépendre de ta sélection écran.
 
         const zoneConfig = getZoneConfigByName(nomPiece) || { area: 15, height: 2.5 };
 
@@ -1811,6 +1853,12 @@ window.synchroniserTouteLaMaison = async function(event) {
             }
         }
 
+        // Ajout de la Météo et du Tampon dans le paquet pour unifier tous les appareils
+        DONNEES_HABITAT['__ENV__'] = {
+            outdoorTemp, outdoorHumidity, outdoorWind, sunshineStatus, hourlyExtForecast: window.hourlyExtForecast
+        };
+        DONNEES_HABITAT['__BUFFER_TOGGLE__'] = includeBufferZones;
+
         // Sauvegarde globale + Synchro Cloud instantanée vers Supabase
         if (window.SolsticeStore && window.SolsticeStore.saveScanData) {
             window.SolsticeStore.saveScanData(DONNEES_HABITAT);
@@ -2015,6 +2063,7 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
                 if (payload.new && payload.new.donnees_habitat) {
                     DONNEES_HABITAT = payload.new.donnees_habitat;
                     localStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(DONNEES_HABITAT));
+                    applySharedEnvironment(DONNEES_HABITAT);
                     recalculerToutLeDashboard();
                 }
             })
