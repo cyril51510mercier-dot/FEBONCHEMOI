@@ -1095,10 +1095,12 @@ function updateStructureTemperature(nomPiece, currentTa) {
         newTstruct = lastData.tStruct + alpha * (currentTop - lastData.tStruct);
     }
 
-    localStorage.setItem(storageKey, JSON.stringify({
-        tStruct: parseFloat(newTstruct.toFixed(2)),
-        lastTop: parseFloat(currentTop.toFixed(2)),
-        lastTimestamp: now
+    // ✅ Stockage dans l'objet global partagé via Supabase
+if (DONNEES_HABITAT[nomPiece]) {
+    DONNEES_HABITAT[nomPiece].tStruct = parseFloat(newTstruct.toFixed(2));
+    DONNEES_HABITAT[nomPiece].lastTop = parseFloat(currentTop.toFixed(2));
+    DONNEES_HABITAT[nomPiece].lastTimestamp = now;
+}
     }));
 
     return newTstruct;
