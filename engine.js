@@ -201,9 +201,13 @@ function getClothingDescription(clo) {
 
 function rafraichirCapteursDepuisConfig() {
     capteursMaison = {};
-    Object.values(GLOBAL_HOUSE_CONFIG).forEach(zone => {
-        if (zone.name && (zone.sensorId || zone.id)) {
-            capteursMaison[zone.name] = zone.sensorId || zone.id;
+    const configToUse = GLOBAL_HOUSE_CONFIG.zones || GLOBAL_HOUSE_CONFIG;
+    Object.entries(configToUse).forEach(([key, zone]) => {
+        if (zone && typeof zone === 'object') {
+            const roomName = zone.name || zone.nom || zone.title;
+            if (roomName) {
+                capteursMaison[roomName] = zone.sensorId || zone.id || key;
+            }
         }
     });
 }
@@ -261,7 +265,7 @@ window.addEventListener('load', async () => {
     if (savedSelection) {
         try { SELECTION_PIECES = JSON.parse(savedSelection); } catch(e) {}
     }
-    if (!SELECTION_PIECES || SELECTION_PIECES.length === 0) {
+    if (!SELECTION_PIECES || SELECTION_PIECES.length === 0 || !SELECTION_PIECES.some(p => Object.keys(capteursMaison).includes(p))) {
         SELECTION_PIECES = Object.keys(capteursMaison);
         localStorage.setItem('SOLSTICE_SELECTION_PIECES', JSON.stringify(SELECTION_PIECES));
     }
@@ -2016,3 +2020,4 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
             })
             .subscribe();
     });
+}
