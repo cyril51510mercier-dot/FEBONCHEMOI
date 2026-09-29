@@ -1078,10 +1078,16 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
         autonomyHours = (tauMoyen * deltaMarge) / deltaExt;
     }
 
-    // 3. Récupération du profil utilisateur & extrêmes météo
+    // 3. Récupération robuste du profil utilisateur & extrêmes météo
     const rawConfig = localStorage.getItem('HOUSE_CONFIG');
     const houseConfig = rawConfig ? JSON.parse(rawConfig) : {};
-    const profileKey = houseConfig.global?.profile || localStorage.getItem('SOLSTICE_PROFILE') || 'mid_term';
+    
+    // Détection élargie de la clé de profil (fallback automatique sur long_term si indéterminé)
+    const profileKey = houseConfig.profile 
+                    || houseConfig.global?.profile 
+                    || houseConfig.global?.userProfile 
+                    || localStorage.getItem('SOLSTICE_PROFILE') 
+                    || 'long_term';
 
     let tMax = outdoorTemp;
     let tMin = outdoorTemp;
@@ -1093,6 +1099,9 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
 
     const mursChauds = tStruct > 22.5;
     const mursFroids = tStruct < 19.5;
+    
+    // Nuit fraîche (< 14°C) ou saison de chauffe = priorité à la chaleur
+    const nuitsFraichesAvenir = tMin < 14.0 || isHeatingSeasonActive();
 
     let actionText = "";
 
@@ -1107,8 +1116,6 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
         }
     } else if (profileKey === 'long_term') {
         // --- VISION LONG TERMISTE (24h - 72h) ---
-        const nuitsFraichesAvenir = tMin < 14.0 || isHeatingSeasonActive();
-
         if (nuitsFraichesAvenir) {
             actionText = (tStruct <= 22.0) ? "☀️ Anticiper & stocker" : "🛡️ Conserver chaleur";
         } else if (mursChauds) {
@@ -1117,22 +1124,15 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
             actionText = "⚖️ Maintenir équilibre";
         }
     } else {
-        // --- VISION MOYEN TERMISTE (MOYENNE 24H - PAR DÉFAUT) ---
-        const picChaleurPonctuel = tMax >= 25.0 && tMin < 17.0;
-        const journeeTresChaude = tMax >= 26.0 && tMin >= 17.0;
-
-        if (mursChauds) {
-            actionText = journeeTresChaude ? "🌙 Décharger chaleur" : "🛡️ Conserver chaleur";
-        } else if (mursFroids) {
-            actionText = "☀️ Stocker chaleur";
+        // --- VISION MOYEN TERMISTE (24H - PAR DÉFAUT) ---
+        if (nuitsFraichesAvenir) {
+            actionText = (tStruct <= 22.0) ? "☀️ Stocker chaleur" : "🛡️ Conserver chaleur";
+        } else if (tMax >= 26.0 && tMin >= 17.0) {
+            actionText = "🌙 Stocker fraîcheur"; // Réservé aux canicules estivales (nuits chaudes)
+        } else if (tMax >= 25.0) {
+            actionText = "🛡️ Préserver fraîcheur";
         } else {
-            if (picChaleurPonctuel) {
-                actionText = "🛡️ Préserver fraîcheur";
-            } else if (journeeTresChaude) {
-                actionText = "🌙 Stocker fraîcheur";
-            } else {
-                actionText = "⚖️ Maintenir équilibre";
-            }
+            actionText = "⚖️ Maintenir équilibre";
         }
     }
     
