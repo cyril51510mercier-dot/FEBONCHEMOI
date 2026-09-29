@@ -1047,63 +1047,74 @@ function updateStructureTemperature(nomPiece, currentTa) {
  * Évaluation dynamique de la réserve thermique (Indépendante de la saison)
  * Mesure simultanément le Stock de Calories (chaud) et le Stock de Frigories (frais).
  */
-function calculateStructureReserve(tStruct, tAir, zoneConfig = null) {
-    const tPivot = 21.0; // Température de consigne neutre
-
-    // 1. Calcul des deux réserves physiques réelles
-    // Stock Calories (0 % à 18 °C / 50 % à 21 °C / 100 % à 24 °C)
-    const rawCalories = ((tStruct - 18.0) / 6.0) * 100;
-    const chargeCalories = Math.max(0, Math.min(100, Math.round(rawCalories)));
-
-    // Stock Frigories / Fraîcheur (100 % à 18 °C / 50 % à 21 °C / 0 % à 24 °C)
-    const rawFrigories = ((24.0 - tStruct) / 6.0) * 100;
-    const chargeFrigories = Math.max(0, Math.min(100, Math.round(rawFrigories)));
-
-    // 2. Détermination de la dominance thermique
-    let modeLabel = "";
-    let chargePercent = 0;
-    let qualification = "";
-
-    if (tStruct >= tPivot) {
-        modeLabel = "Stock Calories";
-        chargePercent = chargeCalories;
-        if (chargePercent >= 75) qualification = "Inertie fortement chargée en chaleur";
-        else if (chargePercent >= 40) qualification = "Inertie chaude modérée";
-        else qualification = "Stock calorifique faible";
-    } else {
-        modeLabel = "Stock Frigories";
-        chargePercent = chargeFrigories;
-        if (chargePercent >= 75) qualification = "Inertie fortement chargée en fraîcheur";
-        else if (chargePercent >= 40) qualification = "Inertie fraîche modérée";
-        else qualification = "Stock de fraîcheur faible";
-    }
-
-    // 3. Flux thermique instantané Air / Structure
+/**
+ * Évaluation dynamique de l'inertie : Flux (kW), Autonomie (h) et Consigne d'action
+ */
+function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
     const deltaFlux = tStruct - tAir;
     const diffAbs = Math.abs(deltaFlux).toFixed(1);
-    let fluxDirection = "";
-    let fluxIcon = "";
+
+    // 1. Calcul de la puissance d'échange surfacique approximative (kW)
+    // Échange superficiel intérieur moyen ~ 17 W/(m³·K)
+    const fluxPowerKw = (totalVolumeM3 * 17 * deltaFlux) / 1000;
+    const absPowerKw = Math.abs(fluxPowerKw).toFixed(2);
+
+    let fluxStatusText = "";
+    let fluxColor = "#4ADE80";
 
     if (deltaFlux > 0.3) {
-        fluxDirection = `La structure cède du chaud à l'air (+${diffAbs} °C)`;
-        fluxIcon = "🔥 Restitution";
+        fluxStatusText = `🔥 Restitution (+${absPowerKw} kW)`;
+        fluxColor = "#FDBA74";
     } else if (deltaFlux < -0.3) {
-        fluxDirection = `La structure absorbe du chaud / cède du frais (-${diffAbs} °C)`;
-        fluxIcon = "❄️ Imbibition";
+        fluxStatusText = `❄️ Absorption (-${absPowerKw} kW)`;
+        fluxColor = "#38BDF8";
     } else {
-        fluxDirection = "Équilibre thermique air / parois";
-        fluxIcon = "⚖️ Stabile";
+        fluxStatusText = "⚖️ Équilibre (0 kW)";
+        fluxColor = "#4ADE80";
+    }
+
+    // 2. Calcul de l'autonomie thermique estimée (maintien > 19 °C sans chauffage)
+    const tExt = getDailyOutdoorTemp();
+    const tauMoyen = 18.0; // Constante de temps moyenne
+    let autonomyHours = 0;
+
+    if (tAir > 19.0 && tAir > tExt) {
+        const deltaMarge = Math.max(0, tStruct - 19.0);
+        const deltaPerte = Math.max(0.1, tAir - tExt);
+        autonomyHours = (tauMoyen * deltaMarge) / deltaPerte;
+    }
+
+    // 3. Action comportementale recommandée
+    let actionText = "⚖️ Inertie stable";
+    const isHeating = isHeatingSeasonActive();
+    const isSunny = (localStorage.getItem('sunshineStatus') || '').toLowerCase().includes('clear') || 
+                    (localStorage.getItem('sunshineStatus') || '').toLowerCase().includes('sun');
+
+    if (isHeating) {
+        if (tStruct < 19.0 && isSunny) {
+            actionText = "☀️ Ouvrir pour charger les murs";
+        } else if (tStruct >= 20.0 && deltaFlux > 0.3) {
+            actionText = "🔥 Murs actifs : chauffage modulable";
+        } else if (tStruct < 18.5) {
+            actionText = "⚠️ Relancer le chauffage (Murs froids)";
+        }
+    } else { // Hors saison de chauffe / Été
+        if (tExt < tAir && deltaFlux > 0.3) {
+            actionText = "🌙 Surventiler pour décharger la chaleur";
+        } else if (tExt > tAir && tStruct < 23.0) {
+            actionText = "🛡️ Fermer les volets : stocker le frais";
+        } else if (tStruct >= 25.0) {
+            actionText = "🚨 Surchauffe structurelle active";
+        }
     }
 
     return {
         tStruct: parseFloat(tStruct.toFixed(1)),
-        chargePercent,
-        chargeCalories,
-        chargeFrigories,
-        qualification,
-        fluxIcon,
-        fluxDirection,
-        modeLabel
+        fluxPowerKw: parseFloat(fluxPowerKw.toFixed(2)),
+        fluxStatusText,
+        fluxColor,
+        autonomyHours: parseFloat(autonomyHours.toFixed(1)),
+        actionText
     };
 }
 
@@ -1377,26 +1388,29 @@ function actualiserCockpitGlobal() {
     }
 
     // Réserve et inertie globales agnostiques
-    const globalReserve = calculateStructureReserve(metrics.avgTStruct, metrics.avgTemp);
+// --- Mettre à jour dans actualiserCockpitGlobal() ---
+    const globalReserve = calculateStructureReserve(metrics.avgTStruct, metrics.avgTemp, metrics.totalVolumeM3);
 
-    if (document.getElementById('global-tstruct')) document.getElementById('global-tstruct').textContent = `${metrics.avgTStruct} °C`;
-    if (document.getElementById('global-reserve-pct')) document.getElementById('global-reserve-pct').textContent = `${globalReserve.chargePercent} %`;
-    if (document.getElementById('global-reserve-mode')) document.getElementById('global-reserve-mode').textContent = `(${globalReserve.modeLabel})`;
-    if (document.getElementById('global-reserve-qualif')) {
-        document.getElementById('global-reserve-qualif').textContent = `🔥 Chaud : ${globalReserve.chargeCalories} % | ❄️ Frais : ${globalReserve.chargeFrigories} %`;
+    if (document.getElementById('global-tstruct')) {
+        document.getElementById('global-tstruct').textContent = `${metrics.avgTStruct} °C`;
+    }
+    
+    const fluxPowerEl = document.getElementById('global-flux-power');
+    if (fluxPowerEl) {
+        fluxPowerEl.textContent = globalReserve.fluxStatusText;
+        fluxPowerEl.style.color = globalReserve.fluxColor;
     }
 
-    const globalFluxEl = document.getElementById('global-flux-status');
-    if (globalFluxEl) {
-        globalFluxEl.textContent = globalReserve.fluxIcon;
-        const diffGlobal = metrics.avgTStruct - metrics.avgTemp;
-        if (diffGlobal > 0.3) {
-            globalFluxEl.style.color = "#FDBA74";
-        } else if (diffGlobal < -0.3) {
-            globalFluxEl.style.color = "#38BDF8";
-        } else {
-            globalFluxEl.style.color = "#4ADE80";
-        }
+    const autonomyEl = document.getElementById('global-autonomy');
+    if (autonomyEl) {
+        autonomyEl.textContent = globalReserve.autonomyHours > 0 
+            ? `~${globalReserve.autonomyHours} h` 
+            : "N/A (T° < 19°C)";
+    }
+
+    const actionEl = document.getElementById('global-reserve-action');
+    if (actionEl) {
+        actionEl.textContent = globalReserve.actionText;
     }
 }
 function recalculerToutLeDashboard() { 
