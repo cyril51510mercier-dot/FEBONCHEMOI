@@ -1006,40 +1006,59 @@ function calculateEquilibriumTstruct(zoneConfig, tOp, tExt24h) {
 }
 
 function updateStructureTemperature(nomPiece, currentTa) {
-    const storageKey = `SOLSTICE_TSTRUCT_${nomPiece}`;
-    const lastDataRaw = localStorage.getItem(storageKey);
     const now = Date.now();
-
     const zoneConfig = getZoneConfigByName(nomPiece);
     const tMr = calculateMeanRadiantTemp(zoneConfig, currentTa);
     const currentTop = (currentTa + tMr) / 2;
     const tExt24h = getDailyOutdoorTemp();
     const tau = calculateDynamicTau(zoneConfig);
 
-    if (!lastDataRaw) {
-        const initialTstruct = calculateEquilibriumTstruct(zoneConfig, currentTop, tExt24h);
-        const initialData = { tStruct: initialTstruct, lastTop: currentTop, lastTimestamp: now };
-        localStorage.setItem(storageKey, JSON.stringify(initialData));
-        return initialTstruct;
+    if (!DONNEES_HABITAT[nomPiece]) {
+        DONNEES_HABITAT[nomPiece] = {};
+    }
+    const roomData = DONNEES_HABITAT[nomPiece];
+
+    // Priorité aux données d'inertie synchronisées dans DONNEES_HABITAT
+    let lastTstruct = roomData.tStruct;
+    let lastTop = roomData.lastTop;
+    let lastTimestamp = roomData.lastTimestamp;
+
+    // Fallback sur le stockage local si première initialisation
+    if (lastTstruct === undefined) {
+        const lastDataRaw = localStorage.getItem(`SOLSTICE_TSTRUCT_${nomPiece}`);
+        if (lastDataRaw) {
+            try {
+                const parsed = JSON.parse(lastDataRaw);
+                lastTstruct = parsed.tStruct;
+                lastTop = parsed.lastTop;
+                lastTimestamp = parsed.lastTimestamp;
+            } catch (e) {}
+        }
     }
 
-    const lastData = JSON.parse(lastDataRaw);
-    const dtHours = (now - lastData.lastTimestamp) / (1000 * 3600);
+    if (lastTstruct === undefined || !lastTimestamp) {
+        const initialTstruct = calculateEquilibriumTstruct(zoneConfig, currentTop, tExt24h);
+        roomData.tStruct = parseFloat(initialTstruct.toFixed(2));
+        roomData.lastTop = parseFloat(currentTop.toFixed(2));
+        roomData.lastTimestamp = now;
+        return roomData.tStruct;
+    }
 
-    if (dtHours < 0.016) return lastData.tStruct;
+    const dtHours = (now - lastTimestamp) / (1000 * 3600);
+    if (dtHours < 0.016) return roomData.tStruct;
 
-    let newTstruct = lastData.tStruct;
-    const lastTop = lastData.lastTop !== undefined ? lastData.lastTop : currentTop;
+    let newTstruct = lastTstruct;
+    const prevTop = lastTop !== undefined ? lastTop : currentTop;
 
     if (dtHours > 24) {
         newTstruct = calculateEquilibriumTstruct(zoneConfig, currentTop, tExt24h);
     } else if (dtHours > 2) {
         const steps = Math.floor(dtHours);
         const alphaStep = 1 - Math.exp(-1 / tau);
-        const tTopStep = (currentTop - lastTop) / steps;
+        const tTopStep = (currentTop - prevTop) / steps;
 
         for (let i = 1; i <= steps; i++) {
-            const interpolatedTop = lastTop + (tTopStep * i);
+            const interpolatedTop = prevTop + (tTopStep * i);
             newTstruct = newTstruct + alphaStep * (interpolatedTop - newTstruct);
         }
 
@@ -1050,16 +1069,14 @@ function updateStructureTemperature(nomPiece, currentTa) {
         }
     } else {
         const alpha = 1 - Math.exp(-dtHours / tau);
-        newTstruct = lastData.tStruct + alpha * (currentTop - lastData.tStruct);
+        newTstruct = lastTstruct + alpha * (currentTop - lastTstruct);
     }
 
-    localStorage.setItem(storageKey, JSON.stringify({
-        tStruct: parseFloat(newTstruct.toFixed(2)),
-        lastTop: parseFloat(currentTop.toFixed(2)),
-        lastTimestamp: now
-    }));
+    roomData.tStruct = parseFloat(newTstruct.toFixed(2));
+    roomData.lastTop = parseFloat(currentTop.toFixed(2));
+    roomData.lastTimestamp = now;
 
-    return newTstruct;
+    return roomData.tStruct;
 }
 
 function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
@@ -1769,10 +1786,13 @@ window.synchroniserTouteLaMaison = async function(event) {
             const nomPiece = zone ? zone.name : null;
             
             if (nomPiece && capteur.temperature !== null && capteur.humidity !== null) {
-                DONNEES_HABITAT[nomPiece] = { 
-                    ta: parseFloat(capteur.temperature), 
-                    rh: parseFloat(capteur.humidity) 
-                };
+                if (!DONNEES_HABITAT[nomPiece]) DONNEES_HABITAT[nomPiece] = {};
+                
+                DONNEES_HABITAT[nomPiece].ta = parseFloat(capteur.temperature);
+                DONNEES_HABITAT[nomPiece].rh = parseFloat(capteur.humidity);
+
+                // Calcule et verrouille l'inertie dans le même objet partagé
+                updateStructureTemperature(nomPiece, DONNEES_HABITAT[nomPiece].ta);
 
                 if (SELECTION_PIECES.includes(nomPiece)) {
                     mettreAJourTuile(nomPiece);
@@ -1787,8 +1807,11 @@ window.synchroniserTouteLaMaison = async function(event) {
             }
         }
 
-        localStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(DONNEES_HABITAT));
-        sessionStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(DONNEES_HABITAT));
+        // Sauvegarde globale + Synchro Cloud instantanée vers Supabase
+        if (window.SolsticeStore && window.SolsticeStore.saveScanData) {
+            window.SolsticeStore.saveScanData(DONNEES_HABITAT);
+        }
+
         actualiserCockpitGlobal();
         
     } catch (error) { 
@@ -1965,3 +1988,31 @@ window.SolsticeEngine = {
         return recs;
     }
 };
+
+// Synchronisation automatique au déverrouillage du téléphone ou retour sur l'onglet
+document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && window.SolsticeStore) {
+        await window.SolsticeStore.init();
+        recalculerToutLeDashboard();
+    }
+});
+
+// Écoute temps réel Supabase (si activé sur la table)
+if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+    getConnectedHouseId().then(houseId => {
+        supabaseClient
+            .channel('solstice_realtime_sync')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'solstice_store',
+                filter: `house_id=eq.${houseId}`
+            }, payload => {
+                if (payload.new && payload.new.donnees_habitat) {
+                    DONNEES_HABITAT = payload.new.donnees_habitat;
+                    localStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(DONNEES_HABITAT));
+                    recalculerToutLeDashboard();
+                }
+            })
+            .subscribe();
+    });
