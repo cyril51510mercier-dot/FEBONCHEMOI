@@ -107,108 +107,116 @@
                 </button>
             </div>
 
-            <!-- SYNTHÈSE MULTI-VECTORIELLE DE L'HABITAT -->
+<!-- SYNTHÈSE GLOBALE DE L'HABITAT -->
 <div class="card" style="background: #0F172A; color: white; border-radius: 12px; padding: 20px; margin-bottom: 25px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #1E293B; padding-bottom: 10px;">
-        <h2 style="margin: 0; font-size: 1.1rem; color: #F8FAFC;">🏛️ Synthèse Multi-Vectorielle de l'Habitat</h2>
+        <h2 style="margin: 0; font-size: 1.1rem; color: #F8FAFC;">🏠 Synthèse Globale de l'Habitat</h2>
         <label style="font-size: 0.85rem; color: #94A3B8; cursor: pointer;">
             <input type="checkbox" id="include-buffer-checkbox" onchange="toggleIncludeBuffer(this.checked)"> Inclure pièces tampons
         </label>
     </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 15px;">
         
-        <!-- CARTE 1 : MICROCLIMAT -->
-        <div style="background: #1E293B; padding: 15px; border-radius: 8px; position: relative;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <!-- Tooltip sur le titre volumique -->
-                <div class="solstice-tooltip-container" style="position: relative; display: inline-block; cursor: help;">
-                    <span style="font-size: 0.72rem; text-transform: uppercase; color: #94A3B8; font-weight: 700;">
-                        MICROCLIMAT (VOLUMIQUE) <span style="color: #D96B43;">ℹ️</span>
-                    </span>
-                    <div class="solstice-tooltip-popup" style="visibility: hidden; width: 180px; background-color: #334155; color: #fff; text-align: center; border-radius: 6px; padding: 6px; position: absolute; z-index: 10; bottom: 125%; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.2s; font-size: 0.75rem; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                        Volume analysé : <strong id="global-volume-tooltip">-- m³</strong>
-                    </div>
+        <!-- CARTE 1 : CONFORT & RESSENTI -->
+        <div style="background: #1E293B; padding: 15px; border-radius: 8px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <span style="font-size: 0.72rem; text-transform: uppercase; color: #94A3B8; font-weight: 700;">CONFORT & RESSENTI</span>
+                <span style="font-size: 0.75rem; color: #CBD5E1; font-weight: 600;"><span id="global-avg-temp">--</span> °C • <span id="global-avg-rh">--</span>%</span>
+            </div>
+            
+            <div style="margin: 8px 0;">
+                <div style="font-size: 1.8rem; font-weight: 800; color: #F8FAFC; line-height: 1;">
+                    <span style="font-size: 1.1rem; color: #94A3B8; font-weight: 600;">PMV :</span> <span id="global-pmv-val">--</span>
+                </div>
+                <div style="margin-top: 8px;">
+                    <span id="global-pmv-status" style="display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; background: #334155;">--</span>
                 </div>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
-                <span style="color: #94A3B8;">T° Moyenne :</span>
-                <strong id="global-avg-temp" style="font-size: 1.1rem; color: #F8FAFC;">-- °C</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
-                <span style="color: #94A3B8;">Humidité Rel. :</span>
-                <strong id="global-avg-rh" style="color: #F8FAFC;">-- %</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.9rem;">
-                <span style="color: #94A3B8;">Humidité Abs. :</span>
-                <strong id="global-avg-ah" style="color: #38BDF8;">-- g/m³</strong>
-            </div>
-            <!-- Qualificatif de l'atmosphère -->
-            <div id="global-microclimate-desc" style="border-top: 1px solid #334155; padding-top: 8px; font-size: 0.8rem; font-weight: 600; text-align: center; color: #38BDF8;">
+
+            <div id="global-pmv-subtext" style="font-size: 0.78rem; color: #94A3B8; font-weight: 500; border-top: 1px dashed #334155; padding-top: 6px;">
                 --
             </div>
         </div>
 
-        <!-- CARTE 2 : CONFORT CORPOREL -->
-        <div style="background: #1E293B; padding: 15px; border-radius: 8px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
-            <span style="font-size: 0.72rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; display: block; margin-bottom: 10px;">CONFORT CORPOREL GLOBAL</span>
-            <div id="global-pmv-val" style="font-size: 2rem; font-weight: 800; color: #F8FAFC; margin-bottom: 8px;">--</div>
-            <span id="global-pmv-status" style="display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; background: #334155;">--</span>
+        <!-- CARTE 2 : AIR & SÉCHAGE -->
+        <div style="background: #1E293B; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div class="solstice-tooltip-container" style="position: relative; display: inline-block; cursor: help;">
+                        <span style="font-size: 0.72rem; text-transform: uppercase; color: #94A3B8; font-weight: 700;">
+                            AIR & SÉCHAGE <span style="color: #D96B43;">ℹ️</span>
+                        </span>
+                        <div class="solstice-tooltip-popup" style="visibility: hidden; width: 170px; background-color: #334155; color: #fff; text-align: center; border-radius: 6px; padding: 6px; position: absolute; z-index: 10; bottom: 125%; left: 0; opacity: 0; transition: opacity 0.2s; font-size: 0.75rem; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                            Volume analysé : <strong id="global-volume-tooltip">-- m³</strong>
+                        </div>
+                    </div>
+                    <span id="global-avg-ah" style="font-size: 0.85rem; font-weight: 700; color: #38BDF8;">-- g/m³</span>
+                </div>
+
+                <div id="global-microclimate-desc" style="font-size: 0.8rem; font-weight: 600; color: #38BDF8; margin-bottom: 10px;">
+                    --
+                </div>
+            </div>
+
+            <!-- Double Potentiel de Séchage (Uniquement la note /10) -->
+            <div style="border-top: 1px dashed #334155; padding-top: 8px;">
+                <div style="font-size: 0.68rem; text-transform: uppercase; color: #64748B; font-weight: 700; margin-bottom: 4px;">Potentiel de Séchage</div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 3px;">
+                    <span style="color: #94A3B8;">🏠 Intérieur :</span>
+                    <strong id="global-drying-indoor" style="color: #F8FAFC;">--/10</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                    <span style="color: #94A3B8;">🌳 Extérieur :</span>
+                    <strong id="global-drying-outdoor" style="color: #F8FAFC;">--/10</strong>
+                </div>
+            </div>
         </div>
 
-        <!-- CARTE 3 : BILAN THERMIQUE -->
-        <div style="background: #1E293B; padding: 15px; border-radius: 8px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <span style="font-size: 0.72rem; text-transform: uppercase; color: #94A3B8; font-weight: 700;">BILAN THERMIQUE</span>
-                <span id="global-ephemeris" style="font-size: 0.75rem; color: #F59E0B; font-weight: 600;">☀️ --:-- • 🌙 --:--</span>
-            </div>
-            
-            <div style="font-size: 0.68rem; text-transform: uppercase; color: #64748B; font-weight: 700; margin-bottom: 4px;">Puissances à l'instant T</div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 3px;">
-                <span style="color: #94A3B8;">🌡️ Gains ext. (Air) :</span>
-                <span id="global-gains-ext" style="color: #38BDF8;">+0 kW</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 3px;">
-                <span style="color: #94A3B8;">🌬️ Déperditions :</span>
-                <span id="global-dep" style="color: #F87171;">-0 kW</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 8px;">
-                <span style="color: #94A3B8;">☀️ Gains solaires :</span>
-                <span id="global-gains-sol" style="color: #FAC710;">+0 kW</span>
+        <!-- CARTE 3 : BILAN THERMIQUE (Conforme maquette initiale) -->
+        <div style="background: #1E293B; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <span style="font-size: 0.72rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; display: block; margin-bottom: 6px;">☀️ BILAN THERMIQUE</span>
+                <div id="global-ephemeris" style="font-size: 0.8rem; color: #F59E0B; font-weight: 600; text-align: center; margin-bottom: 8px;">☀️ --:-- ── 🌙 --:--</div>
+
+                <div style="text-align: center; margin: 6px 0;">
+                    <div id="global-net-main" style="font-size: 1.25rem; font-weight: 800; color: #4ADE80; line-height: 1.2;">-- kWh aujourd'hui</div>
+                    <div id="global-net-status" style="font-size: 0.78rem; color: #94A3B8; margin-top: 2px;">(Maison en gain)</div>
+                </div>
             </div>
 
-            <div style="border-top: 1px dashed #334155; padding-top: 6px; margin-top: 4px;">
-                <div style="font-size: 0.68rem; text-transform: uppercase; color: #64748B; font-weight: 700; margin-bottom: 4px;">Projection du jour (00h - 24h)</div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;">
-                    <span style="color: #94A3B8;">☀️ Diurne (Soleil levé) :</span>
+            <div style="border-top: 1px dashed #334155; padding-top: 8px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 3px;">
+                    <span style="color: #94A3B8;">☀️ Jour :</span>
                     <strong id="global-net-day" style="color: #F8FAFC;">-- kWh</strong>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px;">
-                    <span style="color: #94A3B8;">🌙 Nocturne (Soleil couché) :</span>
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                    <span style="color: #94A3B8;">🌙 Nuit :</span>
                     <strong id="global-net-night" style="color: #F8FAFC;">-- kWh</strong>
-                </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; border-top: 1px solid #334155; padding-top: 4px;">
-                    <span style="color: #F8FAFC; font-weight: 600;">📊 Bilan net journalier :</span>
-                    <strong id="global-net" style="color: #4ADE80;">-- kWh/j</strong>
                 </div>
             </div>
         </div>
 
-        <!-- CARTE 4 : INERTIE & RÉSERVE PAROIS -->
-        <div style="background: #1E293B; padding: 15px; border-radius: 8px;">
-            <span style="font-size: 0.72rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; display: block; margin-bottom: 10px;">INERTIE & RÉSERVE PAROIS</span>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
-                <span style="color: #94A3B8;">T° Masse Parois :</span>
-                <strong id="global-tstruct" style="color: #F59E0B; font-size: 1.1rem;">-- °C</strong>
+        <!-- CARTE 4 : MASSE & INERTIE (Conforme maquette initiale + Autonomie) -->
+        <div style="background: #1E293B; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <span style="font-size: 0.72rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; display: block; margin-bottom: 8px;">🧱 MASSE & INERTIE</span>
+                
+                <div style="margin-bottom: 8px;">
+                    <div style="font-size: 0.9rem; color: #F8FAFC; font-weight: 700;">Murs : <span id="global-tstruct" style="color: #F59E0B;">-- °C</span></div>
+                    <div style="font-size: 0.72rem; color: #64748B;">(Température moyenne)</div>
+                </div>
+
+                <div style="margin-bottom: 8px;">
+                    <div id="global-wall-state-title" style="font-size: 0.85rem; font-weight: 700; color: #38BDF8;">🧱 Parois en recharge</div>
+                    <div id="global-flux-power-detail" style="font-size: 0.75rem; color: #94A3B8;">(-0.00 kW d'absorption)</div>
+                </div>
+
+                <div style="font-size: 0.78rem; color: #CBD5E1; margin-bottom: 4px;">
+                    ⏱️ Autonomie (~19°C) : <strong id="global-autonomy" style="color: #38BDF8;">-- h</strong>
+                </div>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.82rem;">
-                <span style="color: #94A3B8;">Flux Air / Parois :</span>
-                <strong id="global-flux-power" style="color: #4ADE80;">-- kW</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.82rem;">
-                <span style="color: #94A3B8;">Autonomie (~19°C) :</span>
-                <strong id="global-autonomy" style="color: #38BDF8;">-- h</strong>
-            </div>
+
             <div style="border-top: 1px dashed #334155; padding-top: 8px; text-align: center;">
                 <span id="global-reserve-action" style="font-size: 0.85rem; font-weight: 700; color: #4ADE80;">--</span>
             </div>
@@ -216,16 +224,6 @@
 
     </div>
 </div>
-
-<!-- STYLE CSS DU TOOLTIP AU SURVOL / TOUCHER -->
-<style>
-.solstice-tooltip-container:hover .solstice-tooltip-popup {
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-</style>
-                </div>
-            </div>
 
             <!-- Sélecteur de Pièces -->
             <div id="room-selector-container" style="background: white; padding: 14px 18px; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
