@@ -186,6 +186,31 @@ window.SolsticeStore = {
     }
 };
 
+// A. Synchronisation automatique dès qu'on reprend le téléphone en main
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        chargerDonneesDepuisSupabase(); // Ta fonction qui lit Supabase
+    }
+});
+
+// B. Écoute en temps réel des modifications BDD
+if (typeof supabase !== 'undefined') {
+    supabase
+        .channel('solstice-sync')
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'solstice_store' 
+        }, (payload) => {
+            // Applique les nouvelles données et rafraîchit le cockpit
+            if (payload.new && payload.new.donnees_habitat) {
+                DONNEES_HABITAT = payload.new.donnees_habitat;
+                actualiserCockpitGlobal();
+            }
+        })
+        .subscribe();
+}
+
 // ============================================================
 // HELPER ET COMPORTEMENTS DE L'APPLICATION
 // ============================================================
