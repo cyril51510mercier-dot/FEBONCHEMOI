@@ -1436,11 +1436,47 @@ function actualiserCockpitGlobal() {
         document.getElementById('global-volume-tooltip').textContent = `${metrics.totalVolumeM3} m³`;
     }
 
-    if (document.getElementById('global-avg-temp')) document.getElementById('global-avg-temp').textContent = `${metrics.avgTemp} °C`;
-    if (document.getElementById('global-avg-rh')) document.getElementById('global-avg-rh').textContent = `${metrics.avgRH} %`;
+    if (document.getElementById('global-avg-temp')) document.getElementById('global-avg-temp').textContent = `${metrics.avgTemp}`;
+    if (document.getElementById('global-avg-rh')) document.getElementById('global-avg-rh').textContent = `${metrics.avgRH}`;
     if (document.getElementById('global-avg-ah')) document.getElementById('global-avg-ah').textContent = `${metrics.avgAH} g/m³`;
 
-    // Qualificatif textuel du microclimat
+    // 1. CARTE CONFORT ("PMV :" explicitement écrit)
+    const pmvValEl = document.getElementById('global-pmv-val');
+    const pmvStatusEl = document.getElementById('global-pmv-status');
+    const pmvSubtextEl = document.getElementById('global-pmv-subtext');
+
+    if (pmvValEl) pmvValEl.textContent = (metrics.avgPMV > 0 ? "+" : "") + metrics.avgPMV.toFixed(2);
+    
+    if (pmvStatusEl && pmvSubtextEl) {
+        if (metrics.avgPMV >= -0.2 && metrics.avgPMV <= 0.2) {
+            pmvStatusEl.textContent = "Confort Parfait";
+            pmvStatusEl.style.background = "#059669";
+            pmvStatusEl.style.color = "#FFFFFF";
+            pmvSubtextEl.textContent = "Équilibre thermique idéal pour le corps";
+        } else if (metrics.avgPMV > 0.2 && metrics.avgPMV <= 0.75) {
+            pmvStatusEl.textContent = "Légère Chaleur";
+            pmvStatusEl.style.background = "#D97706";
+            pmvStatusEl.style.color = "#FFFFFF";
+            pmvSubtextEl.textContent = "Sensation de douceur chaude";
+        } else if (metrics.avgPMV > 0.75) {
+            pmvStatusEl.textContent = "Inconfort Chaud";
+            pmvStatusEl.style.background = "#DC2626";
+            pmvStatusEl.style.color = "#FFFFFF";
+            pmvSubtextEl.textContent = "Ambiance trop chaude";
+        } else if (metrics.avgPMV < -0.2 && metrics.avgPMV >= -0.75) {
+            pmvStatusEl.textContent = "Confort Optimal";
+            pmvStatusEl.style.background = "#059669";
+            pmvStatusEl.style.color = "#FFFFFF";
+            pmvSubtextEl.textContent = "Légère fraîcheur imperceptible";
+        } else {
+            pmvStatusEl.textContent = "Inconfort Frais";
+            pmvStatusEl.style.background = "#0284C7";
+            pmvStatusEl.style.color = "#FFFFFF";
+            pmvSubtextEl.textContent = "Sensation de fraîcheur marquée";
+        }
+    }
+
+    // 2. CARTE AIR & SÉCHAGE (Affichage strict des notes /10 sans texte statut)
     const descEl = document.getElementById('global-microclimate-desc');
     if (descEl) {
         if (metrics.avgRH > 62 || metrics.avgAH >= 12.0) {
@@ -1463,6 +1499,86 @@ function actualiserCockpitGlobal() {
             descEl.style.color = "#94A3B8";
         }
     }
+
+    if (document.getElementById('global-drying-indoor')) {
+        document.getElementById('global-drying-indoor').textContent = `${metrics.indoorDryingScore10}/10`;
+    }
+    if (document.getElementById('global-drying-outdoor')) {
+        document.getElementById('global-drying-outdoor').textContent = `${metrics.outdoorDryingScore10}/10`;
+    }
+
+    // 3. CARTE BILAN THERMIQUE (Conforme maquette initiale)
+    const ephEl = document.getElementById('global-ephemeris');
+    if (ephEl && window.solsticeEphemeris) {
+        ephEl.textContent = `☀️ ${window.solsticeEphemeris.sunriseStr} ── 🌙 ${window.solsticeEphemeris.sunsetStr}`;
+    }
+
+    const netMainEl = document.getElementById('global-net-main');
+    const netStatusEl = document.getElementById('global-net-status');
+    if (netMainEl && netStatusEl) {
+        const valNet = metrics.totalBilanNetKwh;
+        netMainEl.textContent = `${valNet > 0 ? '+' : ''}${valNet} kWh aujourd'hui`;
+        netMainEl.style.color = valNet >= 0 ? "#4ADE80" : "#F87171";
+        netStatusEl.textContent = valNet >= 0 ? "(Maison en gain)" : "(Maison en perte)";
+    }
+    
+    if (document.getElementById('global-net-day')) {
+        const valDay = metrics.totalBilanDiurnekWh;
+        document.getElementById('global-net-day').textContent = `${valDay > 0 ? '+' : ''}${valDay} kWh`;
+        document.getElementById('global-net-day').style.color = valDay >= 0 ? "#4ADE80" : "#F87171";
+    }
+
+    if (document.getElementById('global-net-night')) {
+        const valNight = metrics.totalBilanNocturnekWh;
+        document.getElementById('global-net-night').textContent = `${valNight > 0 ? '+' : ''}${valNight} kWh`;
+        document.getElementById('global-net-night').style.color = valNight >= 0 ? "#4ADE80" : "#F87171";
+    }
+
+    // 4. CARTE INERTIE & MASSE (Conforme maquette initiale + Autonomie)
+    const globalReserve = calculateStructureReserve(metrics.avgTStruct, metrics.avgTemp, metrics.totalVolumeM3);
+
+    if (document.getElementById('global-tstruct')) {
+        document.getElementById('global-tstruct').textContent = `${metrics.avgTStruct} °C`;
+    }
+    
+    const deltaFlux = metrics.avgTStruct - metrics.avgTemp;
+    const absPowerKw = Math.abs(globalReserve.fluxPowerKw).toFixed(2);
+    const wallTitleEl = document.getElementById('global-wall-state-title');
+    const wallDetailEl = document.getElementById('global-flux-power-detail');
+
+    if (wallTitleEl && wallDetailEl) {
+        if (deltaFlux > 0.3) {
+            wallTitleEl.textContent = "🔥 Parois en restitution";
+            wallTitleEl.style.color = "#FDBA74";
+            wallDetailEl.textContent = `(+${absPowerKw} kW de restitution)`;
+        } else if (deltaFlux < -0.3) {
+            wallTitleEl.textContent = "🧱 Parois en recharge";
+            wallTitleEl.style.color = "#38BDF8";
+            wallDetailEl.textContent = `(-${absPowerKw} kW d'absorption)`;
+        } else {
+            wallTitleEl.textContent = "⚖️ Parois à l'équilibre";
+            wallTitleEl.style.color = "#4ADE80";
+            wallDetailEl.textContent = `(0 kW d'échange)`;
+        }
+    }
+
+    const autonomyEl = document.getElementById('global-autonomy');
+    if (autonomyEl) {
+        if (globalReserve.autonomyHours > 0) {
+            autonomyEl.textContent = `~${globalReserve.autonomyHours} h`;
+        } else if (metrics.avgTemp <= 19.0) {
+            autonomyEl.textContent = "N/A (T° ≤ 19°C)";
+        } else {
+            autonomyEl.textContent = "N/A (Pas de perte)";
+        }
+    }
+
+    const actionEl = document.getElementById('global-reserve-action');
+    if (actionEl) {
+        actionEl.textContent = globalReserve.actionText;
+        actionEl.style.color = globalReserve.actionColor; 
+    }
+}
 
     // PMV
     const pmvValEl = document.getElementById('global-pmv-val');
