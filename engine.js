@@ -1084,33 +1084,84 @@ if (tAir > 19.0 && deltaExt > 0.1) {
     autonomyHours = (tauMoyen * deltaMarge) / deltaExt;
 }
 
-// 3. Action comportementale recommandée
-    let actionText = "";
-    const isHeating = isHeatingSeasonActive();
-    const tDay = getDailyOutdoorTemp(); 
+// Dans calculateStructureReserve() de engine.js
+
+// 1. Récupération du profil utilisateur (court_term, mid_term, long_term)
+const rawConfig = localStorage.getItem('HOUSE_CONFIG');
+const houseConfig = rawConfig ? JSON.parse(rawConfig) : {};
+const profileKey = houseConfig.global?.profile || localStorage.getItem('SOLSTICE_PROFILE') || 'mid_term';
+
+// 2. Extrêmes et tendance météo
+let tMax = outdoorTemp;
+let tMin = outdoorTemp;
+if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length > 0) {
+    const temps = window.hourlyExtForecast.map(s => s.temp);
+    tMax = Math.max(...temps);
+    tMin = Math.min(...temps);
+}
+
+const mursChauds = tStruct > 22.5;
+const mursFroids = tStruct < 19.5;
+
+// 3. Définition des seuils de décision selon le profil
+let actionText = "";
+
+if (profileKey === 'short_term') {
+    // --- VISION COURT TERMISTE (0h - 12h) ---
+    // Priorité au confort immédiat : réaction directe à la température instantanée
+    if (outdoorTemp > 25.0) {
+        actionText = "🛡️ Préserver fraîcheur";
+    } else if (outdoorTemp < 18.0) {
+        actionText = "☀️ Stocker chaleur";
+    } else {
+        actionText = "⚖️ Maintenir équilibre";
+    }
+
+} else if (profileKey === 'long_term') {
+    // --- VISION LONG TERMISTE (24h - 72h) ---
+    // L'inertie est gérée comme un réservoir stratégique.
+    // Si une baisse importante arrive après le pic (ex: passage de 27°C à 21°C / 9°C),
+    // on évite de purger la masse si elle est encore acceptable.
     
-    const mursChauds = tStruct > 22.0;
-    const mursFroids = tStruct < 20.0;
-    
-    // En saison de chauffe / automne, on hausse le seuil de météo chaude
-    const thresholdHot = isHeating ? 24.0 : 22.0;
-    const meteoChaude = tDay > thresholdHot;
-    const meteoFroide = tDay < 18.0;
+    const chuteThermiqueAvenir = (tMax - tMin) > 10.0 || tMin < 12.0;
 
     if (mursChauds) {
-        actionText = meteoChaude ? "🌙 Décharger chaleur" : "🛡️ Conserver chaleur";
+        if (chuteThermiqueAvenir) {
+            // Le froid arrive bientôt : on conserve la chaleur accumulée malgré le pic actuel
+            actionText = "🛡️ Conserver chaleur";
+        } else {
+            actionText = "🌙 Décharger chaleur";
+        }
     } else if (mursFroids) {
-        actionText = meteoChaude ? "🛡️ Conserver fraîcheur" : "☀️ Stocker chaleur";
-    } else { 
-        // Murs à l'équilibre (20.0 °C à 22.0 °C)
-        if (meteoFroide || isHeating) {
-            actionText = "☀️ Stocker chaleur";
-        } else if (meteoChaude) {
+        actionText = "☀️ Stocker chaleur";
+    } else {
+        // Murs à l'équilibre
+        if (chuteThermiqueAvenir || isHeatingSeasonActive()) {
+            actionText = "☀️ Anticiper & stocker";
+        } else {
+            actionText = "⚖️ Maintenir équilibre";
+        }
+    }
+
+} else {
+    // --- VISION MOYEN TERMISTE (MOYENNE 24H - PAR DÉFAUT) ---
+    const picChaleurPonctuel = tMax >= 25.0 && tMin < 17.0;
+    const journeeTresChaude = tMax >= 26.0 && tMin >= 17.0;
+
+    if (mursChauds) {
+        actionText = journeeTresChaude ? "🌙 Décharger chaleur" : "🛡️ Conserver chaleur";
+    } else if (mursFroids) {
+        actionText = "☀️ Stocker chaleur";
+    } else {
+        if (picChaleurPonctuel) {
+            actionText = "🛡️ Préserver fraîcheur";
+        } else if (journeeTresChaude) {
             actionText = "🌙 Stocker fraîcheur";
         } else {
             actionText = "⚖️ Maintenir équilibre";
         }
     }
+}
     
     // (Optionnel) Ajout d'une couleur d'accentuation en fonction de l'action
     let actionColor = "#F8FAFC"; // Blanc par défaut
