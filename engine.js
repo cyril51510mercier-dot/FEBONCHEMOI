@@ -1044,6 +1044,9 @@ function calculateEquilibriumTstruct(zoneConfig, tOp, tExt24h) {
 /**
  * Mise à jour de la température de structure avec rattrapage heure par heure
  */
+/**
+ * Mise à jour de la température de structure avec rattrapage heure par heure
+ */
 function updateStructureTemperature(nomPiece, currentTa) {
     const storageKey = `SOLSTICE_TSTRUCT_${nomPiece}`;
     const lastDataRaw = localStorage.getItem(storageKey);
@@ -1095,13 +1098,12 @@ function updateStructureTemperature(nomPiece, currentTa) {
         newTstruct = lastData.tStruct + alpha * (currentTop - lastData.tStruct);
     }
 
-    // ✅ Stockage dans l'objet global partagé via Supabase
-if (DONNEES_HABITAT[nomPiece]) {
-    DONNEES_HABITAT[nomPiece].tStruct = parseFloat(newTstruct.toFixed(2));
-    DONNEES_HABITAT[nomPiece].lastTop = parseFloat(currentTop.toFixed(2));
-    DONNEES_HABITAT[nomPiece].lastTimestamp = now;
-}
-    }));
+    // Stockage centralisé dans l'objet global
+    if (DONNEES_HABITAT[nomPiece]) {
+        DONNEES_HABITAT[nomPiece].tStruct = parseFloat(newTstruct.toFixed(2));
+        DONNEES_HABITAT[nomPiece].lastTop = parseFloat(currentTop.toFixed(2));
+        DONNEES_HABITAT[nomPiece].lastTimestamp = now;
+    }
 
     return newTstruct;
 }
