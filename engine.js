@@ -206,7 +206,6 @@ if (typeof supabase !== 'undefined') {
             schema: 'public', 
             table: 'solstice_store' 
         }, (payload) => {
-            // Applique les nouvelles données et rafraîchit le cockpit
             if (payload.new && payload.new.donnees_habitat) {
                 DONNEES_HABITAT = payload.new.donnees_habitat;
                 actualiserCockpitGlobal();
@@ -269,12 +268,7 @@ window.toggleIncludeBuffer = function(checked) {
 };
 
 window.addEventListener('load', async () => {
-    // 1. Synchronisation prioritaire avec le Cloud Supabase
-    if (window.SolsticeStore && window.SolsticeStore.init) {
-        await window.SolsticeStore.init();
-    }
-
-    // 2. Chargement de la configuration expert
+    // 1. Chargement de la configuration expert
     const savedConfig = localStorage.getItem('HOUSE_CONFIG');
     if (savedConfig && Object.keys(JSON.parse(savedConfig)).length > 0) { 
         GLOBAL_HOUSE_CONFIG = JSON.parse(savedConfig); 
@@ -285,7 +279,7 @@ window.addEventListener('load', async () => {
         return; 
     }
 
-    // 3. Chargement de la sélection de pièces
+    // 2. Chargement de la sélection de pièces
     const savedSelection = localStorage.getItem('SOLSTICE_SELECTION_PIECES');
     if (savedSelection) {
         SELECTION_PIECES = JSON.parse(savedSelection);
@@ -304,10 +298,15 @@ window.addEventListener('load', async () => {
         try { window.hourlyExtForecast = JSON.parse(cachedForecast); } catch(e) {}
     }
 
-    // 4. Initialisation IHM & Données
+    // 3. Initialisation IHM & Données
     genererSelecteurPieces();
     initialiserDashboard(); 
     restoreSessionData();
+
+    // 4. Synchronisation Cloud Supabase
+    if (window.SolsticeStore && window.SolsticeStore.init) {
+        await window.SolsticeStore.init();
+    }
 
     // 5. Météo
     const savedLoc = localStorage.getItem('location') || 'Reims';
@@ -461,8 +460,8 @@ function getRoomMetric(nomPiece, colIndex) {
     const statusEl = document.getElementById('status-' + idCapteur);
     if (colIndex === 1) return statusEl ? statusEl.textContent : '';
 
-    const ta = (data && data.ta !== undefined) ? data.ta : (isOutdoor ? outdoorTemp : 0);
-    const rh = (data && data.rh !== undefined) ? data.rh : (isOutdoor ? outdoorHumidity : 0);
+    const ta = (data && (data.ta !== undefined ? data.ta : data.temperature)) ?? (isOutdoor ? outdoorTemp : 0);
+    const rh = (data && (data.rh !== undefined ? data.rh : data.humidity)) ?? (isOutdoor ? outdoorHumidity : 0);
 
     if (colIndex === 2) return ta;
     if (colIndex === 3) return rh;
@@ -611,10 +610,8 @@ function getBaseCloAndMet(zoneConfig) {
     let met = 1.2; 
     const currentHour = new Date().getHours();
     
-    // Découpage diurne : Après-midi (11h-18h) vs Matin/Soir (22h-11h)
     let tRefClo = outdoorTemp;
     if (currentHour >= 11 && currentHour < 18) {
-        // En après-midi : prise en compte du pic de chaleur prévisionnel
         if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length > 0) {
             tRefClo = Math.max(...window.hourlyExtForecast.map(s => s.temp));
         }
@@ -965,7 +962,6 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
 
             const netHour = (gainsCondHour + gainsSolHour) - depHour;
             
-            // Ventilation diurne (soleil levé) vs nocturne (soleil couché)
             if (slot.hour >= sunriseH && slot.hour < sunsetH) {
                 bilanDiurnekWh += netHour;
             } else {
@@ -1002,33 +998,24 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
 // MODÈLE D'INERTIE ET RÉSERVE THERMIQUE AVANCÉ (BEM & RATTRAPAGE)
 // ============================================================
 
-/**
- * Calcul dynamique de la constante de temps (Tau) de la zone en heures
- */
 function calculateDynamicTau(zoneConfig) {
     if (!zoneConfig) return 18.0;
     let tau = 18.0;
 
-    // 1. Matériau de structure
     const wallMat = zoneConfig.wallMat || 'cinderblock';
     if (['concrete', 'stone'].includes(wallMat)) tau += 12.0;
     else if (wallMat === 'wood') tau -= 6.0;
 
-    // 2. Emplacement de l'isolation
     const ins = zoneConfig.insulation || 'iti_recent';
-    if (ins.startsWith('ite')) tau += 10.0;     // ITE : masse lourde à l'intérieur
-    else if (ins.startsWith('iti')) tau -= 4.0; // ITI : masse isolée de l'intérieur
+    if (ins.startsWith('ite')) tau += 10.0;
+    else if (ins.startsWith('iti')) tau -= 4.0;
 
-    // 3. Inertie des planchers et plafonds
     if (zoneConfig.floorMat === 'lourd') tau += 4.0;
     if (zoneConfig.ceilingMat === 'lourd') tau += 4.0;
 
     return Math.max(6.0, Math.min(48.0, tau));
 }
 
-/**
- * Calcul de la température d'équilibre physique théorique (Solution 1)
- */
 function calculateEquilibriumTstruct(zoneConfig, tOp, tExt24h) {
     if (!zoneConfig) return tOp;
 
@@ -1045,12 +1032,6 @@ function calculateEquilibriumTstruct(zoneConfig, tOp, tExt24h) {
     return (rExt * tOp + rInt * tExt24h) / (rInt + rExt);
 }
 
-/**
- * Mise à jour de la température de structure avec rattrapage heure par heure
- */
-/**
- * Mise à jour de la température de structure avec rattrapage heure par heure
- */
 function updateStructureTemperature(nomPiece, currentTa) {
     const storageKey = `SOLSTICE_TSTRUCT_${nomPiece}`;
     const lastDataRaw = localStorage.getItem(storageKey);
@@ -1058,7 +1039,7 @@ function updateStructureTemperature(nomPiece, currentTa) {
 
     const zoneConfig = getZoneConfigByName(nomPiece);
     const tMr = calculateMeanRadiantTemp(zoneConfig, currentTa);
-    const currentTop = (currentTa + tMr) / 2; // Température opérative
+    const currentTop = (currentTa + tMr) / 2;
     const tExt24h = getDailyOutdoorTemp();
     const tau = calculateDynamicTau(zoneConfig);
 
@@ -1069,19 +1050,30 @@ function updateStructureTemperature(nomPiece, currentTa) {
         return initialTstruct;
     }
 
-    const lastData = JSON.parse(lastDataRaw);
+    let lastData;
+    try {
+        lastData = JSON.parse(lastDataRaw);
+    } catch(e) {
+        lastData = null;
+    }
+
+    if (!lastData || !lastData.lastTimestamp || isNaN(lastData.lastTimestamp) || isNaN(lastData.tStruct)) {
+        const initialTstruct = calculateEquilibriumTstruct(zoneConfig, currentTop, tExt24h);
+        const initialData = { tStruct: initialTstruct, lastTop: currentTop, lastTimestamp: now };
+        localStorage.setItem(storageKey, JSON.stringify(initialData));
+        return initialTstruct;
+    }
+
     const dtHours = (now - lastData.lastTimestamp) / (1000 * 3600);
 
-    if (dtHours < 0.016) return lastData.tStruct; // Seuil < 1 min
+    if (dtHours < 0.016) return lastData.tStruct;
 
     let newTstruct = lastData.tStruct;
     const lastTop = lastData.lastTop !== undefined ? lastData.lastTop : currentTop;
 
     if (dtHours > 24) {
-        // SOLUTION 1 : Longue absence (> 24h) -> Réalignement physique BEM direct
         newTstruct = calculateEquilibriumTstruct(zoneConfig, currentTop, tExt24h);
     } else if (dtHours > 2) {
-        // SOLUTION 2 : Absence modérée (2h à 24h) -> Boucle de rattrapage (Backfilling)
         const steps = Math.floor(dtHours);
         const alphaStep = 1 - Math.exp(-1 / tau);
         const tTopStep = (currentTop - lastTop) / steps;
@@ -1097,7 +1089,6 @@ function updateStructureTemperature(nomPiece, currentTa) {
             newTstruct = newTstruct + alphaRem * (currentTop - newTstruct);
         }
     } else {
-        // Mise à jour continue (<= 2h)
         const alpha = 1 - Math.exp(-dtHours / tau);
         newTstruct = lastData.tStruct + alpha * (currentTop - lastData.tStruct);
     }
@@ -1109,16 +1100,15 @@ function updateStructureTemperature(nomPiece, currentTa) {
         DONNEES_HABITAT[nomPiece].lastTimestamp = now;
     }
 
+    const updatedData = { tStruct: newTstruct, lastTop: currentTop, lastTimestamp: now };
+    localStorage.setItem(storageKey, JSON.stringify(updatedData));
+
     return newTstruct;
 }
 
-/**
- * Évaluation dynamique de l'inertie : Flux (kW), Autonomie (h) et Consigne d'action
- */
 function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
     const deltaFlux = tStruct - tAir;
 
-    // 1. Calcul de la puissance d'échange surfacique approximative (kW)
     const fluxPowerKw = (totalVolumeM3 * 17 * deltaFlux) / 1000;
     const absPowerKw = Math.abs(fluxPowerKw).toFixed(2);
 
@@ -1136,7 +1126,6 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
         fluxColor = "#4ADE80";
     }
 
-    // 2. Calcul de l'autonomie thermique estimée (maintien > 19 °C)
     const deltaExt = tAir - outdoorTemp; 
     let autonomyHours = 0;
 
@@ -1146,11 +1135,9 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
         autonomyHours = (tauMoyen * deltaMarge) / deltaExt;
     }
 
-    // 3. Récupération robuste du profil utilisateur & extrêmes météo
     const rawConfig = localStorage.getItem('HOUSE_CONFIG');
     const houseConfig = rawConfig ? JSON.parse(rawConfig) : {};
     
-    // Détection élargie de la clé de profil (fallback automatique sur long_term si indéterminé)
     const profileKey = houseConfig.profile 
                     || houseConfig.global?.profile 
                     || houseConfig.global?.userProfile 
@@ -1166,15 +1153,11 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
     }
 
     const mursChauds = tStruct > 22.5;
-    const mursFroids = tStruct < 19.5;
-    
-    // Nuit fraîche (< 14°C) ou saison de chauffe = priorité à la chaleur
     const nuitsFraichesAvenir = tMin < 14.0 || isHeatingSeasonActive();
 
     let actionText = "";
 
     if (profileKey === 'short_term') {
-        // --- VISION COURT TERMISTE (0h - 12h) ---
         if (outdoorTemp > 25.0) {
             actionText = "🛡️ Préserver fraîcheur";
         } else if (outdoorTemp < 18.0) {
@@ -1183,7 +1166,6 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
             actionText = "⚖️ Maintenir équilibre";
         }
     } else if (profileKey === 'long_term') {
-        // --- VISION LONG TERMISTE (24h - 72h) ---
         if (nuitsFraichesAvenir) {
             actionText = (tStruct <= 22.0) ? "☀️ Anticiper & stocker" : "🛡️ Conserver chaleur";
         } else if (mursChauds) {
@@ -1192,11 +1174,10 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
             actionText = "⚖️ Maintenir équilibre";
         }
     } else {
-        // --- VISION MOYEN TERMISTE (24H - PAR DÉFAUT) ---
         if (nuitsFraichesAvenir) {
             actionText = (tStruct <= 22.0) ? "☀️ Stocker chaleur" : "🛡️ Conserver chaleur";
         } else if (tMax >= 26.0 && tMin >= 17.0) {
-            actionText = "🌙 Stocker fraîcheur"; // Réservé aux canicules estivales (nuits chaudes)
+            actionText = "🌙 Stocker fraîcheur";
         } else if (tMax >= 25.0) {
             actionText = "🛡️ Préserver fraîcheur";
         } else {
@@ -1240,7 +1221,12 @@ function calculateGlobalHabitatMetrics() {
     let totalBilanNocturnekWh = 0;
 
     for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
-        if (!data || isNaN(data.ta) || isNaN(data.rh)) continue;
+        if (!data) continue;
+
+        const ta = (data.ta !== undefined ? parseFloat(data.ta) : (data.temperature !== undefined ? parseFloat(data.temperature) : NaN));
+        const rh = (data.rh !== undefined ? parseFloat(data.rh) : (data.humidity !== undefined ? parseFloat(data.humidity) : NaN));
+
+        if (isNaN(ta) || isNaN(rh)) continue;
         if (!SELECTION_PIECES.includes(nomPiece)) continue;
 
         const zoneConfig = getZoneConfigByName(nomPiece) || { area: 15, height: 2.5 };
@@ -1252,19 +1238,19 @@ function calculateGlobalHabitatMetrics() {
         const height = parseFloat(zoneConfig.height) || 2.5;
         const volume = area * height;
 
-        const ah = calculateAbsoluteHumidity(data.ta, data.rh);
+        const ah = calculateAbsoluteHumidity(ta, rh);
         const vel = calculateAirVelocity(zoneConfig, nomPiece);
-        const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
+        const tr = calculateMeanRadiantTemp(zoneConfig, ta);
         const { met, totalClo } = getBaseCloAndMet(zoneConfig);
-        const pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
+        const pmv = calculatePMV(ta, tr, vel, rh, met, totalClo);
         
-        const drying = calculateDryingPotential(data.ta, data.rh, vel);
-        const energy = calculateDailyThermalBalance(zoneConfig, data.ta);
-        const tStruct = updateStructureTemperature(nomPiece, data.ta);
+        const drying = calculateDryingPotential(ta, rh, vel);
+        const energy = calculateDailyThermalBalance(zoneConfig, ta);
+        const tStruct = updateStructureTemperature(nomPiece, ta);
 
         totalVolume += volume;
-        weightedTemp += data.ta * volume;
-        weightedRH += data.rh * volume;
+        weightedTemp += ta * volume;
+        weightedRH += rh * volume;
         weightedAH += ah * volume;
         weightedPMV += pmv * volume;
         weightedTStruct += tStruct * volume;
@@ -1280,11 +1266,9 @@ function calculateGlobalHabitatMetrics() {
 
     if (totalVolume === 0) return null;
 
-    // Calcul du séchage extérieur à partir des données météo globales
     const velExt = (outdoorWind || 0) / 3.6;
     const dryingOutdoor = calculateDryingPotential(outdoorTemp, outdoorHumidity, velExt);
 
-    // Moyenne pondérée du séchage intérieur
     const avgDryingIndoorIndex = weightedDryingIndex / totalVolume;
     const indoorDryingScore10 = (Math.min(100, Math.max(0, Math.round((avgDryingIndoorIndex / 1.8) * 100))) / 10).toFixed(1);
 
@@ -1331,11 +1315,11 @@ function mettreAJourTuile(nomPiece) {
 
     const isOutdoor = isOutdoorZone(nomPiece, zoneConfig);
 
-    const currentTa = (data && data.ta !== undefined) ? data.ta : (isOutdoor ? outdoorTemp : 0);
-    const currentRh = (data && data.rh !== undefined) ? data.rh : (isOutdoor ? outdoorHumidity : 0);
+    const currentTa = (data && (data.ta !== undefined ? data.ta : data.temperature)) ?? (isOutdoor ? outdoorTemp : 0);
+    const currentRh = (data && (data.rh !== undefined ? data.rh : data.humidity)) ?? (isOutdoor ? outdoorHumidity : 0);
 
-    if (tempEl) tempEl.textContent = currentTa.toFixed(1) + " °C";
-    if (humEl) humEl.textContent = currentRh.toFixed(0) + " %";
+    if (tempEl) tempEl.textContent = Number(currentTa).toFixed(1) + " °C";
+    if (humEl) humEl.textContent = Number(currentRh).toFixed(0) + " %";
 
     const ahEl = document.getElementById('ah-' + idCapteur);
     const dryingEl = document.getElementById('drying-' + idCapteur);
@@ -1376,13 +1360,13 @@ function mettreAJourTuile(nomPiece) {
     if (!data) return;
 
     const vel = calculateAirVelocity(zoneConfig, nomPiece);
-    const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
+    const tr = calculateMeanRadiantTemp(zoneConfig, currentTa);
     const { met, totalClo } = getBaseCloAndMet(zoneConfig);
 
-    const drying = calculateDryingPotential(data.ta, data.rh, vel);
-    const energyBalance = calculateDailyThermalBalance(zoneConfig, data.ta);
-    const tStruct = updateStructureTemperature(nomPiece, data.ta);
-    let pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
+    const drying = calculateDryingPotential(currentTa, currentRh, vel);
+    const energyBalance = calculateDailyThermalBalance(zoneConfig, currentTa);
+    const tStruct = updateStructureTemperature(nomPiece, currentTa);
+    let pmv = calculatePMV(currentTa, tr, vel, currentRh, met, totalClo);
 
     if (dryingEl) {
         dryingEl.innerHTML = `
@@ -1433,7 +1417,6 @@ function isHeatingSeasonActive() {
     if (forcedSeason === 'heating' || forcedSeason === 'ON') return true;
     if (forcedSeason === 'off' || forcedSeason === 'OFF') return false;
 
-    // Mode AUTO : bascule si la température extérieure moyenne du jour est < 15.5 °C
     const tDay = getDailyOutdoorTemp();
     return tDay < 15.5;
 }
@@ -1469,7 +1452,6 @@ function actualiserCockpitGlobal() {
 
     if (!metrics) return;
 
-    // Tooltip Volume au survol
     if (document.getElementById('global-volume-tooltip')) {
         document.getElementById('global-volume-tooltip').textContent = `${metrics.totalVolumeM3} m³`;
     }
@@ -1478,7 +1460,6 @@ function actualiserCockpitGlobal() {
     if (document.getElementById('global-avg-rh')) document.getElementById('global-avg-rh').textContent = `${metrics.avgRH}`;
     if (document.getElementById('global-avg-ah')) document.getElementById('global-avg-ah').textContent = `${metrics.avgAH} g/m³`;
 
-    // 1. CARTE CONFORT ("PMV :" explicitement écrit)
     const pmvValEl = document.getElementById('global-pmv-val');
     const pmvStatusEl = document.getElementById('global-pmv-status');
     const pmvSubtextEl = document.getElementById('global-pmv-subtext');
@@ -1514,7 +1495,6 @@ function actualiserCockpitGlobal() {
         }
     }
 
-    // 2. CARTE AIR & SÉCHAGE (Affichage strict des notes /10 sans texte statut)
     const descEl = document.getElementById('global-microclimate-desc');
     if (descEl) {
         if (metrics.avgRH > 62 || metrics.avgAH >= 12.0) {
@@ -1545,7 +1525,6 @@ function actualiserCockpitGlobal() {
         document.getElementById('global-drying-outdoor').textContent = `${metrics.outdoorDryingScore10}/10`;
     }
 
-    // 3. CARTE BILAN THERMIQUE
     const ephEl = document.getElementById('global-ephemeris');
     if (ephEl && window.solsticeEphemeris) {
         ephEl.textContent = `☀️ ${window.solsticeEphemeris.sunriseStr} ── 🌙 ${window.solsticeEphemeris.sunsetStr}`;
@@ -1572,7 +1551,6 @@ function actualiserCockpitGlobal() {
         document.getElementById('global-net-night').style.color = valNight >= 0 ? "#4ADE80" : "#F87171";
     }
 
-    // 4. CARTE INERTIE & MASSE
     const globalReserve = calculateStructureReserve(metrics.avgTStruct, metrics.avgTemp, metrics.totalVolumeM3);
 
     if (document.getElementById('global-tstruct')) {
@@ -1678,7 +1656,7 @@ window.geolocaliserMeteo = function() {
 
 function rechercherMeteoParNomVille(city) {
     if (!city || city === "Ma position") {
-        const savedLat = localStorage.setItem('SOLSTICE_LAT');
+        const savedLat = localStorage.getItem('SOLSTICE_LAT');
         const savedLon = localStorage.getItem('SOLSTICE_LON');
         if (savedLat && savedLon) {
             fetchOneCallWeather(parseFloat(savedLat), parseFloat(savedLon), localStorage.getItem('location') || 'Ma position');
@@ -1757,7 +1735,6 @@ function fetchOneCallWeather(lat, lon, cityName = 'Reims') {
             outdoorWind = (data.current.wind_speed * 3.6); 
             sunshineStatus = data.current.weather[0]?.main || 'Clouds'; 
             
-            // Stockage de l'éphéméride (Lever & Coucher du soleil)
             if (data.current.sunrise && data.current.sunset) {
                 const formatTime = (ts) => {
                     const d = new Date(ts * 1000);
