@@ -1044,10 +1044,6 @@ function updateStructureTemperature(nomPiece, currentTa) {
 }
 
 /**
- * Évaluation dynamique de la réserve thermique (Indépendante de la saison)
- * Mesure simultanément le Stock de Calories (chaud) et le Stock de Frigories (frais).
- */
-/**
  * Évaluation dynamique de l'inertie : Flux (kW), Autonomie (h) et Consigne d'action
  */
 function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
@@ -1055,7 +1051,6 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
     const diffAbs = Math.abs(deltaFlux).toFixed(1);
 
     // 1. Calcul de la puissance d'échange surfacique approximative (kW)
-    // Échange superficiel intérieur moyen ~ 17 W/(m³·K)
     const fluxPowerKw = (totalVolumeM3 * 17 * deltaFlux) / 1000;
     const absPowerKw = Math.abs(fluxPowerKw).toFixed(2);
 
@@ -1073,91 +1068,78 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
         fluxColor = "#4ADE80";
     }
 
-// 2. Calcul de l'autonomie thermique estimée (maintien > 19 °C)
-// On utilise la température extérieure instantanée (outdoorTemp)
-const deltaExt = tAir - outdoorTemp; // ex: 22.1 - 21.0 = 1.1 °C
-let autonomyHours = 0;
+    // 2. Calcul de l'autonomie thermique estimée (maintien > 19 °C)
+    const deltaExt = tAir - outdoorTemp; 
+    let autonomyHours = 0;
 
-if (tAir > 19.0 && deltaExt > 0.1) {
-    const deltaMarge = Math.max(0, tStruct - 19.0); // ex: 21.4 - 19.0 = 2.4 °C
-    const tauMoyen = 18.0; // Constante de temps
-    autonomyHours = (tauMoyen * deltaMarge) / deltaExt;
-}
-
-// Dans calculateStructureReserve() de engine.js
-
-// 1. Récupération du profil utilisateur (court_term, mid_term, long_term)
-const rawConfig = localStorage.getItem('HOUSE_CONFIG');
-const houseConfig = rawConfig ? JSON.parse(rawConfig) : {};
-const profileKey = houseConfig.global?.profile || localStorage.getItem('SOLSTICE_PROFILE') || 'mid_term';
-
-// 2. Extrêmes et tendance météo
-let tMax = outdoorTemp;
-let tMin = outdoorTemp;
-if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length > 0) {
-    const temps = window.hourlyExtForecast.map(s => s.temp);
-    tMax = Math.max(...temps);
-    tMin = Math.min(...temps);
-}
-
-const mursChauds = tStruct > 22.5;
-const mursFroids = tStruct < 19.5;
-
-// 3. Définition des seuils de décision selon le profil
-let actionText = "";
-
-if (profileKey === 'short_term') {
-    // --- VISION COURT TERMISTE (0h - 12h) ---
-    // Priorité au confort immédiat : réaction directe à la température instantanée
-    if (outdoorTemp > 25.0) {
-        actionText = "🛡️ Préserver fraîcheur";
-    } else if (outdoorTemp < 18.0) {
-        actionText = "☀️ Stocker chaleur";
-    } else {
-        actionText = "⚖️ Maintenir équilibre";
+    if (tAir > 19.0 && deltaExt > 0.1) {
+        const deltaMarge = Math.max(0, tStruct - 19.0);
+        const tauMoyen = 18.0; 
+        autonomyHours = (tauMoyen * deltaMarge) / deltaExt;
     }
 
-} else if (profileKey === 'long_term') {
-    // --- VISION LONG TERMISTE (24h - 72h) ---
-    // Si les nuits de la période tombent sous 14 °C ou hors saison douce, 
-    // l'objectif prioritaire est de charger la masse avant le rafraîchissement.
-    
-    const nuitsFraichesAvenir = tMin < 14.0 || isHeatingSeasonActive();
+    // 3. Récupération du profil utilisateur & extrêmes météo
+    const rawConfig = localStorage.getItem('HOUSE_CONFIG');
+    const houseConfig = rawConfig ? JSON.parse(rawConfig) : {};
+    const profileKey = houseConfig.global?.profile || localStorage.getItem('SOLSTICE_PROFILE') || 'mid_term';
 
-    if (nuitsFraichesAvenir) {
-        actionText = (tStruct <= 22.0) ? "☀️ Anticiper & stocker" : "🛡️ Conserver chaleur";
-    } else if (mursChauds) {
-        actionText = "🌙 Décharger chaleur";
-    } else {
-        actionText = "⚖️ Maintenir équilibre";
+    let tMax = outdoorTemp;
+    let tMin = outdoorTemp;
+    if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length > 0) {
+        const temps = window.hourlyExtForecast.map(s => s.temp);
+        tMax = Math.max(...temps);
+        tMin = Math.min(...temps);
     }
-}
 
-} else {
-    // --- VISION MOYEN TERMISTE (MOYENNE 24H - PAR DÉFAUT) ---
-    const picChaleurPonctuel = tMax >= 25.0 && tMin < 17.0;
-    const journeeTresChaude = tMax >= 26.0 && tMin >= 17.0;
+    const mursChauds = tStruct > 22.5;
+    const mursFroids = tStruct < 19.5;
 
-    if (mursChauds) {
-        actionText = journeeTresChaude ? "🌙 Décharger chaleur" : "🛡️ Conserver chaleur";
-    } else if (mursFroids) {
-        actionText = "☀️ Stocker chaleur";
-    } else {
-        if (picChaleurPonctuel) {
+    let actionText = "";
+
+    if (profileKey === 'short_term') {
+        // --- VISION COURT TERMISTE (0h - 12h) ---
+        if (outdoorTemp > 25.0) {
             actionText = "🛡️ Préserver fraîcheur";
-        } else if (journeeTresChaude) {
-            actionText = "🌙 Stocker fraîcheur";
+        } else if (outdoorTemp < 18.0) {
+            actionText = "☀️ Stocker chaleur";
         } else {
             actionText = "⚖️ Maintenir équilibre";
         }
+    } else if (profileKey === 'long_term') {
+        // --- VISION LONG TERMISTE (24h - 72h) ---
+        const nuitsFraichesAvenir = tMin < 14.0 || isHeatingSeasonActive();
+
+        if (nuitsFraichesAvenir) {
+            actionText = (tStruct <= 22.0) ? "☀️ Anticiper & stocker" : "🛡️ Conserver chaleur";
+        } else if (mursChauds) {
+            actionText = "🌙 Décharger chaleur";
+        } else {
+            actionText = "⚖️ Maintenir équilibre";
+        }
+    } else {
+        // --- VISION MOYEN TERMISTE (MOYENNE 24H - PAR DÉFAUT) ---
+        const picChaleurPonctuel = tMax >= 25.0 && tMin < 17.0;
+        const journeeTresChaude = tMax >= 26.0 && tMin >= 17.0;
+
+        if (mursChauds) {
+            actionText = journeeTresChaude ? "🌙 Décharger chaleur" : "🛡️ Conserver chaleur";
+        } else if (mursFroids) {
+            actionText = "☀️ Stocker chaleur";
+        } else {
+            if (picChaleurPonctuel) {
+                actionText = "🛡️ Préserver fraîcheur";
+            } else if (journeeTresChaude) {
+                actionText = "🌙 Stocker fraîcheur";
+            } else {
+                actionText = "⚖️ Maintenir équilibre";
+            }
+        }
     }
-}
     
-    // (Optionnel) Ajout d'une couleur d'accentuation en fonction de l'action
-    let actionColor = "#F8FAFC"; // Blanc par défaut
-    if (actionText.includes("Stocker") || actionText.includes("Conserver")) actionColor = "#4ADE80"; // Vert
-    if (actionText.includes("Décharger")) actionColor = "#38BDF8"; // Bleu
-    if (actionText.includes("équilibre")) actionColor = "#94A3B8"; // Gris clair
+    let actionColor = "#F8FAFC";
+    if (actionText.includes("Stocker") || actionText.includes("Conserver")) actionColor = "#4ADE80";
+    if (actionText.includes("Décharger")) actionColor = "#38BDF8";
+    if (actionText.includes("équilibre")) actionColor = "#94A3B8";
 
     return {
         tStruct: parseFloat(tStruct.toFixed(1)),
@@ -1180,7 +1162,6 @@ function calculateGlobalHabitatMetrics() {
     let weightedAH = 0;
     let weightedPMV = 0;
     let weightedTStruct = 0;
-    let weightedChargePct = 0;
 
     let totalDeperditionsKw = 0;
     let totalGainsConductionKw = 0;
@@ -1208,7 +1189,6 @@ function calculateGlobalHabitatMetrics() {
         const energy = calculateDailyThermalBalance(zoneConfig, data.ta);
 
         const tStruct = updateStructureTemperature(nomPiece, data.ta);
-        const reserve = calculateStructureReserve(tStruct, data.ta);
 
         totalVolume += volume;
         weightedTemp += data.ta * volume;
@@ -1216,7 +1196,6 @@ function calculateGlobalHabitatMetrics() {
         weightedAH += ah * volume;
         weightedPMV += pmv * volume;
         weightedTStruct += tStruct * volume;
-        weightedChargePct += reserve.chargePercent * volume;
 
         totalDeperditionsKw += energy.depKw;
         totalGainsConductionKw += energy.gainsConductionKw;
@@ -1232,7 +1211,6 @@ function calculateGlobalHabitatMetrics() {
         avgAH: parseFloat((weightedAH / totalVolume).toFixed(2)),
         avgPMV: parseFloat((weightedPMV / totalVolume).toFixed(2)),
         avgTStruct: parseFloat((weightedTStruct / totalVolume).toFixed(1)),
-        avgChargePct: Math.round(weightedChargePct / totalVolume),
         totalDeperditionsKw: parseFloat(totalDeperditionsKw.toFixed(2)),
         totalGainsConductionKw: parseFloat(totalGainsConductionKw.toFixed(2)),
         totalGainsSolairesKw: parseFloat(totalGainsSolairesKw.toFixed(2)),
@@ -1439,8 +1417,6 @@ function actualiserCockpitGlobal() {
         netEl.style.color = metrics.totalBilanNetKwh >= 0 ? "#4ADE80" : "#F87171";
     }
 
-    // Réserve et inertie globales agnostiques
-// --- Mettre à jour dans actualiserCockpitGlobal() ---
     const globalReserve = calculateStructureReserve(metrics.avgTStruct, metrics.avgTemp, metrics.totalVolumeM3);
 
     if (document.getElementById('global-tstruct')) {
@@ -1453,25 +1429,24 @@ function actualiserCockpitGlobal() {
         fluxPowerEl.style.color = globalReserve.fluxColor;
     }
 
-const autonomyEl = document.getElementById('global-autonomy');
-if (autonomyEl) {
-    if (globalReserve.autonomyHours > 0) {
-        autonomyEl.textContent = `~${globalReserve.autonomyHours} h`;
-    } else if (metrics.avgTemp <= 19.0) {
-        autonomyEl.textContent = "N/A (T° ≤ 19°C)";
-    } else {
-        autonomyEl.textContent = "N/A (Pas de déperdition)";
+    const autonomyEl = document.getElementById('global-autonomy');
+    if (autonomyEl) {
+        if (globalReserve.autonomyHours > 0) {
+            autonomyEl.textContent = `~${globalReserve.autonomyHours} h`;
+        } else if (metrics.avgTemp <= 19.0) {
+            autonomyEl.textContent = "N/A (T° ≤ 19°C)";
+        } else {
+            autonomyEl.textContent = "N/A (Pas de déperdition)";
+        }
+    }
+
+    const actionEl = document.getElementById('global-reserve-action');
+    if (actionEl) {
+        actionEl.textContent = globalReserve.actionText;
+        actionEl.style.color = globalReserve.actionColor; 
     }
 }
 
-const actionEl = document.getElementById('global-reserve-action');
-    if (actionEl) {
-        actionEl.textContent = globalReserve.actionText;
-        // Si tu as gardé la variable actionColor dans le return de calculateStructureReserve :
-        actionEl.style.color = globalReserve.actionColor; 
-    }
-// *(N'oublie pas d'ajouter `actionColor` dans le `return { ... }` à la fin de `calculateStructureReserve` si tu utilises la couleur !)
-}
 function recalculerToutLeDashboard() { 
     for (const nomPiece of SELECTION_PIECES) { 
         mettreAJourTuile(nomPiece); 
