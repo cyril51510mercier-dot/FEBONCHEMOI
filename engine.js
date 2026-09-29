@@ -1084,35 +1084,47 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
         autonomyHours = (tauMoyen * deltaMarge) / deltaPerte;
     }
 
-    // 3. Action comportementale recommandée
-    let actionText = "⚖️ Inertie stable";
-    const isHeating = isHeatingSeasonActive();
-    const isSunny = (localStorage.getItem('sunshineStatus') || '').toLowerCase().includes('clear') || 
-                    (localStorage.getItem('sunshineStatus') || '').toLowerCase().includes('sun');
+// 3. Action comportementale recommandée (7 scénarios)
+    let actionText = "";
+    
+    // Tendance météo moyenne (basée sur les prévisions de la journée)
+    const tDay = getDailyOutdoorTemp(); 
+    
+    // Seuils d'évaluation arbitraires (ajustables selon ton bâti)
+    const mursChauds = tStruct > 22.0;
+    const mursFroids = tStruct < 20.0;
+    
+    const meteoChaude = tDay > 22.0;
+    const meteoFroide = tDay < 18.0;
 
-    if (isHeating) {
-        if (tStruct < 19.0 && isSunny) {
-            actionText = "☀️ Ouvrir pour charger les murs";
-        } else if (tStruct >= 20.0 && deltaFlux > 0.3) {
-            actionText = "🔥 Murs actifs : chauffage modulable";
-        } else if (tStruct < 18.5) {
-            actionText = "⚠️ Relancer le chauffage (Murs froids)";
-        }
-    } else { // Hors saison de chauffe / Été
-        if (tExt < tAir && deltaFlux > 0.3) {
-            actionText = "🌙 Surventiler pour décharger la chaleur";
-        } else if (tExt > tAir && tStruct < 23.0) {
-            actionText = "🛡️ Fermer les volets : stocker le frais";
-        } else if (tStruct >= 25.0) {
-            actionText = "🚨 Surchauffe structurelle active";
+    // Logique croisée : État de la masse VS Météo à venir
+    if (mursChauds) {
+        actionText = meteoChaude ? "🌙 Décharger chaleur" : "🛡️ Conserver chaleur";
+    } else if (mursFroids) {
+        actionText = meteoChaude ? "🛡️ Conserver fraîcheur" : "☀️ Stocker chaleur";
+    } else { 
+        // Murs à l'équilibre (entre 20.0 et 22.0 °C)
+        if (meteoFroide) {
+            actionText = "☀️ Stocker chaleur";
+        } else if (meteoChaude) {
+            actionText = "🌙 Stocker fraîcheur";
+        } else {
+            actionText = "⚖️ Maintenir équilibre";
         }
     }
+    
+    // (Optionnel) Ajout d'une couleur d'accentuation en fonction de l'action
+    let actionColor = "#F8FAFC"; // Blanc par défaut
+    if (actionText.includes("Stocker") || actionText.includes("Conserver")) actionColor = "#4ADE80"; // Vert
+    if (actionText.includes("Décharger")) actionColor = "#38BDF8"; // Bleu
+    if (actionText.includes("équilibre")) actionColor = "#94A3B8"; // Gris clair
 
     return {
         tStruct: parseFloat(tStruct.toFixed(1)),
         fluxPowerKw: parseFloat(fluxPowerKw.toFixed(2)),
         fluxStatusText,
         fluxColor,
+        actionColor,
         autonomyHours: parseFloat(autonomyHours.toFixed(1)),
         actionText
     };
@@ -1408,10 +1420,13 @@ function actualiserCockpitGlobal() {
             : "N/A (T° < 19°C)";
     }
 
-    const actionEl = document.getElementById('global-reserve-action');
+const actionEl = document.getElementById('global-reserve-action');
     if (actionEl) {
         actionEl.textContent = globalReserve.actionText;
+        // Si tu as gardé la variable actionColor dans le return de calculateStructureReserve :
+        actionEl.style.color = globalReserve.actionColor; 
     }
+// *(N'oublie pas d'ajouter `actionColor` dans le `return { ... }` à la fin de `calculateStructureReserve` si tu utilises la couleur !)
 }
 function recalculerToutLeDashboard() { 
     for (const nomPiece of SELECTION_PIECES) { 
