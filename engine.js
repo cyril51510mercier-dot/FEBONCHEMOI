@@ -1119,29 +1119,19 @@ if (profileKey === 'short_term') {
 
 } else if (profileKey === 'long_term') {
     // --- VISION LONG TERMISTE (24h - 72h) ---
-    // L'inertie est gérée comme un réservoir stratégique.
-    // Si une baisse importante arrive après le pic (ex: passage de 27°C à 21°C / 9°C),
-    // on évite de purger la masse si elle est encore acceptable.
+    // Si les nuits de la période tombent sous 14 °C ou hors saison douce, 
+    // l'objectif prioritaire est de charger la masse avant le rafraîchissement.
     
-    const chuteThermiqueAvenir = (tMax - tMin) > 10.0 || tMin < 12.0;
+    const nuitsFraichesAvenir = tMin < 14.0 || isHeatingSeasonActive();
 
-    if (mursChauds) {
-        if (chuteThermiqueAvenir) {
-            // Le froid arrive bientôt : on conserve la chaleur accumulée malgré le pic actuel
-            actionText = "🛡️ Conserver chaleur";
-        } else {
-            actionText = "🌙 Décharger chaleur";
-        }
-    } else if (mursFroids) {
-        actionText = "☀️ Stocker chaleur";
+    if (nuitsFraichesAvenir) {
+        actionText = (tStruct <= 22.0) ? "☀️ Anticiper & stocker" : "🛡️ Conserver chaleur";
+    } else if (mursChauds) {
+        actionText = "🌙 Décharger chaleur";
     } else {
-        // Murs à l'équilibre
-        if (chuteThermiqueAvenir || isHeatingSeasonActive()) {
-            actionText = "☀️ Anticiper & stocker";
-        } else {
-            actionText = "⚖️ Maintenir équilibre";
-        }
+        actionText = "⚖️ Maintenir équilibre";
     }
+}
 
 } else {
     // --- VISION MOYEN TERMISTE (MOYENNE 24H - PAR DÉFAUT) ---
