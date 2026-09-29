@@ -1,4 +1,4 @@
-const CACHE_NAME = 'solstice-v5';
+const CACHE_NAME = 'solstice-v6';
 const ASSETS = [
   './',
   './index.html',
