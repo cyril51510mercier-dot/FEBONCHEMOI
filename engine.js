@@ -432,8 +432,8 @@ function getRoomMetric(nomPiece, colIndex) {
     const statusEl = document.getElementById('status-' + idCapteur);
     if (colIndex === 1) return statusEl ? statusEl.textContent : '';
 
-    const ta = isOutdoor ? outdoorTemp : (data?.ta || 0);
-    const rh = isOutdoor ? outdoorHumidity : (data?.rh || 0);
+    const ta = (data && data.ta !== undefined) ? data.ta : (isOutdoor ? outdoorTemp : 0);
+    const rh = (data && data.rh !== undefined) ? data.rh : (isOutdoor ? outdoorHumidity : 0);
 
     if (colIndex === 2) return ta;
     if (colIndex === 3) return rh;
@@ -445,7 +445,7 @@ function getRoomMetric(nomPiece, colIndex) {
 
     if (colIndex === 5) return isOutdoor ? -999 : calculatePMV(ta, tr, vel, rh, met, totalClo);
     if (colIndex === 6) return isOutdoor ? -999 : calculateDailyThermalBalance(zoneConfig, ta).bilanNetkWh;
-    if (colIndex === 7) return isOutdoor ? -999 : (nomPiece, ta);
+    if (colIndex === 7) return isOutdoor ? -999 : ta;
     if (colIndex === 8) return calculateDryingPotential(ta, rh, vel).dryingIndex;
 
     return 0;
@@ -1203,8 +1203,8 @@ function mettreAJourTuile(nomPiece) {
 
     const isOutdoor = isOutdoorZone(nomPiece, zoneConfig);
 
-    const currentTa = isOutdoor ? outdoorTemp : (data?.ta || 0);
-    const currentRh = isOutdoor ? outdoorHumidity : (data?.rh || 0);
+    const currentTa = (data && data.ta !== undefined) ? data.ta : (isOutdoor ? outdoorTemp : 0);
+    const currentRh = (data && data.rh !== undefined) ? data.rh : (isOutdoor ? outdoorHumidity : 0);
 
     if (tempEl) tempEl.textContent = currentTa.toFixed(1) + " °C";
     if (humEl) humEl.textContent = currentRh.toFixed(0) + " %";
@@ -1230,7 +1230,7 @@ function mettreAJourTuile(nomPiece) {
         }
 
         const velExt = outdoorWind / 3.6;
-        const dryingExt = calculateDryingPotential(outdoorTemp, outdoorHumidity, velExt);
+        const dryingExt = calculateDryingPotential(currentTa, currentRh, velExt);
         if (dryingEl) {
             dryingEl.innerHTML = `
                 <div style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
