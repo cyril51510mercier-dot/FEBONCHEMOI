@@ -805,7 +805,7 @@ function calculateDryingPotential(ta, rh, vel = 0.1) {
 
 function calculateDailyThermalBalance(zoneConfig, ta) {
     if (!zoneConfig || (Array.isArray(zoneConfig.usages) && zoneConfig.usages.includes('outdoor'))) {
-        return { hTotalWPerK: 0, deperditionskWh: 0, gainsConductionkWh: 0, gainsSolaireskWh: 0, gainsTotauxkWh: 0, bilanNetkWh: 0, depKw: 0, gainsConductionKw: 0, gainsSolairesKw: 0 };
+        return { hTotalWPerK: 0, deperditionskWh: 0, gainsConductionkWh: 0, gainsSolaireskWh: 0, gainsTotauxkWh: 0, bilanNetkWh: 0, bilanDiurnekWh: 0, bilanNocturnekWh: 0, depKw: 0, gainsConductionKw: 0, gainsSolairesKw: 0 };
     }
 
     const area = parseFloat(zoneConfig.area) || 15;
@@ -892,14 +892,24 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     let deperditionskWh = 0;
     let gainsConductionkWh = 0;
     let gainsSolaireskWh = 0;
+    
+    let bilanDiurnekWh = 0;
+    let bilanNocturnekWh = 0;
+
+    const sunriseH = window.solsticeEphemeris?.sunriseHour || 7;
+    const sunsetH = window.solsticeEphemeris?.sunsetHour || 19;
 
     if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length === 24) {
         window.hourlyExtForecast.forEach(slot => {
             const tExtHour = slot.temp;
+            let depHour = 0;
+            let gainsCondHour = 0;
+            let gainsSolHour = 0;
+
             if (ta > tExtHour) {
-                deperditionskWh += (hTotal * (ta - tExtHour)) / 1000;
+                depHour = (hTotal * (ta - tExtHour)) / 1000;
             } else {
-                gainsConductionkWh += (hTotal * (tExtHour - ta)) / 1000;
+                gainsCondHour = (hTotal * (tExtHour - ta)) / 1000;
             }
 
             if (slot.isSunny && Array.isArray(zoneConfig.windows)) {
@@ -916,14 +926,29 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
                     orients.forEach(o => { sumI += (orientMap[o] || 1.5); });
                     let iSolar = orients.length > 0 ? (sumI / orients.length) : 1.5;
 
-                    gainsSolaireskWh += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 12));
+                    gainsSolHour += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 12));
                 });
+            }
+
+            deperditionskWh += depHour;
+            gainsConductionkWh += gainsCondHour;
+            gainsSolaireskWh += gainsSolHour;
+
+            const netHour = (gainsCondHour + gainsSolHour) - depHour;
+            
+            // Ventilation diurne (soleil levé) vs nocturne (soleil couché)
+            if (slot.hour >= sunriseH && slot.hour < sunsetH) {
+                bilanDiurnekWh += netHour;
+            } else {
+                bilanNocturnekWh += netHour;
             }
         });
     } else {
         deperditionskWh = depKw * 24;
         gainsConductionkWh = gainsConductionKw * 24;
         gainsSolaireskWh = gainsSolairesKw * 24;
+        bilanDiurnekWh = (gainsConductionKw + gainsSolairesKw - depKw) * 12;
+        bilanNocturnekWh = (gainsConductionKw - depKw) * 12;
     }
 
     const gainsTotauxkWh = gainsSolaireskWh + gainsConductionkWh;
@@ -938,7 +963,9 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
         gainsConductionkWh: parseFloat(gainsConductionkWh.toFixed(2)),
         gainsSolaireskWh: parseFloat(gainsSolaireskWh.toFixed(2)),
         gainsTotauxkWh: parseFloat(gainsTotauxkWh.toFixed(2)),
-        bilanNetkWh: parseFloat(bilanNetkWh.toFixed(2))
+        bilanNetkWh: parseFloat(bilanNetkWh.toFixed(2)),
+        bilanDiurnekWh: parseFloat(bilanDiurnekWh.toFixed(2)),
+        bilanNocturnekWh: parseFloat(bilanNocturnekWh.toFixed(2))
     };
 }
 
@@ -1177,6 +1204,10 @@ function calculateGlobalHabitatMetrics() {
     let totalGainsSolairesKw = 0;
     let totalBilanNetKwh = 0;
 
+    // 1. DÉCLARATION DES ACCUMULATEURS DIURNE / NOCTURNE
+    let totalBilanDiurnekWh = 0;
+    let totalBilanNocturnekWh = 0;
+
     for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
         if (!data || isNaN(data.ta) || isNaN(data.rh)) continue;
         if (!SELECTION_PIECES.includes(nomPiece)) continue;
@@ -1195,6 +1226,8 @@ function calculateGlobalHabitatMetrics() {
         const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
         const { met, totalClo } = getBaseCloAndMet(zoneConfig);
         const pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
+        
+        // Bilan de la pièce
         const energy = calculateDailyThermalBalance(zoneConfig, data.ta);
 
         const tStruct = updateStructureTemperature(nomPiece, data.ta);
@@ -1210,10 +1243,15 @@ function calculateGlobalHabitatMetrics() {
         totalGainsConductionKw += energy.gainsConductionKw;
         totalGainsSolairesKw += energy.gainsSolairesKw;
         totalBilanNetKwh += energy.bilanNetkWh;
+
+        // 2. SOMME DES VALEURS POUR CHAQUE PIÈCE
+        totalBilanDiurnekWh += energy.bilanDiurnekWh;
+        totalBilanNocturnekWh += energy.bilanNocturnekWh;
     }
 
     if (totalVolume === 0) return null;
 
+    // 3. RETOUR DES TOTAUX ARRONDIS
     return {
         avgTemp: parseFloat((weightedTemp / totalVolume).toFixed(1)),
         avgRH: parseFloat((weightedRH / totalVolume).toFixed(0)),
@@ -1224,6 +1262,8 @@ function calculateGlobalHabitatMetrics() {
         totalGainsConductionKw: parseFloat(totalGainsConductionKw.toFixed(2)),
         totalGainsSolairesKw: parseFloat(totalGainsSolairesKw.toFixed(2)),
         totalBilanNetKwh: parseFloat(totalBilanNetKwh.toFixed(2)),
+        totalBilanDiurnekWh: parseFloat(totalBilanDiurnekWh.toFixed(2)),
+        totalBilanNocturnekWh: parseFloat(totalBilanNocturnekWh.toFixed(2)),
         totalVolumeM3: parseFloat(totalVolume.toFixed(1))
     };
 }
@@ -1391,11 +1431,40 @@ function actualiserCockpitGlobal() {
 
     if (!metrics) return;
 
-    if (document.getElementById('global-volume-badge')) document.getElementById('global-volume-badge').textContent = `Volume : ${metrics.totalVolumeM3} m³`;
+    // Tooltip Volume au survol
+    if (document.getElementById('global-volume-tooltip')) {
+        document.getElementById('global-volume-tooltip').textContent = `${metrics.totalVolumeM3} m³`;
+    }
+
     if (document.getElementById('global-avg-temp')) document.getElementById('global-avg-temp').textContent = `${metrics.avgTemp} °C`;
     if (document.getElementById('global-avg-rh')) document.getElementById('global-avg-rh').textContent = `${metrics.avgRH} %`;
     if (document.getElementById('global-avg-ah')) document.getElementById('global-avg-ah').textContent = `${metrics.avgAH} g/m³`;
 
+    // Qualificatif textuel du microclimat
+    const descEl = document.getElementById('global-microclimate-desc');
+    if (descEl) {
+        if (metrics.avgRH > 62 || metrics.avgAH >= 12.0) {
+            descEl.textContent = "💧 Atmosphère lourde & chargée en humidité";
+            descEl.style.color = "#38BDF8";
+        } else if (metrics.avgTemp < 19.0 && metrics.avgRH > 60) {
+            descEl.textContent = "❄️ Ambiance fraîche & moite";
+            descEl.style.color = "#93C5FD";
+        } else if (metrics.avgTemp < 19.0 && metrics.avgRH < 40) {
+            descEl.textContent = "🌵 Air sec & frais";
+            descEl.style.color = "#FDBA74";
+        } else if (metrics.avgTemp > 23.0 && metrics.avgRH < 40) {
+            descEl.textContent = "☀️ Chaleur sèche";
+            descEl.style.color = "#F59E0B";
+        } else if (metrics.avgTemp >= 19.0 && metrics.avgTemp <= 23.0 && metrics.avgRH >= 40 && metrics.avgRH <= 60) {
+            descEl.textContent = "🍃 Atmosphère douce & équilibrée";
+            descEl.style.color = "#4ADE80";
+        } else {
+            descEl.textContent = "📊 Microclimat stable";
+            descEl.style.color = "#94A3B8";
+        }
+    }
+
+    // PMV
     const pmvValEl = document.getElementById('global-pmv-val');
     const pmvStatusEl = document.getElementById('global-pmv-status');
     if (pmvValEl) pmvValEl.textContent = (metrics.avgPMV > 0 ? "+" : "") + metrics.avgPMV.toFixed(2);
@@ -1416,16 +1485,37 @@ function actualiserCockpitGlobal() {
         }
     }
 
+    // Éphéméride
+    const ephEl = document.getElementById('global-ephemeris');
+    if (ephEl && window.solsticeEphemeris) {
+        ephEl.textContent = `☀️ ${window.solsticeEphemeris.sunriseStr} • 🌙 ${window.solsticeEphemeris.sunsetStr}`;
+    }
+
+    // Puissances Instant T
     if (document.getElementById('global-gains-ext')) document.getElementById('global-gains-ext').textContent = `+${metrics.totalGainsConductionKw} kW`;
     if (document.getElementById('global-dep')) document.getElementById('global-dep').textContent = `-${metrics.totalDeperditionsKw} kW`;
     if (document.getElementById('global-gains-sol')) document.getElementById('global-gains-sol').textContent = `+${metrics.totalGainsSolairesKw} kW`;
     
+    // Projection 00h - 24h
+    if (document.getElementById('global-net-day')) {
+        const valDay = metrics.totalBilanDiurnekWh;
+        document.getElementById('global-net-day').textContent = `${valDay > 0 ? '+' : ''}${valDay} kWh`;
+        document.getElementById('global-net-day').style.color = valDay >= 0 ? "#4ADE80" : "#F87171";
+    }
+
+    if (document.getElementById('global-net-night')) {
+        const valNight = metrics.totalBilanNocturnekWh;
+        document.getElementById('global-net-night').textContent = `${valNight > 0 ? '+' : ''}${valNight} kWh`;
+        document.getElementById('global-net-night').style.color = valNight >= 0 ? "#4ADE80" : "#F87171";
+    }
+
     const netEl = document.getElementById('global-net');
     if (netEl) {
         netEl.textContent = `${metrics.totalBilanNetKwh > 0 ? '+' : ''}${metrics.totalBilanNetKwh} kWh/j`;
         netEl.style.color = metrics.totalBilanNetKwh >= 0 ? "#4ADE80" : "#F87171";
     }
 
+    // Inertie & Réserve
     const globalReserve = calculateStructureReserve(metrics.avgTStruct, metrics.avgTemp, metrics.totalVolumeM3);
 
     if (document.getElementById('global-tstruct')) {
