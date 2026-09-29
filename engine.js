@@ -580,9 +580,18 @@ function getDailyOutdoorTemp() {
 
 function getBaseCloAndMet(zoneConfig) {
     let met = 1.2; 
+    const currentHour = new Date().getHours();
     
-    const tDay = getDailyOutdoorTemp();
-    let baseClo = Math.max(0.35, Math.min(1.30, 1.20 - 0.035 * (tDay - 5)));
+    // Découpage diurne : Après-midi (11h-18h) vs Matin/Soir (22h-11h)
+    let tRefClo = outdoorTemp;
+    if (currentHour >= 11 && currentHour < 18) {
+        // En après-midi : prise en compte du pic de chaleur prévisionnel
+        if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length > 0) {
+            tRefClo = Math.max(...window.hourlyExtForecast.map(s => s.temp));
+        }
+    }
+
+    let baseClo = Math.max(0.35, Math.min(1.30, 1.20 - 0.035 * (tRefClo - 5)));
 
     if (zoneConfig && Array.isArray(zoneConfig.usages)) {
         if (zoneConfig.usages.includes('kitchen')) met = 1.6;
@@ -1586,6 +1595,20 @@ function fetchOneCallWeather(lat, lon, cityName = 'Reims') {
             outdoorWind = (data.current.wind_speed * 3.6); 
             sunshineStatus = data.current.weather[0]?.main || 'Clouds'; 
             
+            // Stockage de l'éphéméride (Lever & Coucher du soleil)
+            if (data.current.sunrise && data.current.sunset) {
+                const formatTime = (ts) => {
+                    const d = new Date(ts * 1000);
+                    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                };
+                window.solsticeEphemeris = {
+                    sunriseStr: formatTime(data.current.sunrise),
+                    sunsetStr: formatTime(data.current.sunset),
+                    sunriseHour: new Date(data.current.sunrise * 1000).getHours(),
+                    sunsetHour: new Date(data.current.sunset * 1000).getHours()
+                };
+            }
+
             if (Array.isArray(data.hourly)) {
                 window.hourlyExtForecast = processOneCallHourlyForecast(data.hourly);
                 localStorage.setItem('SOLSTICE_HOURLY_FORECAST', JSON.stringify(window.hourlyExtForecast));
