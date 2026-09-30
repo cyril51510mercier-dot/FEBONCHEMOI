@@ -63,21 +63,28 @@
         <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
             
             <!-- Météo Extérieure Déroulante -->
-            <details id="weather-accordion" style="background: white; border-radius: 12px; padding: 14px 18px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                <summary style="cursor: pointer; font-weight: 700; font-size: 0.9rem; color: #0F172A; display: flex; justify-content: space-between; align-items: center; list-style: none;">
-                    <span>🌍 Conditions Extérieures : <span id="summary-city-name" style="color: #D96B43;">Reims</span></span>
-                    <span style="font-size: 0.8rem; color: #64748B;">⚙️ Modifier ▾</span>
-                </summary>
-                
-                <div style="margin-top: 12px; border-top: 1px solid #F1F5F9; padding-top: 12px;">
-                    <div style="display: flex; gap: 8px;">
-                        <input type="text" id="location" placeholder="Ex: Reims" aria-label="Ville" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #CBD5E1; font-size: 0.88rem;">
-                        <button id="getWeatherButton" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 8px 12px; cursor: pointer;" title="Rechercher" onclick="rechercherMeteo()">🔍</button> 
-                        <button id="geoLocateButton" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 0.85rem; font-weight: 600;" onclick="geolocaliserMeteo()">📍 Géolocaliser</button>
-                    </div>
-                    <div id="weatherSummary" style="margin-top: 10px; font-size: 0.88rem; font-weight: 600; color: #1E293B; min-height: 20px;"></div>
-                </div>
-            </details>
+<details id="weather-accordion" style="background: white; border-radius: 12px; padding: 14px 18px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <summary style="cursor: pointer; font-weight: 700; font-size: 0.9rem; color: #0F172A; display: flex; justify-content: space-between; align-items: center; list-style: none; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <span>🌍 <span id="summary-city-name" style="color: #D96B43;">Reims</span></span>
+            <!-- Météo toujours visible dans le titre (accordéon fermé) -->
+            <span id="summary-weather-inline" style="font-weight: 600; color: #0284C7; font-size: 0.85rem; background: #F1F5F9; padding: 3px 10px; border-radius: 6px;">
+                🌡️️ -- °C | 💧 --%
+            </span>
+        </div>
+        <span style="font-size: 0.8rem; color: #64748B;">⚙️ Modifier ▾</span>
+    </summary>
+    
+    <div style="margin-top: 12px; border-top: 1px solid #F1F5F9; padding-top: 12px;">
+        <div style="display: flex; gap: 8px;">
+            <input type="text" id="location" placeholder="Ex: Reims" aria-label="Ville" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #CBD5E1; font-size: 0.88rem;">
+            <button id="getWeatherButton" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 8px 12px; cursor: pointer;" title="Rechercher" onclick="rechercherMeteo()">🔍</button> 
+            <button id="geoLocateButton" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 0.85rem; font-weight: 600;" onclick="geolocaliserMeteo()">📍 Géolocaliser</button>
+        </div>
+        <!-- Encart météo avec fond sombre et texte blanc lisible -->
+        <div id="weatherSummary" style="margin-top: 10px; font-size: 0.88rem; font-weight: 600; color: #F8FAFC; background: #0F172A; padding: 8px 12px; border-radius: 6px; min-height: 20px;"></div>
+    </div>
+</details>
 
             <!-- Isolation Corporelle Déroulante -->
             <details id="clothing-accordion" style="background: white; border-radius: 12px; padding: 14px 18px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
