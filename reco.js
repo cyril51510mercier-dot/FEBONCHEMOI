@@ -616,56 +616,80 @@ document.addEventListener('DOMContentLoaded', function() {
             const selectedZone = zoneSelect ? zoneSelect.value : currentZoneId;
             const zonesMap = getAvailableZonesMap();
 
-// alignement strict avec la Synthèse Globale (exclut extérieur ET pièces tampons)
-if (selectedZone === 'all') {
-    let totalVol = 0;
-    let weightedPmvInit = 0;
-    let weightedPmvSim = 0;
+            // Alignement strict avec la Synthèse Globale
+            if (selectedZone === 'all') {
+                let totalVol = 0;
+                let weightedPmvInit = 0;
+                let weightedPmvSim = 0;
 
-    Object.keys(zonesMap).forEach(zId => {
-        const rName = zonesMap[zId];
-        const zConfig = houseConfig[zId] || { area: 15, height: 2.5 };
-        
-        // EXCLUSION : Extérieurs ET Pièces Tampons (comme dans la Synthèse Globale)
-        if (isExteriorZone(zId, zConfig) || isBufferZone(zId, zConfig)) return;
+                Object.keys(zonesMap).forEach(zId => {
+                    const rName = zonesMap[zId];
+                    const zConfig = houseConfig[zId] || { area: 15, height: 2.5 };
+                    
+                    if (isExteriorZone(zId, zConfig) || isBufferZone(zId, zConfig)) return;
 
-        // Récupération des données réelles du scan
-        const rData = donneesHabitat[rName];
-        if (!rData || rData.ta === undefined) return; // Ignore les pièces sans mesures réelles
+                    const rData = donneesHabitat[rName];
+                    if (!rData || rData.ta === undefined) return;
 
-        const vol = (parseFloat(zConfig.area) || 15) * (parseFloat(zConfig.height) || 2.5);
+                    const vol = (parseFloat(zConfig.area) || 15) * (parseFloat(zConfig.height) || 2.5);
 
-        const baseTa = rData.ta;
-        const baseRh = rData.rh ?? 50;
-        const baseTr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(zConfig, baseTa) : baseTa;
-        const baseVel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zConfig, rName) : 0.1;
-        const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(zConfig) : { met: 1.2, totalClo: 1.0 };
+                    const baseTa = rData.ta;
+                    const baseRh = rData.rh ?? 50;
+                    const baseTr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(zConfig, baseTa) : baseTa;
+                    const baseVel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zConfig, rName) : 0.1;
+                    const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(zConfig) : { met: 1.2, totalClo: 1.0 };
 
-        const pmvI = engine.calculatePMV(baseTa, baseTr, baseVel, baseRh, met, totalClo);
+                    const pmvI = engine.calculatePMV(baseTa, baseTr, baseVel, baseRh, met, totalClo);
 
-        const checkedActionKeys = [];
-        allRecs.filter(r => r.zoneId === zId).forEach(r => {
-            const item = lifecycleState.recos[r.id];
-            if (item && item.status === 'completed') checkedActionKeys.push(r.actionKey);
-        });
+                    const checkedActionKeys = [];
+                    allRecs.filter(r => r.zoneId === zId).forEach(r => {
+                        const item = lifecycleState.recos[r.id];
+                        if (item && item.status === 'completed') checkedActionKeys.push(r.actionKey);
+                    });
 
-        const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: baseRh, met, clo: totalClo };
-        const simRes = engine.evaluateSimulatedPMV ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal) : { pmv: pmvI };
+                    const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: baseRh, met, clo: totalClo };
+                    const simRes = engine.evaluateSimulatedPMV ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal) : { pmv: pmvI };
 
-        totalVol += vol;
-        weightedPmvInit += pmvI * vol;
-        weightedPmvSim += simRes.pmv * vol;
-    });
+                    totalVol += vol;
+                    weightedPmvInit += pmvI * vol;
+                    weightedPmvSim += simRes.pmv * vol;
+                });
 
-    const finalPmvInit = totalVol > 0 ? (weightedPmvInit / totalVol) : 0;
-    const finalPmvSim = totalVol > 0 ? (weightedPmvSim / totalVol) : 0;
+                const finalPmvInit = totalVol > 0 ? (weightedPmvInit / totalVol) : 0;
+                const finalPmvSim = totalVol > 0 ? (weightedPmvSim / totalVol) : 0;
 
-    if (dispInitEl) dispInitEl.textContent = (finalPmvInit > 0 ? "+" : "") + finalPmvInit.toFixed(2);
-    if (simEl) {
-        simEl.textContent = (finalPmvSim > 0 ? "+" : "") + finalPmvSim.toFixed(2);
-        simEl.style.color = Math.abs(finalPmvSim) <= 0.5 ? '#4ade80' : (finalPmvSim > 0.5 ? '#f87171' : '#38bdf8');
-    }
-}
+                if (dispInitEl) dispInitEl.textContent = (finalPmvInit > 0 ? "+" : "") + finalPmvInit.toFixed(2);
+                if (simEl) {
+                    simEl.textContent = (finalPmvSim > 0 ? "+" : "") + finalPmvSim.toFixed(2);
+                    simEl.style.color = Math.abs(finalPmvSim) <= 0.5 ? '#4ade80' : (finalPmvSim > 0.5 ? '#f87171' : '#38bdf8');
+                }
+            } else {
+                const roomName = zonesMap[selectedZone] || selectedZone;
+                const targetZoneConfig = houseConfig[selectedZone] || null;
+                const roomData = donneesHabitat[roomName] || { ta: 20, rh: 50 };
+
+                const baseTa = roomData.ta;
+                const baseTr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(targetZoneConfig, baseTa) : baseTa;
+                const baseVel = engine.calculateAirVelocity ? engine.calculateAirVelocity(targetZoneConfig, roomName) : 0.1;
+                const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(targetZoneConfig) : { met: 1.2, totalClo: 1.0 };
+
+                const checkedActionKeys = [];
+                allRecs.forEach(r => {
+                    const item = lifecycleState.recos[r.id];
+                    if (item && item.status === 'completed') checkedActionKeys.push(r.actionKey);
+                });
+
+                const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: roomData.rh, met, clo: totalClo };
+                const pmvInit = engine.calculatePMV(baseTa, baseTr, baseVel, roomData.rh, met, totalClo);
+                const simulation = engine.evaluateSimulatedPMV ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal) : { pmv: pmvInit };
+
+                if (dispInitEl) dispInitEl.textContent = (pmvInit > 0 ? "+" : "") + pmvInit.toFixed(2);
+                if (simEl) {
+                    const pmvSimulated = simulation.pmv;
+                    simEl.textContent = (pmvSimulated > 0 ? "+" : "") + pmvSimulated.toFixed(2);
+                    simEl.style.color = Math.abs(pmvSimulated) <= 0.5 ? 'var(--eco, #2ecc71)' : (pmvSimulated > 0.5 ? 'var(--hot, #e74c3c)' : 'var(--cold, #3498db)');
+                }
+            }
             } else {
                 const roomName = zonesMap[selectedZone] || selectedZone;
                 const targetZoneConfig = houseConfig[selectedZone] || null;
