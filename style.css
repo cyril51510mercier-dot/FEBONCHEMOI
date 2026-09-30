@@ -435,3 +435,13 @@ tr:last-child td {
     right: 15px;
     border-radius: 3px;
 }
+
+/* Rendre le bandeau météo fixe au défilement */
+#weatherSummary {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background-color: #0F172A;
+    padding: 10px 15px;
+    border-bottom: 1px solid #1E293B;
+}
