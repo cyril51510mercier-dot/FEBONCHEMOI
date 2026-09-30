@@ -3,7 +3,7 @@
  * Stratégie : Network-First + Purge Automatique des Caches Obsolètes
  */
 
-const CACHE_NAME = 'solstice-v7.9'; // ⚡ Pense à incrémenter ce numéro lors de grosses mises à jour
+const CACHE_NAME = 'solstice-v7.10'; // ⚡ Pense à incrémenter ce numéro lors de grosses mises à jour
 
 const ASSETS = [
   './',
