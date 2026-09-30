@@ -1,6 +1,6 @@
 /**
  * ==================================================================
- * SOLSTICE — MOTEUR DE RECOMMANDATIONS & CYCLE DE VIE (V7.0)
+ * SOLSTICE — MOTEUR DE RECOMMANDATIONS & CYCLE DE VIE (V7.1)
  * Horodatage, fenêtrage strict, portes d'adjacence & régénération 24h
  * ==================================================================
  */
@@ -31,7 +31,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const raw = localStorage.getItem('SOLSTICE_RECO_LIFECYCLE');
                 const state = raw ? JSON.parse(raw) : { lastDate: TODAY_KEY, recos: {} };
                 
-                // Réinitialisation quotidienne si changement de date
                 if (state.lastDate !== TODAY_KEY) {
                     state.lastDate = TODAY_KEY;
                     state.recos = {}; 
@@ -120,15 +119,17 @@ document.addEventListener('DOMContentLoaded', function() {
             let totalPmv = 0;
             let count = 0;
             Object.keys(donneesHabitat).forEach(roomName => {
+                if (roomName === '__ENV__' || roomName === '__BUFFER_TOGGLE__') return;
                 const zId = roomName.toLowerCase().replace(/[^a-z0-9]/g, '_');
                 const zone = houseConfig[zId];
                 if (!isExteriorZone(zId, zone)) {
                     const roomData = donneesHabitat[roomName];
+                    if (!roomData || typeof roomData.ta === 'undefined') return;
                     const ta = roomData.ta || 20;
                     const rh = roomData.rh || 50;
-                    const tr = engine.calculateMeanRadiantTemp(zone, ta);
-                    const vel = engine.calculateAirVelocity(zone, roomName);
-                    const { met, totalClo } = engine.getBaseCloAndMet(zone);
+                    const tr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(zone, ta) : ta;
+                    const vel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zone, roomName) : 0.1;
+                    const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(zone) : { met: 1.2, totalClo: 1.0 };
                     totalPmv += engine.calculatePMV(ta, tr, vel, rh, met, totalClo);
                     count++;
                 }
@@ -146,6 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             Object.keys(donneesHabitat).forEach(roomName => {
+                if (roomName === '__ENV__' || roomName === '__BUFFER_TOGGLE__') return;
                 const zId = roomName.toLowerCase().replace(/[^a-z0-9]/g, '_');
                 if (!isExteriorZone(zId, houseConfig[zId]) && !zonesMap[zId] && !Object.values(zonesMap).includes(roomName)) {
                     zonesMap[zId] = roomName;
@@ -176,44 +178,56 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // ============================================================
-        // GENERATION DES RECOMMANDATIONS CONDITIONNEES
+        // GÉNÉRATION DES RECOMMANDATIONS CONDITIONNÉES
         // ============================================================
         function generateRecommendationsForZone(zone, zoneId, roomData) {
-            // --- CALCUL DE LA STRUCTURE ET DES STOCKS THERMIQUES ---
-const tStruct = engine.updateStructureTemperature ? engine.updateStructureTemperature(zoneName, ta) : ta;
-const reserve = engine.calculateStructureReserve ? engine.calculateStructureReserve(tStruct, ta, zone) : { chargeCalories: 50, chargeFrigories: 50 };
             const recs = [];
             if (isExteriorZone(zoneId, zone)) return recs;
 
             const isBuffer = isBufferZone(zoneId, zone);
             const zoneName = zone ? (zone.name || zoneId) : zoneId;
-            const ta = roomData.ta || 20;
-            const rh = roomData.rh || 50;
+            const ta = roomData ? (roomData.ta ?? 20) : 20;
+            const rh = roomData ? (roomData.rh ?? 50) : 50;
+
+            // --- CALCUL DE LA STRUCTURE ET DES STOCKS THERMIQUES ---
+            const area = parseFloat(zone?.area) || 15;
+            const height = parseFloat(zone?.height) || 2.5;
+            const volume = area * height;
+            const tau = engine.calculateDynamicTau ? engine.calculateDynamicTau(zone) : 18;
+
+            const tStruct = engine.updateStructureTemperature ? engine.updateStructureTemperature(zoneName, ta) : ta;
+            const rawReserve = engine.calculateStructureReserve ? engine.calculateStructureReserve(tStruct, ta, volume, tau) : {};
+
+            const chargeCalories = Math.max(0, Math.min(100, Math.round(((tStruct - 15) / (22 - 15)) * 100)));
+            const chargeFrigories = Math.max(0, Math.min(100, Math.round(((26 - tStruct) / (26 - 18)) * 100)));
+
+            const reserve = {
+                ...rawReserve,
+                chargeCalories: isNaN(chargeCalories) ? 50 : chargeCalories,
+                chargeFrigories: isNaN(chargeFrigories) ? 50 : chargeFrigories
+            };
+
             const ahInt = getAbsoluteHumidity(ta, rh);
-            const ahExt = getAbsoluteHumidity(envDataGlobal.t_ext, 60);
+            const ahExt = getAbsoluteHumidity(envDataGlobal.t_ext, envDataGlobal.rh_ext || 60);
 
             const tr = engine.calculateMeanRadiantTemp(zone, ta);
             const vel = engine.calculateAirVelocity(zone, zoneName);
             
-            // Prise en compte dynamique du CLO configuré au tableau de bord
             const { met, totalClo } = engine.getBaseCloAndMet(zone);
 
             const roomPmv = engine.calculatePMV(ta, tr, vel, rh, met, totalClo);
-            const needsHeat = roomPmv < -0.5;
-            const needsCooling = roomPmv > 0.5;
+            const needsHeat = roomPmv < -0.4;
+            const needsCooling = roomPmv > 0.4;
             const isSunny = envDataGlobal.sun_status.toLowerCase().includes('clear') || envDataGlobal.sun_status.toLowerCase().includes('sun');
 
-            // --- DECTECTION EXPERTE DES FENETRES ET PORTES ---
-            
-            // Une fenêtre valide pour l'aération ne doit PAS être fixe
-            const hasNonFixedWindow = Array.isArray(zone?.windows) && zone.windows.some(w => w.vent && w.vent !== 'fixe' && w.vent !== 'fixed');
+            // --- DÉTECTION EXPERTE DES FENÊTRES ET PORTES ---
+            const hasNonFixedWindow = !zone?.windows || zone.windows.length === 0 || zone.windows.some(w => !w.vent || (w.vent !== 'fixe' && w.vent !== 'fixed'));
             const mainVentType = zone?.windows?.find(w => w.vent && w.vent !== 'fixe' && w.vent !== 'fixed')?.vent || 'battante';
             
-            const hasShutters = !zone || !zone.windows || zone.windows.some(w => w.shutter && w.shutter !== 'aucun');
+            const hasShutters = !zone?.windows || zone.windows.length === 0 || zone.windows.some(w => !w.shutter || w.shutter !== 'aucun');
             const hasInteriorCurtains = zone?.windows?.some(w => w.shutter === 'rideau_interieur' || w.shutter === 'store_interieur');
             const hasVentilationSystem = (zone?.equipment?.vmcSystem && zone.equipment.vmcSystem !== 'aucun' && zone.equipment.vmcSystem !== 'none') || hasNonFixedWindow;
 
-            // Détection fine des portes vers espaces chauffés / non chauffés
             const adj = zone?.adj || {};
             const hasUnheatedDoor = zone?.hasBufferDoor || adj.hasBufferDoor || 
                                     [1, 2, 3, 4].some(i => adj[`wall${i}`] === 'unheated' && adj[`doorWall${i}`]);
@@ -226,7 +240,6 @@ const reserve = engine.calculateStructureReserve ? engine.calculateStructureRese
 
             // --- NIVEAU 1 : ACTIONS IMMÉDIATES (< 1h) ---
 
-            // Aération flash ciblée : UNIQUEMENT SI FENETRE NON FIXE
             if (rh > 65 && ahExt < ahInt) {
                 if (zone?.equipment?.vmcSystem === 'marche_forcee' || zone?.equipment?.vmcSystem === 'continue_non_pilotable') {
                     recs.push({ id: `${zoneId}_vmc_boost`, level: 1, actionKey: 'vmc_boost', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: 'Boost VMC anti-humidité', text: `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide.`, impactWeight: 15 });
@@ -236,7 +249,6 @@ const reserve = engine.calculateStructureReserve ? engine.calculateStructureRese
                 }
             }
 
-            // Arbitrage surchauffe / Free-cooling
             const isOutdoorHeatwaveThreat = tExtMaxDay > (ta + 1.5);
             if (needsCooling && envDataGlobal.t_ext < ta && hasNonFixedWindow && (globalHousePmv >= -0.2 || isOutdoorHeatwaveThreat)) {
                 recs.push({ id: `${zoneId}_free_cooling`, level: 1, actionKey: 'free_cooling', zoneId, zoneName, timing: 'immediate', type: 'type-cool', title: 'Surventilation traversante (Free-cooling)', text: `Il fait plus frais dehors (${envDataGlobal.t_ext} °C). Ouvrez pour décharger l'air chaud de la pièce.`, impactWeight: 20 });
@@ -250,7 +262,6 @@ const reserve = engine.calculateStructureReserve ? engine.calculateStructureRese
                 recs.push({ id: `${zoneId}_heating_cut_during_ventilation`, level: 1, actionKey: 'heating_cut', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Coupure du chauffage pendant l\'aération', text: `Coupez le chauffage dans cette pièce pendant l'ouverture des fenêtres.`, impactWeight: 10 });
             }
 
-            // Protections solaires
             if (needsCooling && isSunny && hasShutters) {
                 recs.push({ id: `${zoneId}_shutter_close`, level: 1, actionKey: 'shutter_close', zoneId, zoneName, timing: 'immediate', type: 'type-sun', title: 'Bouclier solaire immédiat', text: `Fermez les volets pour bloquer le rayonnement direct avant le vitrage.`, impactWeight: 25 });
             }
@@ -283,7 +294,6 @@ const reserve = engine.calculateStructureReserve ? engine.calculateStructureRese
                 recs.push({ id: `${zoneId}_fan_on`, level: 1, actionKey: 'fan_on', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: `Activer le brassage d'air (${zone.equipment.fanSystem})`, text: `Le flux d'air rafraîchit le ressenti cutané de 2 °C sans climatisation.`, impactWeight: 18 });
             }
 
-            // Local Tampon conditionné par la présence effective d'une porte
             if (!isBuffer && hasUnheatedDoor) {
                 recs.push({ id: `${zoneId}_buffer_door_close`, level: 1, actionKey: 'heating_cut', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Fermeture de la porte du local non chauffé', text: `Conservez la porte fermée avec le local non chauffé (garage/cellier) pour éviter les fuites thermiques.`, impactWeight: 12 });
                 
@@ -292,9 +302,23 @@ const reserve = engine.calculateStructureReserve ? engine.calculateStructureRese
                 }
             }
 
-            // Transfert thermique inter-pièces conditionné par une porte vers pièce chauffée
             if (roomPmv > 0.5 && roomPmv > (globalHousePmv + 0.3) && hasHeatedDoor) {
                 recs.push({ id: `${zoneId}_inter_room_heat_transfer`, level: 1, actionKey: 'sun_heat', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Dissipation de chaleur vers le reste du logement', text: `Cette pièce est plus chaude que le reste de la maison (${ta} °C). Ouvrez la porte intérieure pour transférer la chaleur.`, impactWeight: 10 });
+            }
+
+            if (isHeatingSeasonActive && reserve.chargeCalories >= 75) {
+                recs.push({
+                    id: `${zoneId}_high_calorie_stock_eco`,
+                    level: 1,
+                    actionKey: 'heating_cut',
+                    zoneId,
+                    zoneName,
+                    timing: 'immediate',
+                    type: 'type-eco',
+                    title: 'Valorisation de l\'inertie chaude (Calories > 75 %)',
+                    text: `Les murs sont gorgés de chaleur (${reserve.chargeCalories} %). Vous pouvez baisser la consigne d'un degré : la structure prendra le relais sans perte de confort.`,
+                    impactWeight: 16
+                });
             }
 
             // --- NIVEAU 2 : OPPORTUNISME 24H ---
@@ -323,19 +347,19 @@ const reserve = engine.calculateStructureReserve ? engine.calculateStructureRese
             }
 
             if (isHeatingSeasonActive && needsHeat && reserve.chargeCalories < 35) {
-    recs.push({
-        id: `${zoneId}_low_calorie_stock`,
-        level: 2,
-        actionKey: 'floor_inertia',
-        zoneId,
-        zoneName,
-        timing: 'anticipated',
-        type: 'type-heat',
-        title: 'Recharge de la masse thermique (Calories < 35 %)',
-        text: `La réserve de chaleur des murs est faible (${reserve.chargeCalories} %). Anticipez la relance du chauffage pour éviter l'effet de paroi froide.`,
-        impactWeight: 18
-    });
-}
+                recs.push({
+                    id: `${zoneId}_low_calorie_stock`,
+                    level: 2,
+                    actionKey: 'floor_inertia',
+                    zoneId,
+                    zoneName,
+                    timing: 'anticipated',
+                    type: 'type-heat',
+                    title: 'Recharge de la masse thermique (Calories < 35 %)',
+                    text: `La réserve de chaleur des murs est faible (${reserve.chargeCalories} %). Anticipez la relance du chauffage pour éviter l'effet de paroi froide.`,
+                    impactWeight: 18
+                });
+            }
 
             // --- NIVEAU 3 : STRATÉGIE MÉTÉO (48h-72h) ---
             if (needsCooling && isHeavyStructure && isNight) {
@@ -350,34 +374,20 @@ const reserve = engine.calculateStructureReserve ? engine.calculateStructureRese
                 recs.push({ id: `${zoneId}_deep_precooling_heatwave`, level: 3, actionKey: 'free_cooling', zoneId, zoneName, timing: 'strategic', type: 'type-cool', title: 'Sur-rafraîchissement de masse pré-canicule (48h)', text: `Canicule durable prévue sous 48h : Surventilez au maximum la nuit prochaine pour geler la masse des murs porteurs.`, impactWeight: 22 });
             }
 
-            if (isHeatingSeasonActive && reserve.chargeCalories >= 75) {
-    recs.push({
-        id: `${zoneId}_high_calorie_stock_eco`,
-        level: 1,
-        actionKey: 'heating_cut',
-        zoneId,
-        zoneName,
-        timing: 'immediate',
-        type: 'type-eco',
-        title: 'Valorisation de l\'inertie chaude (Calories > 75 %)',
-        text: `Les murs sont gorgés de chaleur (${reserve.chargeCalories} %). Vous pouvez baisser la consigne d'un degré : la structure prendra le relais sans perte de confort.`,
-        impactWeight: 16
-    });
-}
             if ((needsCooling || tExtMaxDay > ta) && reserve.chargeFrigories < 35) {
-    recs.push({
-        id: `${zoneId}_low_frigorie_stock`,
-        level: 3,
-        actionKey: 'free_cooling',
-        zoneId,
-        zoneName,
-        timing: 'strategic',
-        type: 'type-cool',
-        title: 'Décharge nocturne prioritaire (Fraîcheur < 35 %)',
-        text: `La structure est saturée en chaleur (stock de fraîcheur à ${reserve.chargeFrigories} %). Ouvrez les fenêtres cette nuit pour refroidir le cœur des murs porteurs.`,
-        impactWeight: 22
-    });
-}
+                recs.push({
+                    id: `${zoneId}_low_frigorie_stock`,
+                    level: 3,
+                    actionKey: 'free_cooling',
+                    zoneId,
+                    zoneName,
+                    timing: 'strategic',
+                    type: 'type-cool',
+                    title: 'Décharge nocturne prioritaire (Fraîcheur < 35 %)',
+                    text: `La structure est saturée en chaleur (stock de fraîcheur à ${reserve.chargeFrigories} %). Ouvrez les fenêtres cette nuit pour refroidir le cœur des murs porteurs.`,
+                    impactWeight: 22
+                });
+            }
 
             return recs.filter(rec => activeProfile.allowedLevels.includes(rec.level));
         }
@@ -404,18 +414,14 @@ const reserve = engine.calculateStructureReserve ? engine.calculateStructureRese
                 allRecs = generateRecommendationsForZone(zone, selectedZone, roomData);
             }
 
-            // --- MISE A JOUR HORODATAGE ET CYCLE DE VIE ---
             syncRecommendationsLifecycle(allRecs);
-
             return allRecs;
         }
 
-        // --- SYNCHRONISATION HORODATÉE DU CYCLE DE VIE ---
         function syncRecommendationsLifecycle(activeGeneratedRecos) {
             const now = Date.now();
             const activeIds = new Set(activeGeneratedRecos.map(r => r.id));
 
-            // 1. Enregistrer l'apparition des nouvelles recommandations
             activeGeneratedRecos.forEach(r => {
                 if (!lifecycleState.recos[r.id]) {
                     lifecycleState.recos[r.id] = {
@@ -426,7 +432,6 @@ const reserve = engine.calculateStructureReserve ? engine.calculateStructureRese
                         status: 'active'
                     };
                 } else {
-                    // Si elle réapparaît alors qu'elle était expirée
                     const item = lifecycleState.recos[r.id];
                     if (item.status === 'expired') {
                         item.status = 'active';
@@ -436,7 +441,6 @@ const reserve = engine.calculateStructureReserve ? engine.calculateStructureRese
                 }
             });
 
-            // 2. Détecter les recommandations qui ont disparu sans être réalisées
             Object.keys(lifecycleState.recos).forEach(id => {
                 const item = lifecycleState.recos[id];
                 if (!activeIds.has(id) && item.status === 'active') {
@@ -532,9 +536,6 @@ const reserve = engine.calculateStructureReserve ? engine.calculateStructureRese
             render();
         }
 
-        // ============================================================
-        // CALCUL FINANCIER & SCORE AVEC FACTEUR DE REACTIVITE TEMPOREL
-        // ============================================================
         function calculateFinancialImpact(allRecs) {
             let savedKwhDay = 0;
             let earnedPoints = 0;
@@ -546,11 +547,10 @@ const reserve = engine.calculateStructureReserve ? engine.calculateStructureRese
             allRecs.forEach(r => {
                 const item = lifecycleState.recos[r.id];
                 if (item && item.status === 'completed') {
-                    // Calcul du facteur de réactivité (délai entre apparition et réalisation)
                     let reactivityFactor = 1.0;
                     if (item.appearedAt && item.completedAt) {
                         const delayHours = (item.completedAt - item.appearedAt) / (1000 * 3600);
-                        if (delayHours > 2) reactivityFactor = 0.85; // Baisse si réalisé avec retard
+                        if (delayHours > 2) reactivityFactor = 0.85;
                         if (delayHours > 6) reactivityFactor = 0.70;
                     }
 
@@ -624,14 +624,14 @@ const reserve = engine.calculateStructureReserve ? engine.calculateStructureRese
             };
 
             const baseTa = roomData.ta;
-            const baseTr = engine.calculateMeanRadiantTemp(targetZoneConfig, baseTa);
-            const baseVel = engine.calculateAirVelocity(targetZoneConfig, roomName);
-            const { met, totalClo } = engine.getBaseCloAndMet(targetZoneConfig);
+            const baseTr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(targetZoneConfig, baseTa) : baseTa;
+            const baseVel = engine.calculateAirVelocity ? engine.calculateAirVelocity(targetZoneConfig, roomName) : 0.1;
+            const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(targetZoneConfig) : { met: 1.2, totalClo: 1.0 };
 
             const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: roomData.rh, met, clo: totalClo };
 
             const pmvInit = engine.calculatePMV(baseTa, baseTr, baseVel, roomData.rh, met, totalClo);
-            const simulation = engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal);
+            const simulation = engine.evaluateSimulatedPMV ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal) : { pmv: pmvInit };
 
             const dispInitEl = document.getElementById('disp-pmv-init');
             const simEl = document.getElementById('disp-pmv-sim');
