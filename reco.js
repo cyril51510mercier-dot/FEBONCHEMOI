@@ -11,14 +11,20 @@ document.addEventListener('DOMContentLoaded', function() {
         window.SolsticeStore.init();
     }
     
-    // ... suite du script
     try {
-        const store = window.SolsticeStore;
-        const engine = window.SolsticeEngine;
+        // Accès sécurisé avec fallbacks
+        const store = window.SolsticeStore || {};
+        const engine = window.SolsticeEngine || {};
 
-        const houseConfig = store.getZones();
-        const donneesHabitat = store.getScanData();
-        const envDataGlobal = store.getEnvData();
+        const houseConfig = (store.getZones && store.getZones()) || {};
+        const donneesHabitat = (store.getScanData && store.getScanData()) || {};
+        const envDataGlobal = (store.getEnvData && store.getEnvData()) || { 
+            t_ext: 15, 
+            rh_ext: 60, 
+            sun_status: 'clear',
+            t_ext_max: 18,
+            t_ext_min: 10
+        };
 
         let currentZoneId = sessionStorage.getItem('currentZoneId') || 'all';
 
@@ -52,8 +58,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let lifecycleState = getRecoLifecycleState();
 
+        // Recherche robuste du profil utilisateur
         const globalConfig = houseConfig.global || {};
-        const activeProfileKey = globalConfig.userProfile || 'mid_term';
+        const activeProfileKey = globalConfig.userProfile 
+                              || globalConfig.profile 
+                              || houseConfig.userProfile 
+                              || houseConfig.profile 
+                              || 'mid_term';
 
         const forcedSeason = globalConfig.forcedSeason;
         const manualHeating = globalConfig.heatingSeasonActive;
@@ -66,8 +77,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const profilesDef = engine.PROFILES || {
             short_term: { label: "Court termiste", allowedLevels: [1], maxDeltaPmv: 0.0 },
-            mid_term: { label: "Moyen termiste", allowedLevels: [1, 2], maxDeltaPmv: 0.3 },
-            long_term: { label: "Long termiste", allowedLevels: [1, 2, 3], maxDeltaPmv: 0.6 }
+            mid_term:   { label: "Moyen termiste", allowedLevels: [1, 2], maxDeltaPmv: 0.3 },
+            long_term:  { label: "Long termiste",  allowedLevels: [1, 2, 3], maxDeltaPmv: 0.6 }
         };
         const activeProfile = profilesDef[activeProfileKey] || profilesDef.mid_term;
 
@@ -93,7 +104,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function isExteriorZone(zId, zone) {
-            const id = zId.toLowerCase();
+            const id = (zId || '').toLowerCase();
             const name = (zone?.name || '').toLowerCase();
             return id.includes('exterieur') || id.includes('jardin') || id.includes('rue') ||
                    name.includes('extérieur') || name.includes('jardin') || name.includes('rue') ||
@@ -101,7 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function isBufferZone(zId, zone) {
-            const id = zId.toLowerCase();
+            const id = (zId || '').toLowerCase();
             const name = (zone?.name || '').toLowerCase();
             return id.includes('garage') || id.includes('cave') || id.includes('cellier') ||
                    name.includes('garage') || name.includes('cave') || name.includes('cellier') ||
@@ -215,10 +226,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const vel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zone, zoneName) : 0.1;
             const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(zone) : { met: 1.2, totalClo: 1.0 };
 
-            const roomPmv = engine.calculatePMV(ta, tr, vel, rh, met, totalClo);
+            const roomPmv = engine.calculatePMV ? engine.calculatePMV(ta, tr, vel, rh, met, totalClo) : 0;
             const needsHeat = roomPmv < -0.4;
             const needsCooling = roomPmv > 0.4;
-            const isSunny = envDataGlobal.sun_status.toLowerCase().includes('clear') || envDataGlobal.sun_status.toLowerCase().includes('sun');
+            const isSunny = (envDataGlobal.sun_status || '').toLowerCase().includes('clear') || (envDataGlobal.sun_status || '').toLowerCase().includes('sun');
 
             const hasNonFixedWindow = !zone?.windows || zone.windows.length === 0 || zone.windows.some(w => !w.vent || (w.vent !== 'fixe' && w.vent !== 'fixed'));
             const mainVentType = zone?.windows?.find(w => w.vent && w.vent !== 'fixe' && w.vent !== 'fixed')?.vent || 'battante';
@@ -233,7 +244,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const hasEastWestWin = zone?.windows?.some(w => ['E', 'W'].includes(w.orient));
             const hasRoofWin = zone?.windows?.some(w => w.tilt === 'inclinee');
-            const isHeavyStructure = zone?.wallMat === 'concrete' || zone?.wallMat === 'stone' || zone?.floorMat === 'lourd';
 
             // --- NIVEAU 1 : ACTIONS IMMÉDIATES (< 1h) ---
 
@@ -498,48 +508,45 @@ document.addEventListener('DOMContentLoaded', function() {
                     const roomData = donneesHabitat[roomName] || { ta: 20, rh: 50 };
                     const ta = roomData.ta || 20;
 
-                    // Paramètres physiques réels ou valeurs DPE par défaut
                     const area = parseFloat(zoneConfig.area) || 15;
-                    const windowArea = parseFloat(zoneConfig.windowArea) || (area * 0.15); // 15% de la surface si non précisé
-                    const uWindow = parseFloat(zoneConfig.uWindow) || 2.8; // W/m².K
-                    const deltaR = parseFloat(zoneConfig.shutterDeltaR) || 0.15; // m².K/W
+                    const windowArea = parseFloat(zoneConfig.windowArea) || (area * 0.15);
+                    const uWindow = parseFloat(zoneConfig.uWindow) || 2.8;
+                    const deltaR = parseFloat(zoneConfig.shutterDeltaR) || 0.15;
                     const etaGen = getGeneratorEfficiency(zoneConfig);
-                    const eerClim = 3.0; // EER clim standard
+                    const eerClim = 3.0;
 
                     let dynamicKwh = 0.0;
 
                     // 1. Fermeture des volets / Protection solaire / Bouclier nocturne
                     if (r.actionKey === 'shutter_close' || r.actionKey === 'anticipate_sun') {
                         if (isCoolingActive) {
-                            // Énergie solaire évitée en été = A_vitre * G_sol * (g_nu - g_clos) * delta_t / 1000
-                            const solEnergyKw = (windowArea * gSol * (0.65 - 0.05) * 6) / 1000; // 6h d'ensoleillement
+                            const solEnergyKw = (windowArea * gSol * (0.65 - 0.05) * 6) / 1000;
                             dynamicKwh = solEnergyKw / eerClim;
                         } else if (isHeatingSeasonActive) {
-                            // Gain par réduction des déperditions nocturnes (Delta U * A * DeltaT * dt)
                             const uWithShutter = 1 / ((1 / uWindow) + deltaR);
                             const deltaU = uWindow - uWithShutter;
                             const deltaT = Math.max(0, ta - envDataGlobal.t_ext);
-                            const thermalGain = (windowArea * deltaU * deltaT * 10) / 1000; // 10h de nuit
+                            const thermalGain = (windowArea * deltaU * deltaT * 10) / 1000;
                             dynamicKwh = thermalGain / etaGen;
                         }
                     } 
                     // 2. Chauffage solaire passif en hiver
                     else if (r.actionKey === 'sun_heat') {
                         if (isHeatingSeasonActive) {
-                            const solGainKw = (windowArea * gSol * 0.60 * 5) / 1000; // 5h d'apports directs
+                            const solGainKw = (windowArea * gSol * 0.60 * 5) / 1000;
                             dynamicKwh = solGainKw / etaGen;
                         }
                     }
-                    // 3. Consigne nocturne / Coupure du chauffage (Réduction de déperdition transm. + vent.)
+                    // 3. Consigne nocturne / Coupure du chauffage
                     else if (r.actionKey === 'bedroom_temp' || r.actionKey === 'heating_cut') {
                         if (isHeatingSeasonActive) {
                             const uWall = parseFloat(zoneConfig.uWall) || 0.8;
-                            const wallArea = (Math.sqrt(area) * 4 * 2.5); // Périmètre x Hauteur
+                            const wallArea = (Math.sqrt(area) * 4 * 2.5);
                             const hTransm = (wallArea * uWall) + (windowArea * uWindow);
-                            const hVent = 0.34 * 45; // Débit VMC 45 m³/h
-                            const deltaConsigne = (r.actionKey === 'bedroom_temp') ? 2.0 : 1.5; // -2°C ou -1.5°C
+                            const hVent = 0.34 * 45;
+                            const deltaConsigne = (r.actionKey === 'bedroom_temp') ? 2.0 : 1.5;
                             
-                            const thermalSavedKw = ((hTransm + hVent) * deltaConsigne * 8) / 1000; // 8h de baisse
+                            const thermalSavedKw = ((hTransm + hVent) * deltaConsigne * 8) / 1000;
                             dynamicKwh = thermalSavedKw / etaGen;
                         }
                     }
@@ -547,24 +554,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     else if (r.actionKey === 'free_cooling') {
                         if (isCoolingActive || ta > 23) {
                             const deltaT = Math.max(0, ta - envDataGlobal.t_ext);
-                            const flowRate = 350; // m³/h par aération traversante
-                            const thermalExtractedKw = (0.34 * flowRate * deltaT * 3) / 1000; // 3h de surventilation
+                            const flowRate = 350;
+                            const thermalExtractedKw = (0.34 * flowRate * deltaT * 3) / 1000;
                             dynamicKwh = thermalExtractedKw / eerClim;
                         }
                     }
                     // 5. Purge VMC / Aération d'humidité
                     else if (r.actionKey === 'vmc_boost' || r.actionKey === 'open_win_humidity') {
                         if (isHeatingSeasonActive) {
-                            const deltaFlow = (r.actionKey === 'vmc_boost') ? 60 : 200; // Surdébit m³/h
+                            const deltaFlow = (r.actionKey === 'vmc_boost') ? 60 : 200;
                             const deltaT = Math.max(0, ta - envDataGlobal.t_ext);
-                            const energyToHeatAir = (0.34 * deltaFlow * deltaT * 0.5) / 1000; // 30 min de purge
+                            const energyToHeatAir = (0.34 * deltaFlow * deltaT * 0.5) / 1000;
                             dynamicKwh = energyToHeatAir / etaGen;
                         }
                     }
                     // 6. Inertie et déphasage des dalles
                     else if (r.actionKey === 'floor_inertia') {
                         if (isHeatingSeasonActive) {
-                            dynamicKwh = (area * 0.12) / etaGen; // Reprise d'inertie dalle
+                            dynamicKwh = (area * 0.12) / etaGen;
                         }
                     }
 
@@ -616,7 +623,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const selectedZone = zoneSelect ? zoneSelect.value : currentZoneId;
             const zonesMap = getAvailableZonesMap();
 
-            // Alignement strict avec la Synthèse Globale
+            // Structure conditionnelle unique et propre
             if (selectedZone === 'all') {
                 let totalVol = 0;
                 let weightedPmvInit = 0;
@@ -639,7 +646,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const baseVel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zConfig, rName) : 0.1;
                     const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(zConfig) : { met: 1.2, totalClo: 1.0 };
 
-                    const pmvI = engine.calculatePMV(baseTa, baseTr, baseVel, baseRh, met, totalClo);
+                    const pmvI = engine.calculatePMV ? engine.calculatePMV(baseTa, baseTr, baseVel, baseRh, met, totalClo) : 0;
 
                     const checkedActionKeys = [];
                     allRecs.filter(r => r.zoneId === zId).forEach(r => {
@@ -680,34 +687,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: roomData.rh, met, clo: totalClo };
-                const pmvInit = engine.calculatePMV(baseTa, baseTr, baseVel, roomData.rh, met, totalClo);
-                const simulation = engine.evaluateSimulatedPMV ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal) : { pmv: pmvInit };
-
-                if (dispInitEl) dispInitEl.textContent = (pmvInit > 0 ? "+" : "") + pmvInit.toFixed(2);
-                if (simEl) {
-                    const pmvSimulated = simulation.pmv;
-                    simEl.textContent = (pmvSimulated > 0 ? "+" : "") + pmvSimulated.toFixed(2);
-                    simEl.style.color = Math.abs(pmvSimulated) <= 0.5 ? 'var(--eco, #2ecc71)' : (pmvSimulated > 0.5 ? 'var(--hot, #e74c3c)' : 'var(--cold, #3498db)');
-                }
-            }
-            } else {
-                const roomName = zonesMap[selectedZone] || selectedZone;
-                const targetZoneConfig = houseConfig[selectedZone] || null;
-                const roomData = donneesHabitat[roomName] || { ta: 20, rh: 50 };
-
-                const baseTa = roomData.ta;
-                const baseTr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(targetZoneConfig, baseTa) : baseTa;
-                const baseVel = engine.calculateAirVelocity ? engine.calculateAirVelocity(targetZoneConfig, roomName) : 0.1;
-                const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(targetZoneConfig) : { met: 1.2, totalClo: 1.0 };
-
-                const checkedActionKeys = [];
-                allRecs.forEach(r => {
-                    const item = lifecycleState.recos[r.id];
-                    if (item && item.status === 'completed') checkedActionKeys.push(r.actionKey);
-                });
-
-                const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: roomData.rh, met, clo: totalClo };
-                const pmvInit = engine.calculatePMV(baseTa, baseTr, baseVel, roomData.rh, met, totalClo);
+                const pmvInit = engine.calculatePMV ? engine.calculatePMV(baseTa, baseTr, baseVel, roomData.rh, met, totalClo) : 0;
                 const simulation = engine.evaluateSimulatedPMV ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal) : { pmv: pmvInit };
 
                 if (dispInitEl) dispInitEl.textContent = (pmvInit > 0 ? "+" : "") + pmvInit.toFixed(2);
