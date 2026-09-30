@@ -941,49 +941,54 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const sunriseH = window.solsticeEphemeris?.sunriseHour || 7;
     const sunsetH = window.solsticeEphemeris?.sunsetHour || 19;
 
-    if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length === 24) {
-        window.hourlyExtForecast.forEach(slot => {
-            const tExtHour = slot.temp;
-            let depHour = 0;
-            let gainsCondHour = 0;
-            let gainsSolHour = 0;
+// On fixe la température intérieure de référence à 20°C (ou la consigne) pour stabiliser le bilan de la journée
+const tIntRef = 20.0; 
 
-            if (ta > tExtHour) {
-                depHour = (hTotal * (ta - tExtHour)) / 1000;
-            } else {
-                gainsCondHour = (hTotal * (tExtHour - ta)) / 1000;
-            }
+if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length === 24) {
+    window.hourlyExtForecast.forEach(slot => {
+        const tExtHour = slot.temp;
+        let depHour = 0;
+        let gainsCondHour = 0;
+        let gainsSolHour = 0;
 
-            if (slot.isSunny && Array.isArray(zoneConfig.windows)) {
-                zoneConfig.windows.forEach(win => {
-                    const wArea = parseFloat(win.area) || 0;
-                    if (wArea <= 0) return;
+        // Calcul des déperditions/gains basés sur la consigne fixe tIntRef
+        if (tIntRef > tExtHour) {
+            depHour = (hTotal * (tIntRef - tExtHour)) / 1000;
+        } else {
+            gainsCondHour = (hTotal * (tExtHour - tIntRef)) / 1000;
+        }
 
-                    const gFactor = glassMap[win.glass] ?? 0.60;
-                    const maskFactor = maskMap[win.mask] ?? 1.0;
-                    const shutterFactor = shutterMap[win.shutter] ?? 1.0;
+        if (slot.isSunny && Array.isArray(zoneConfig.windows)) {
+            zoneConfig.windows.forEach(win => {
+                const wArea = parseFloat(win.area) || 0;
+                if (wArea <= 0) return;
 
-                    const orients = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
-                    let sumI = 0;
-                    orients.forEach(o => { sumI += (orientMap[o] || 1.5); });
-                    let iSolar = orients.length > 0 ? (sumI / orients.length) : 1.5;
+                const gFactor = glassMap[win.glass] ?? 0.60;
+                const maskFactor = maskMap[win.mask] ?? 1.0;
+                const shutterFactor = shutterMap[win.shutter] ?? 1.0;
 
-                    gainsSolHour += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 12));
-                });
-            }
+                const orients = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
+                let sumI = 0;
+                orients.forEach(o => { sumI += (orientMap[o] || 1.5); });
+                let iSolar = orients.length > 0 ? (sumI / orients.length) : 1.5;
 
-            deperditionskWh += depHour;
-            gainsConductionkWh += gainsCondHour;
-            gainsSolaireskWh += gainsSolHour;
+                gainsSolHour += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 12));
+            });
+        }
 
-            const netHour = (gainsCondHour + gainsSolHour) - depHour;
-            
-            if (slot.hour >= sunriseH && slot.hour < sunsetH) {
-                bilanDiurnekWh += netHour;
-            } else {
-                bilanNocturnekWh += netHour;
-            }
-        });
+        deperditionskWh += depHour;
+        gainsConductionkWh += gainsCondHour;
+        gainsSolaireskWh += gainsSolHour;
+
+        const netHour = (gainsCondHour + gainsSolHour) - depHour;
+        
+        if (slot.hour >= sunriseH && slot.hour < sunsetH) {
+            bilanDiurnekWh += netHour;
+        } else {
+            bilanNocturnekWh += netHour;
+        }
+    });
+}
     } else {
         deperditionskWh = depKw * 24;
         gainsConductionkWh = gainsConductionKw * 24;
@@ -1124,7 +1129,6 @@ function updateStructureTemperature(nomPiece, currentTa) {
 
 function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
     const deltaFlux = tStruct - tAir;
-
     const fluxPowerKw = (totalVolumeM3 * 17 * deltaFlux) / 1000;
     const absPowerKw = Math.abs(fluxPowerKw).toFixed(2);
 
@@ -1142,15 +1146,23 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
         fluxColor = "#4ADE80";
     }
 
-    const deltaExt = tAir - outdoorTemp; 
-    let autonomyHours = 0;
-
-    if (tAir > 19.0 && deltaExt > 0.1) {
-        const deltaMarge = Math.max(0, tStruct - 19.0);
-        const tauMoyen = 18.0; 
-        autonomyHours = (tauMoyen * deltaMarge) / deltaExt;
+    // --- FIX POINT 4a : AUTONOMIE BASÉE SUR LA TEMPÉRATURE DE LA NUIT À VENIR ---
+    let tExtNuit = outdoorTemp;
+    if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length > 0) {
+        const tempsNuit = window.hourlyExtForecast.filter(s => s.hour >= 22 || s.hour <= 7).map(s => s.temp);
+        if (tempsNuit.length > 0) tExtNuit = Math.min(...tempsNuit);
     }
 
+    const deltaExtNuit = tAir - tExtNuit;
+    let autonomyHours = 0;
+
+    if (tAir > 19.0 && deltaExtNuit > 0.1) {
+        const deltaMarge = Math.max(0, tStruct - 19.0);
+        const tauMoyen = 18.0; 
+        autonomyHours = (tauMoyen * deltaMarge) / deltaExtNuit;
+    }
+
+    // --- FIX POINT 4b : ANALYSE DES PRÉVISIONS 1J / 2J PAR PROFIL ---
     const rawConfig = localStorage.getItem('HOUSE_CONFIG');
     const houseConfig = rawConfig ? JSON.parse(rawConfig) : {};
     
@@ -1160,42 +1172,44 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
                     || localStorage.getItem('SOLSTICE_PROFILE') 
                     || 'long_term';
 
-    let tMax = outdoorTemp;
-    let tMin = outdoorTemp;
+    let tMaxPrevue = outdoorTemp;
+    let tMinPrevue = outdoorTemp;
+
     if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length > 0) {
-        const temps = window.hourlyExtForecast.map(s => s.temp);
-        tMax = Math.max(...temps);
-        tMin = Math.min(...temps);
+        const tempsMeteo = window.hourlyExtForecast.map(s => s.temp);
+        tMaxPrevue = Math.max(...tempsMeteo);
+        tMinPrevue = Math.min(...tempsMeteo);
     }
 
     const mursChauds = tStruct > 22.5;
-    const nuitsFraichesAvenir = tMin < 14.0 || isHeatingSeasonActive();
+    // Une purge/décharge n'est pertinente que si une vraie journée chaude (>= 25°C) arrive
+    const vagueDeChaleurAvenir = tMaxPrevue >= 25.0;
+    const periodeFroideAvenir = tMinPrevue < 15.0 || isHeatingSeasonActive();
 
     let actionText = "";
 
     if (profileKey === 'short_term') {
-        if (outdoorTemp > 25.0) {
-            actionText = "🛡️ Préserver fraîcheur";
-        } else if (outdoorTemp < 18.0) {
-            actionText = "☀️ Stocker chaleur";
-        } else {
-            actionText = "⚖️ Maintenir équilibre";
-        }
-    } else if (profileKey === 'long_term') {
-        if (nuitsFraichesAvenir) {
-            actionText = (tStruct <= 22.0) ? "☀️️ Anticiper & stocker" : "🛡️ Conserver chaleur";
-        } else if (mursChauds) {
+        if (outdoorTemp > 25.0) actionText = "🛡️ Préserver fraîcheur";
+        else if (outdoorTemp < 18.0) actionText = "☀️ Stocker chaleur";
+        else actionText = "⚖️ Maintenir équilibre";
+
+    } else if (profileKey === 'mid_term') {
+        // Horizon 24h (1 jour)
+        if (vagueDeChaleurAvenir && mursChauds) {
             actionText = "🌙 Décharger chaleur";
+        } else if (periodeFroideAvenir || !vagueDeChaleurAvenir) {
+            actionText = (tStruct <= 22.0) ? "☀️ Stocker chaleur" : "🛡️ Conserver chaleur";
         } else {
             actionText = "⚖️ Maintenir équilibre";
         }
+
     } else {
-        if (nuitsFraichesAvenir) {
-            actionText = (tStruct <= 22.0) ? "☀️ Stocker chaleur" : "🛡️ Conserver chaleur";
-        } else if (tMax >= 26.0 && tMin >= 17.0) {
-            actionText = "🌙 Stocker fraîcheur";
-        } else if (tMax >= 25.0) {
-            actionText = "🛡️ Préserver fraîcheur";
+        // Profil Long Termiste (Horizon 48h / global)
+        if (vagueDeChaleurAvenir && mursChauds) {
+            actionText = "🌙 Décharger chaleur";
+        } else if (periodeFroideAvenir || !vagueDeChaleurAvenir) {
+            // Si les jours à venir ne sont pas chauds, conserver l'énergie accumulée
+            actionText = (tStruct <= 22.0) ? "☀️ Anticiper & stocker" : "🛡️ Conserver chaleur";
         } else {
             actionText = "⚖️ Maintenir équilibre";
         }
