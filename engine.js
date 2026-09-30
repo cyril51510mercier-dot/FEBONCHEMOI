@@ -158,13 +158,18 @@ window.SolsticeStore = {
     getAllZones() { return this.getZones(); },
     
     getZones() {
-        try {
+    try {
+        // Rechargement depuis le localStorage si l'objet mémoire 'config' est vide
+        if (!this.config || Object.keys(this.config).length === 0) {
             const raw = localStorage.getItem(this.STORAGE_KEY);
-            return raw ? JSON.parse(raw) : {};
-        } catch (e) {
-            return {};
+            this.config = raw ? JSON.parse(raw) : {};
         }
-    },
+        return (this.config && Object.keys(this.config).length > 0) ? this.config : { global: {} };
+    } catch (e) {
+        console.error("[SolsticeStore] Erreur lecture getZones :", e);
+        return { global: {} };
+    }
+},
 
     getScanData() {
         try {
