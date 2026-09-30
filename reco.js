@@ -6,6 +6,12 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialisation forcée de la source de données
+    if (window.SolsticeStore && typeof window.SolsticeStore.init === 'function') {
+        window.SolsticeStore.init();
+    }
+    
+    // ... suite du script
     try {
         const store = window.SolsticeStore;
         const engine = window.SolsticeEngine;
