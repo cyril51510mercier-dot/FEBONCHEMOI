@@ -221,11 +221,12 @@ const mergedRecos = { ...localRecos, ...remoteRecos };
 // ============================================================
 
 function getClothingDescription(clo) {
-    if (clo < 0.45) return "Maillot de bain / Short & débardeur léger";
-    if (clo < 0.65) return "T-shirt, short / jupe légère & nu-pieds";
-    if (clo < 0.85) return "Pantalon léger & t-shirt manches longues";
-    if (clo < 1.05) return "Pantalon, chemise ou pull léger";
-    if (clo < 1.25) return "Pull chaud, pantalon épais & chaussettes";
+    if (clo < 0.45) return "Short & débardeur léger";
+    if (clo < 0.55) return "T-shirt, short / jupe légère & nu-pieds";
+    if (clo < 0.75) return "Pantalon léger & T-shirt / chemisette";
+    if (clo < 0.95) return "Pantalon & T-shirt manches longues / chemise";
+    if (clo < 1.15) return "Pantalon, chemise & pull léger";
+    if (clo < 1.35) return "Pull chaud, pantalon épais & chaussettes";
     return "Gros pull, veste d'intérieur & plaid";
 }
 
