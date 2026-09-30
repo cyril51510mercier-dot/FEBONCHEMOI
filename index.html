@@ -108,13 +108,15 @@
             </div>
 
 <!-- SYNTHÈSE GLOBALE DE L'HABITAT -->
-<div class="card" style="background: #0F172A; color: white; border-radius: 12px; padding: 20px; margin-bottom: 25px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #1E293B; padding-bottom: 10px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #1E293B; padding-bottom: 10px;">
+    <div style="display: flex; align-items: baseline; gap: 10px;">
         <h2 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #F8FAFC;">🏠 Synthèse Globale de l'Habitat</h2>
-        <label style="font-size: 0.82rem; color: #94A3B8; cursor: pointer;">
-            <input type="checkbox" id="include-buffer-checkbox" onchange="toggleIncludeBuffer(this.checked)"> Inclure pièces tampons
-        </label>
+        <span id="global-calc-timestamp" style="font-size: 0.75rem; color: #64748B; font-weight: 500;">--:--</span>
     </div>
+    <label style="font-size: 0.82rem; color: #94A3B8; cursor: pointer;">
+        <input type="checkbox" id="include-buffer-checkbox" onchange="toggleIncludeBuffer(this.checked)"> Inclure pièces tampons
+    </label>
+</div>
 
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 15px;">
         
