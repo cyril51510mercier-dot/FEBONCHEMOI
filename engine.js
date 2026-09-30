@@ -1125,7 +1125,7 @@ function updateStructureTemperature(nomPiece, currentTa) {
     return roomData.tStruct;
 }
 
-function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
+function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel = 18.0) {
     const deltaFlux = tStruct - tAir;
     const fluxPowerKw = (totalVolumeM3 * 17 * deltaFlux) / 1000;
     const absPowerKw = Math.abs(fluxPowerKw).toFixed(2);
@@ -1144,23 +1144,29 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
         fluxColor = "#4ADE80";
     }
 
-    // --- FIX POINT 4a : AUTONOMIE BASÉE SUR LA TEMPÉRATURE DE LA NUIT À VENIR ---
-    let tExtNuit = outdoorTemp;
-    if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length > 0) {
-        const tempsNuit = window.hourlyExtForecast.filter(s => s.hour >= 22 || s.hour <= 7).map(s => s.temp);
-        if (tempsNuit.length > 0) tExtNuit = Math.min(...tempsNuit);
+    // --- CALCUL DE L'AUTONOMIE INERTIELLE T_STRUCT -> 19°C ---
+    const tauMoyen = 18.0; // Constante de temps moyenne d'inertie du bâtiment (h)
+    const tExtMoy = getDailyOutdoorTemp(); // Température extérieure moyenne prévisionnelle
+    const tCible = 19.0;
+
+    let autonomyText = "";
+
+    if (tStruct <= tCible) {
+        autonomyText = "Parois ≤ 19°C";
+    } else if (tExtMoy >= tCible) {
+        autonomyText = "N/A (T° ext ≥ 19°C)";
+    } else {
+// Utilisation du tau issu du paramétrage BEM expert
+        const hoursTo19 = tauReel * Math.log((tStruct - tExtMoy) / (tCible - tExtMoy));
+
+        if (hoursTo19 >= 48) {
+            const days = (hoursTo19 / 24).toFixed(1);
+            autonomyText = `~${days} jours`;
+        } else {
+            autonomyText = `~${hoursTo19.toFixed(1)} h`;
+        }
     }
-
-    const deltaExtNuit = tAir - tExtNuit;
-    let autonomyHours = 0;
-
-    if (tAir > 19.0 && deltaExtNuit > 0.1) {
-        const deltaMarge = Math.max(0, tStruct - 19.0);
-        const tauMoyen = 18.0; 
-        autonomyHours = (tauMoyen * deltaMarge) / deltaExtNuit;
-    }
-
-    // --- FIX POINT 4b : ANALYSE DES PRÉVISIONS 1J / 2J PAR PROFIL ---
+    // --- ANALYSE DES PRÉVISIONS 1J / 2J PAR PROFIL ---
     const rawConfig = localStorage.getItem('HOUSE_CONFIG');
     const houseConfig = rawConfig ? JSON.parse(rawConfig) : {};
     
@@ -1180,7 +1186,6 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
     }
 
     const mursChauds = tStruct > 22.5;
-    // Une purge/décharge n'est pertinente que si une vraie journée chaude (>= 25°C) arrive
     const vagueDeChaleurAvenir = tMaxPrevue >= 25.0;
     const periodeFroideAvenir = tMinPrevue < 15.0 || isHeatingSeasonActive();
 
@@ -1192,7 +1197,6 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
         else actionText = "⚖️ Maintenir équilibre";
 
     } else if (profileKey === 'mid_term') {
-        // Horizon 24h (1 jour)
         if (vagueDeChaleurAvenir && mursChauds) {
             actionText = "🌙 Décharger chaleur";
         } else if (periodeFroideAvenir || !vagueDeChaleurAvenir) {
@@ -1202,11 +1206,9 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
         }
 
     } else {
-        // Profil Long Termiste (Horizon 48h / global)
         if (vagueDeChaleurAvenir && mursChauds) {
             actionText = "🌙 Décharger chaleur";
         } else if (periodeFroideAvenir || !vagueDeChaleurAvenir) {
-            // Si les jours à venir ne sont pas chauds, conserver l'énergie accumulée
             actionText = (tStruct <= 22.0) ? "☀️ Anticiper & stocker" : "🛡️ Conserver chaleur";
         } else {
             actionText = "⚖️ Maintenir équilibre";
@@ -1224,7 +1226,7 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100) {
         fluxStatusText,
         fluxColor,
         actionColor,
-        autonomyHours: parseFloat(autonomyHours.toFixed(1)),
+        autonomyText,
         actionText
     };
 }
@@ -1240,6 +1242,7 @@ function calculateGlobalHabitatMetrics() {
     let weightedPMV = 0;
     let weightedTStruct = 0;
     let weightedDryingIndex = 0;
+    let weightedTau = 0; // Accumulateur pour la constante de temps BEM
 
     let totalDeperditionsKw = 0;
     let totalGainsConductionKw = 0;
@@ -1249,18 +1252,20 @@ function calculateGlobalHabitatMetrics() {
     let totalBilanDiurnekWh = 0;
     let totalBilanNocturnekWh = 0;
 
-    for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
+for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
         if (nomPiece === '__ENV__' || nomPiece === '__BUFFER_TOGGLE__') continue;
         if (!data || isNaN(data.ta) || isNaN(data.rh)) continue;
 
         const zoneConfig = getZoneConfigByName(nomPiece) || { area: 15, height: 2.5 };
-
         if (isOutdoorZone(nomPiece, zoneConfig)) continue;
         if (!includeBufferZones && isBufferZone(nomPiece, zoneConfig)) continue;
 
         const area = parseFloat(zoneConfig.area) || 15;
         const height = parseFloat(zoneConfig.height) || 2.5;
         const volume = area * height;
+
+        // Calcul du tau dynamique de la pièce depuis la config BEM
+        const tauPiece = calculateDynamicTau(zoneConfig);
 
         const ah = calculateAbsoluteHumidity(data.ta, data.rh);
         const vel = calculateAirVelocity(zoneConfig, nomPiece);
@@ -1273,6 +1278,7 @@ function calculateGlobalHabitatMetrics() {
         const tStruct = updateStructureTemperature(nomPiece, data.ta);
 
         totalVolume += volume;
+        weightedTau += tauPiece * volume;
         weightedTemp += data.ta * volume;
         weightedRH += data.rh * volume;
         weightedAH += ah * volume;
@@ -1290,6 +1296,7 @@ function calculateGlobalHabitatMetrics() {
     }
 
     if (totalVolume === 0) return null;
+    const avgTau = weightedTau / totalVolume; // Tau réel personnalisé de la maison
 
     // Calcul du séchage extérieur (Météo)
     const velExt = (outdoorWind || 0) / 3.6;
@@ -1305,6 +1312,7 @@ function calculateGlobalHabitatMetrics() {
         avgAH: parseFloat((weightedAH / totalVolume).toFixed(2)),
         avgPMV: parseFloat((weightedPMV / totalVolume).toFixed(2)),
         avgTStruct: parseFloat((weightedTStruct / totalVolume).toFixed(1)),
+        avgTau: parseFloat(avgTau.toFixed(1)),
         indoorDryingScore10: indoorDryingScore10,
         outdoorDryingScore10: dryingOutdoor.score10,
         totalDeperditionsKw: parseFloat(totalDeperditionsKw.toFixed(2)),
@@ -1583,7 +1591,13 @@ function actualiserCockpitGlobal() {
     }
 
     // 4. CARTE INERTIE & MASSE
-    const globalReserve = calculateStructureReserve(metrics.avgTStruct, metrics.avgTemp, metrics.totalVolumeM3);
+    // Transmission de metrics.avgTau au calcul de reserve
+const globalReserve = calculateStructureReserve(
+    metrics.avgTStruct, 
+    metrics.avgTemp, 
+    metrics.totalVolumeM3, 
+    metrics.avgTau
+);
 
     if (document.getElementById('global-tstruct')) {
         document.getElementById('global-tstruct').textContent = `${metrics.avgTStruct} °C`;
