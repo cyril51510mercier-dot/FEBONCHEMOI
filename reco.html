@@ -83,29 +83,72 @@
         </div>
 
         <div class="score-card-container">
-    <!-- Éco-Score du jour -->
-    <div class="score-card">
-        <span class="score-label">Éco-Score du jour</span>
-        <div class="score-value-main" id="disp-today-score">+0 / +0 pts</div>
-        <div class="progress-bar-bg">
-            <div class="progress-bar-fill" id="scoreBar" style="width: 0%;"></div>
+    <!-- BANDEAU DE DASHBOARD SOLSTICE — RECO & SCORES -->
+<div class="solstice-dashboard-grid">
+
+    <!-- Carte 1 : Éco-Score du Jour -->
+    <div class="solstice-card card-primary">
+        <div class="card-header">
+            <span class="card-icon">🎯</span>
+            <span class="card-label">Éco-Score du Jour</span>
+        </div>
+        <div class="card-body">
+            <div class="score-display-main" id="disp-today-score">+0 / +0 <span class="unit">pts</span></div>
+            <div class="progress-container">
+                <div class="progress-bar-glow" id="scoreBar" style="width: 0%;"></div>
+            </div>
+            <div class="card-subtext" id="roomScoreTitle">Optimisation en temps réel</div>
         </div>
     </div>
 
-    <!-- Éco-Score Cumulé (XP) -->
-    <div class="score-card">
-        <span class="score-label">Éco-Score Cumulé (Total)</span>
-        <div class="score-value-xp" id="disp-total-xp">0 pts XP</div>
-        <span class="score-subtext">Expérience environnementale</span>
+    <!-- Carte 2 : Expérience Cumulée (XP) -->
+    <div class="solstice-card card-xp">
+        <div class="card-header">
+            <span class="card-icon">⚡</span>
+            <span class="card-label">Éco-Score Cumulé</span>
+        </div>
+        <div class="card-body">
+            <div class="score-display-xp" id="disp-total-xp">0 <span class="unit">pts XP</span></div>
+            <div class="xp-badge">Niveau Bâtiment Passif</div>
+            <div class="card-subtext">Capital sobriété du logement</div>
+        </div>
     </div>
 
-    <!-- Cagnotte Économies -->
-    <div class="score-card">
-        <span class="score-label">Cagnotte Économies</span>
-        <div class="score-value-eur" id="disp-daily-savings-eur">0,00 €</div>
-        <div class="score-subtext" id="disp-daily-savings-kwh">0.0 kWh/j évités aujourd'hui</div>
-        <div class="cagnotte-total-tag">Cagnotte cumulée : <strong id="disp-cagnotte-total">0,00 €</strong></div>
+    <!-- Carte 3 : Gains Énergétiques & Financiers -->
+    <div class="solstice-card card-finance">
+        <div class="card-header">
+            <span class="card-icon">🌱</span>
+            <span class="card-label">Cagnotte & Économies</span>
+        </div>
+        <div class="card-body">
+            <div class="score-display-eur" id="disp-daily-savings-eur">0,00 €</div>
+            <div class="energy-avoided" id="disp-daily-savings-kwh">0.00 kWh/j évités aujourd'hui</div>
+            <div class="cagnotte-pill">
+                Cagnotte globale : <strong id="disp-cagnotte-total">0,00 €</strong>
+            </div>
+        </div>
     </div>
+
+    <!-- Carte 4 : Confort PMV Volumique -->
+    <div class="solstice-card card-pmv">
+        <div class="card-header">
+            <span class="card-icon">🌡️</span>
+            <span class="card-label">Ressenti Thermal (PMV)</span>
+        </div>
+        <div class="card-body pmv-body">
+            <div class="pmv-box">
+                <span class="pmv-tag">Mesuré</span>
+                <span class="pmv-val" id="disp-pmv-init">0.00</span>
+            </div>
+            <div class="pmv-arrow">➔</div>
+            <div class="pmv-box highlight">
+                <span class="pmv-tag">Simulé</span>
+                <span class="pmv-val" id="disp-pmv-sim">0.00</span>
+            </div>
+        </div>
+        <div class="card-subtext">Pondération volumique des pièces</div>
+    </div>
+
 </div>
 
         <!-- Groupes par Niveau -->
