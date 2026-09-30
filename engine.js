@@ -191,23 +191,27 @@ window.SolsticeStore = {
     },
 
     getEnvData() {
-    try {
-        const raw = localStorage.getItem('SOLSTICE_ENV_DATA');
-        const data = raw ? JSON.parse(raw) : {};
-        
-        // Structure garantie à la source pour toute l'application
-        return {
-            t_ext: typeof data.t_ext === 'number' ? data.t_ext : 15,
-            rh_ext: typeof data.rh_ext === 'number' ? data.rh_ext : 60,
-            sun_status: data.sun_status || 'clear',
-            t_ext_max: typeof data.t_ext_max === 'number' ? data.t_ext_max : ((data.t_ext || 15) + 3),
-            t_ext_min: typeof data.t_ext_min === 'number' ? data.t_ext_min : ((data.t_ext || 15) - 5)
-        };
-    } catch (e) {
-        console.error("[SolsticeStore] Erreur lecture EnvData :", e);
-        return { t_ext: 15, rh_ext: 60, sun_status: 'clear', t_ext_max: 18, t_ext_min: 10 };
-    }
-},
+        try {
+            const raw = localStorage.getItem('SOLSTICE_ENV_DATA');
+            const data = raw ? JSON.parse(raw) : {};
+            const envScan = (DONNEES_HABITAT && DONNEES_HABITAT['__ENV__']) || {};
+            
+            const tExt = typeof data.t_ext === 'number' ? data.t_ext : (typeof envScan.outdoorTemp === 'number' ? envScan.outdoorTemp : outdoorTemp);
+            const rhExt = typeof data.rh_ext === 'number' ? data.rh_ext : (typeof envScan.outdoorHumidity === 'number' ? envScan.outdoorHumidity : outdoorHumidity);
+            const sunStatus = data.sun_status || envScan.sunshineStatus || sunshineStatus || 'clear';
+
+            return {
+                t_ext: tExt,
+                rh_ext: rhExt,
+                sun_status: sunStatus,
+                t_ext_max: typeof data.t_ext_max === 'number' ? data.t_ext_max : (tExt + 3),
+                t_ext_min: typeof data.t_ext_min === 'number' ? data.t_ext_min : (tExt - 5)
+            };
+        } catch (e) {
+            console.error("[SolsticeStore] Erreur lecture EnvData :", e);
+            return { t_ext: outdoorTemp || 15, rh_ext: outdoorHumidity || 60, sun_status: sunshineStatus || 'clear', t_ext_max: 18, t_ext_min: 10 };
+        }
+    },
 
     getCheckedRecos() {
         try {
@@ -1977,9 +1981,15 @@ window.SolsticeEngine = {
         long_term:  { label: "Long termiste", allowedLevels: [1, 2, 3], pmvThreshold: 0.5, maxDeltaPmv: 0.6 }
     },
 
+    isOutdoorZone: typeof isOutdoorZone !== 'undefined' ? isOutdoorZone : null,
+    isBufferZone: typeof isBufferZone !== 'undefined' ? isBufferZone : null,
+    getZoneConfigByName: typeof getZoneConfigByName !== 'undefined' ? getZoneConfigByName : null,
+    calculateGlobalHabitatMetrics: typeof calculateGlobalHabitatMetrics !== 'undefined' ? calculateGlobalHabitatMetrics : null,
     calculatePMV: typeof calculatePMV !== 'undefined' ? calculatePMV : null,
     calculateMeanRadiantTemp: typeof calculateMeanRadiantTemp !== 'undefined' ? calculateMeanRadiantTemp : null,
     calculateAirVelocity: typeof calculateAirVelocity !== 'undefined' ? calculateAirVelocity : null,
+    getBaseCloAndMet: typeof getBaseCloAndMet !== 'undefined' ? getBaseCloAndMet : null,
+    evaluateSimulatedPMV: typeof evaluateSimulatedPMV !== 'undefined' ? evaluateSimulatedPMV : null,
     getBaseCloAndMet: typeof getBaseCloAndMet !== 'undefined' ? getBaseCloAndMet : null,
 
     evaluateSimulatedPMV(baseState, checkedActionKeys, envData) {
