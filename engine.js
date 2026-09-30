@@ -34,7 +34,6 @@ if (typeof supabase !== 'undefined') {
 function applySharedEnvironment(data) {
     if (!data) return;
     
-    // Ne restaurer l'environnement que si aucune prévision en direct n'est déjà chargée
     if (data['__ENV__'] && (!window.hourlyExtForecast || window.hourlyExtForecast.length === 0)) {
         const env = data['__ENV__'];
         outdoorTemp = env.outdoorTemp ?? outdoorTemp;
@@ -46,7 +45,6 @@ function applySharedEnvironment(data) {
         if (typeof updateWeatherUI === 'function') updateWeatherUI();
     }
     
-    // Aligner l'option d'inclusion des zones tampons
     if (typeof data['__BUFFER_TOGGLE__'] === 'boolean') {
         includeBufferZones = data['__BUFFER_TOGGLE__'];
         const cb = document.getElementById('include-buffer-checkbox');
@@ -98,10 +96,9 @@ window.SolsticeStore = {
                     const remoteScan = data.donnees_habitat || {};
                     const remoteRecos = data.checked_recos || {};
 
-                    // ✅ NOUVEAU CODE : Le Cloud (Supabase) devient la source de vérité prioritaire
-const mergedConfig = { ...localConfig, ...remoteConfig };
-const mergedScan = { ...localScan, ...remoteScan };
-const mergedRecos = { ...localRecos, ...remoteRecos };
+                    const mergedConfig = { ...localConfig, ...remoteConfig };
+                    const mergedScan = { ...localScan, ...remoteScan };
+                    const mergedRecos = { ...localRecos, ...remoteRecos };
 
                     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(mergedConfig));
                     localStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(mergedScan));
@@ -272,7 +269,6 @@ window.toggleIncludeBuffer = function(checked) {
     includeBufferZones = checked;
     localStorage.setItem('SOLSTICE_INCLUDE_BUFFER', checked ? 'true' : 'false');
     
-    // Partage du toggle avec les autres appareils via Cloud
     DONNEES_HABITAT['__BUFFER_TOGGLE__'] = checked;
     if (window.SolsticeStore && window.SolsticeStore.saveScanData) {
         window.SolsticeStore.saveScanData(DONNEES_HABITAT);
@@ -282,12 +278,10 @@ window.toggleIncludeBuffer = function(checked) {
 };
 
 window.addEventListener('load', async () => {
-    // 1. Synchronisation prioritaire avec le Cloud Supabase
     if (window.SolsticeStore && window.SolsticeStore.init) {
         await window.SolsticeStore.init();
     }
 
-    // 2. Chargement de la configuration expert
     const savedConfig = localStorage.getItem('HOUSE_CONFIG');
     if (savedConfig && Object.keys(JSON.parse(savedConfig)).length > 0) { 
         GLOBAL_HOUSE_CONFIG = JSON.parse(savedConfig); 
@@ -298,7 +292,6 @@ window.addEventListener('load', async () => {
         return; 
     }
 
-    // 3. Chargement de la sélection de pièces
     const savedSelection = localStorage.getItem('SOLSTICE_SELECTION_PIECES');
     if (savedSelection) {
         try { SELECTION_PIECES = JSON.parse(savedSelection); } catch(e) {}
@@ -318,12 +311,10 @@ window.addEventListener('load', async () => {
         try { window.hourlyExtForecast = JSON.parse(cachedForecast); } catch(e) {}
     }
 
-    // 4. Initialisation IHM & Données
     genererSelecteurPieces();
     initialiserDashboard(); 
     restoreSessionData();
 
-    // 5. Météo
     const savedLoc = localStorage.getItem('location') || 'Reims';
     const savedLat = localStorage.getItem('SOLSTICE_LAT');
     const savedLon = localStorage.getItem('SOLSTICE_LON');
@@ -340,7 +331,6 @@ window.addEventListener('load', async () => {
         rechercherMeteoParNomVille(savedLoc);
     }
 
-    // 6. Restauration des relevés capteurs
     const cachedHabitat = localStorage.getItem('SOLSTICE_DONNEES_HABITAT') || sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
     if (cachedHabitat) {
         DONNEES_HABITAT = JSON.parse(cachedHabitat);
@@ -1064,12 +1054,10 @@ function updateStructureTemperature(nomPiece, currentTa) {
     }
     const roomData = DONNEES_HABITAT[nomPiece];
 
-    // Priorité aux données d'inertie synchronisées dans DONNEES_HABITAT
     let lastTstruct = roomData.tStruct;
     let lastTop = roomData.lastTop;
     let lastTimestamp = roomData.lastTimestamp;
 
-    // Fallback sur le stockage local si première initialisation
     if (lastTstruct === undefined) {
         const lastDataRaw = localStorage.getItem(`SOLSTICE_TSTRUCT_${nomPiece}`);
         if (lastDataRaw) {
@@ -1145,8 +1133,7 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
     }
 
     // --- CALCUL DE L'AUTONOMIE INERTIELLE T_STRUCT -> 19°C ---
-    const tauMoyen = 18.0; // Constante de temps moyenne d'inertie du bâtiment (h)
-    const tExtMoy = getDailyOutdoorTemp(); // Température extérieure moyenne prévisionnelle
+    const tExtMoy = getDailyOutdoorTemp(); 
     const tCible = 19.0;
 
     let autonomyText = "";
@@ -1156,7 +1143,7 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
     } else if (tExtMoy >= tCible) {
         autonomyText = "N/A (T° ext ≥ 19°C)";
     } else {
-// Utilisation du tau issu du paramétrage BEM expert
+        // Utilisation du tau issu du paramétrage BEM expert
         const hoursTo19 = tauReel * Math.log((tStruct - tExtMoy) / (tCible - tExtMoy));
 
         if (hoursTo19 >= 48) {
@@ -1166,7 +1153,8 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
             autonomyText = `~${hoursTo19.toFixed(1)} h`;
         }
     }
-    // --- ANALYSE DES PRÉVISIONS 1J / 2J PAR PROFIL ---
+
+    // --- ANALYSE DES PRÉVISIONS PAR PROFIL ET RÉPARATION DE LA LOGIQUE DÉCHARGE ---
     const rawConfig = localStorage.getItem('HOUSE_CONFIG');
     const houseConfig = rawConfig ? JSON.parse(rawConfig) : {};
     
@@ -1186,8 +1174,8 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
     }
 
     const mursChauds = tStruct > 22.5;
-    const vagueDeChaleurAvenir = tMaxPrevue >= 25.0;
-    const periodeFroideAvenir = tMinPrevue < 15.0 || isHeatingSeasonActive();
+    const vraieVagueDeChaleur = tMaxPrevue >= 25.0 && tMinPrevue >= 16.0;
+    const nuitsFraichesOuChauffe = tMinPrevue < 15.0 || isHeatingSeasonActive();
 
     let actionText = "";
 
@@ -1197,19 +1185,19 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
         else actionText = "⚖️ Maintenir équilibre";
 
     } else if (profileKey === 'mid_term') {
-        if (vagueDeChaleurAvenir && mursChauds) {
-            actionText = "🌙 Décharger chaleur";
-        } else if (periodeFroideAvenir || !vagueDeChaleurAvenir) {
+        if (nuitsFraichesOuChauffe) {
             actionText = (tStruct <= 22.0) ? "☀️ Stocker chaleur" : "🛡️ Conserver chaleur";
+        } else if (vraieVagueDeChaleur && mursChauds) {
+            actionText = "🌙 Décharger chaleur";
         } else {
             actionText = "⚖️ Maintenir équilibre";
         }
 
-    } else {
-        if (vagueDeChaleurAvenir && mursChauds) {
-            actionText = "🌙 Décharger chaleur";
-        } else if (periodeFroideAvenir || !vagueDeChaleurAvenir) {
+    } else { // long_term
+        if (nuitsFraichesOuChauffe) {
             actionText = (tStruct <= 22.0) ? "☀️ Anticiper & stocker" : "🛡️ Conserver chaleur";
+        } else if (vraieVagueDeChaleur && mursChauds) {
+            actionText = "🌙 Décharger chaleur";
         } else {
             actionText = "⚖️ Maintenir équilibre";
         }
@@ -1242,7 +1230,7 @@ function calculateGlobalHabitatMetrics() {
     let weightedPMV = 0;
     let weightedTStruct = 0;
     let weightedDryingIndex = 0;
-    let weightedTau = 0; // Accumulateur pour la constante de temps BEM
+    let weightedTau = 0;
 
     let totalDeperditionsKw = 0;
     let totalGainsConductionKw = 0;
@@ -1252,7 +1240,7 @@ function calculateGlobalHabitatMetrics() {
     let totalBilanDiurnekWh = 0;
     let totalBilanNocturnekWh = 0;
 
-for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
+    for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
         if (nomPiece === '__ENV__' || nomPiece === '__BUFFER_TOGGLE__') continue;
         if (!data || isNaN(data.ta) || isNaN(data.rh)) continue;
 
@@ -1264,7 +1252,6 @@ for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
         const height = parseFloat(zoneConfig.height) || 2.5;
         const volume = area * height;
 
-        // Calcul du tau dynamique de la pièce depuis la config BEM
         const tauPiece = calculateDynamicTau(zoneConfig);
 
         const ah = calculateAbsoluteHumidity(data.ta, data.rh);
@@ -1296,13 +1283,11 @@ for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
     }
 
     if (totalVolume === 0) return null;
-    const avgTau = weightedTau / totalVolume; // Tau réel personnalisé de la maison
+    const avgTau = weightedTau / totalVolume;
 
-    // Calcul du séchage extérieur (Météo)
     const velExt = (outdoorWind || 0) / 3.6;
     const dryingOutdoor = calculateDryingPotential(outdoorTemp, outdoorHumidity, velExt);
 
-    // Calcul de la moyenne pondérée du séchage intérieur
     const avgDryingIndoorIndex = weightedDryingIndex / totalVolume;
     const indoorDryingScore10 = (Math.min(100, Math.max(0, Math.round((avgDryingIndoorIndex / 1.8) * 100))) / 10).toFixed(1);
 
@@ -1555,7 +1540,6 @@ function actualiserCockpitGlobal() {
         }
     }
 
-    // Injection des valeurs de séchage dans le DOM
     if (document.getElementById('global-drying-indoor')) {
         document.getElementById('global-drying-indoor').textContent = `${metrics.indoorDryingScore10}/10`;
     }
@@ -1591,13 +1575,12 @@ function actualiserCockpitGlobal() {
     }
 
     // 4. CARTE INERTIE & MASSE
-    // Transmission de metrics.avgTau au calcul de reserve
-const globalReserve = calculateStructureReserve(
-    metrics.avgTStruct, 
-    metrics.avgTemp, 
-    metrics.totalVolumeM3, 
-    metrics.avgTau
-);
+    const globalReserve = calculateStructureReserve(
+        metrics.avgTStruct, 
+        metrics.avgTemp, 
+        metrics.totalVolumeM3, 
+        metrics.avgTau
+    );
 
     if (document.getElementById('global-tstruct')) {
         document.getElementById('global-tstruct').textContent = `${metrics.avgTStruct} °C`;
@@ -1626,21 +1609,15 @@ const globalReserve = calculateStructureReserve(
 
     const autonomyEl = document.getElementById('global-autonomy');
     if (autonomyEl) {
-        if (globalReserve.autonomyHours > 0) {
-            autonomyEl.textContent = `~${globalReserve.autonomyHours} h`;
-        } else if (metrics.avgTemp <= 19.0) {
-            autonomyEl.textContent = "N/A (T° ≤ 19°C)";
-        } else {
-            autonomyEl.textContent = "N/A (Pas de perte)";
-        }
+        autonomyEl.textContent = globalReserve.autonomyText;
     }
 
     const timeEl = document.getElementById('global-calc-timestamp');
-if (timeEl) {
-    const now = new Date();
-    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    timeEl.textContent = `(Calculé à ${timeStr})`;
-}
+    if (timeEl) {
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        timeEl.textContent = `(Calculé à ${timeStr})`;
+    }
 
     const actionEl = document.getElementById('global-reserve-action');
     if (actionEl) {
@@ -1819,17 +1796,17 @@ function fetchOneCallWeather(lat, lon, cityName = 'Reims') {
             localStorage.setItem('sunshineStatus', sunshineStatus);
             
             if (typeof DONNEES_HABITAT === 'object') {
-    DONNEES_HABITAT['__ENV__'] = {
-        outdoorTemp,
-        outdoorHumidity,
-        outdoorWind,
-        sunshineStatus,
-        hourlyExtForecast: window.hourlyExtForecast
-    };
-    if (window.SolsticeStore && window.SolsticeStore.saveScanData) {
-        window.SolsticeStore.saveScanData(DONNEES_HABITAT);
-    }
-}
+                DONNEES_HABITAT['__ENV__'] = {
+                    outdoorTemp,
+                    outdoorHumidity,
+                    outdoorWind,
+                    sunshineStatus,
+                    hourlyExtForecast: window.hourlyExtForecast
+                };
+                if (window.SolsticeStore && window.SolsticeStore.saveScanData) {
+                    window.SolsticeStore.saveScanData(DONNEES_HABITAT);
+                }
+            }
 
             updateWeatherUI();
             updateClothingDisplay(); 
@@ -1856,12 +1833,10 @@ function updateWeatherUI(loading = false, error = false, errorMsg = "") {
         return;
     }
 
-    // 1. Mise à jour de l'affichage permanent dans l'en-tête
     if (inlineEl) {
         inlineEl.innerHTML = `🌡️ ${outdoorTemp.toFixed(1)} °C &nbsp;|&nbsp; 💧 ${outdoorHumidity}% HR &nbsp;|&nbsp; 💨 ${outdoorWind.toFixed(0)} km/h`;
     }
 
-    // 2. Mise à jour de l'encart détaillé en texte blanc clair (#F8FAFC)
     if (summaryEl) {
         summaryEl.style.color = "#F8FAFC";
         summaryEl.innerHTML = `
@@ -1912,7 +1887,6 @@ window.synchroniserTouteLaMaison = async function(event) {
                 DONNEES_HABITAT[nomPiece].ta = parseFloat(capteur.temperature);
                 DONNEES_HABITAT[nomPiece].rh = parseFloat(capteur.humidity);
 
-                // Calcule et verrouille l'inertie dans le même objet partagé
                 updateStructureTemperature(nomPiece, DONNEES_HABITAT[nomPiece].ta);
 
                 if (SELECTION_PIECES.includes(nomPiece)) {
@@ -1928,13 +1902,11 @@ window.synchroniserTouteLaMaison = async function(event) {
             }
         }
 
-        // Ajout de la Météo et du Tampon dans le paquet pour unifier tous les appareils
         DONNEES_HABITAT['__ENV__'] = {
             outdoorTemp, outdoorHumidity, outdoorWind, sunshineStatus, hourlyExtForecast: window.hourlyExtForecast
         };
         DONNEES_HABITAT['__BUFFER_TOGGLE__'] = includeBufferZones;
 
-        // Sauvegarde globale + Synchro Cloud instantanée vers Supabase
         if (window.SolsticeStore && window.SolsticeStore.saveScanData) {
             window.SolsticeStore.saveScanData(DONNEES_HABITAT);
         }
@@ -2116,7 +2088,6 @@ window.SolsticeEngine = {
     }
 };
 
-// Synchronisation automatique au déverrouillage du téléphone ou retour sur l'onglet
 document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'visible' && window.SolsticeStore) {
         await window.SolsticeStore.init();
@@ -2124,7 +2095,6 @@ document.addEventListener('visibilitychange', async () => {
     }
 });
 
-// Écoute temps réel Supabase (si activé sur la table)
 if (typeof supabaseClient !== 'undefined' && supabaseClient) {
     getConnectedHouseId().then(houseId => {
         supabaseClient
