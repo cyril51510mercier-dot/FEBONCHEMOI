@@ -44,6 +44,18 @@
         <div id="profileSaveStatus" style="font-size: 0.8rem; color: #27ae60; font-weight: bold; margin-top: 5px; display: none;">✅ Profil enregistré</div>
     </div>
 
+    <div style="margin-top: 15px;">
+    <label for="mainEnergySource" style="font-weight: 600;">Source d'énergie principale de chauffage du logement :</label>
+    <select id="mainEnergySource" style="width: 100%; padding: 10px; margin-top: 6px; border-radius: 6px; font-weight: 600;">
+        <option value="elec_direct" selected>Électricité directe (Convecteurs / Panneaux rayonnants)</option>
+        <option value="pac_air_eau">Pompe à chaleur Air/Eau (COP moyen 3,2)</option>
+        <option value="pac_air_air">Pompe à chaleur Air/Air / Climatisation réversible (COP 3,0)</option>
+        <option value="gaz_condens">Chaudière Gaz à condensation (Rendement 95 %)</option>
+        <option value="granules">Poêle / Chaudière à granulés (Bois)</option>
+        <option value="fioul">Chaudière Fioul</option>
+    </select>
+</div>
+
     <div class="config-card">
         <h3>🔥 Saison de Chauffe</h3>
         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
@@ -154,6 +166,11 @@
                         <option value="ite_heavy">ITE Lourde (Isolant extérieur performant)</option>
                     </select>
                 </div>
+
+                <div>
+    <label for="customWallU">Coeff. de déperdition mur $U_{\text{mur}}$ (W/m²·K) — Optionnel :</label>
+    <input type="number" id="customWallU" step="0.01" min="0.1" max="4.0" placeholder="Auto si vide (ex: 0.22 DPE)">
+</div>
 
                 <div class="full-width" style="margin-top:10px;"><strong style="color:var(--primary, #2c3e50);">Plafond / Toiture :</strong></div>
                 <div>
@@ -307,6 +324,20 @@
                         <option value="floor">Plancher Chauffant (Hydraulique / Électrique)</option>
                     </select>
                 </div>
+
+                <!-- Chauffage : Ajout de la Source d'Énergie -->
+<div class="full-width">
+    <label for="heatingEnergySource" style="font-weight: bold; color: #c0392b;">Source d'énergie de chauffage (pour cette zone) :</label>
+    <select id="heatingEnergySource">
+        <option value="inherit">Identique au logement (Défaut global)</option>
+        <option value="elec_direct">Électricité directe (Joule)</option>
+        <option value="pac_air_eau">Pompe à chaleur Air/Eau</option>
+        <option value="pac_air_air">Pompe à chaleur Air/Air (Climatisation réversible)</option>
+        <option value="gaz_condens">Gaz à condensation</option>
+        <option value="granules">Granulés / Bois</option>
+        <option value="fioul">Fioul</option>
+    </select>
+</div>
                 
                 <div class="full-width">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">Dispositif(s) de Régulation Chauffage :</label>
@@ -367,6 +398,24 @@
                         <option value="mobile">Ventilateur sur pied / Table (Mobile)</option>
                     </select>
                 </div>
+
+                <!-- Ventilation : Précision du système et du débit -->
+<div class="form-grid" style="margin-top: 10px;">
+    <div>
+        <label for="vmcType">Type de ventilation installée :</label>
+        <select id="vmcType">
+            <option value="none">Ventilation naturelle / Ouverture fenêtres</option>
+            <option value="sf_auto">VMC Simple Flux Auto-réglable</option>
+            <option value="sf_hygro">VMC Simple Flux Hygro-réglable (Hygro A / Hygro B)</option>
+            <option value="df_eff">VMC Double Flux (Échangeur haute efficacité ~85 %)</option>
+        </select>
+    </div>
+    <div>
+        <label for="vmcAirflow">Débit nominal d'extraction ($q_v$ en m³/h) :</label>
+        <input type="number" id="vmcAirflow" step="5" min="0" placeholder="Auto d'après DPE (ex: 45)">
+    </div>
+</div>
+                
                 <div>
                     <label for="vmcSystem">Ventilation</label>
                     <select id="vmcSystem">
@@ -618,7 +667,7 @@
                 }
             });
 
-            document.getElementById('saveConfigBtn').addEventListener('click', handleSave);
+            document.getElementById('saveConfigBtn').addEventListener('click', );
         }
 
         function toggleOutdoorMode() {
@@ -770,6 +819,7 @@
                 height: isNaN(ceilingHeightVal) ? 2.5 : ceilingHeightVal,
                 wallMat: document.getElementById('wallMaterial').value,
                 wallThick: isNaN(wallThicknessVal) ? 0 : wallThicknessVal,
+                
                 insulation: document.getElementById('zoneInsulation').value,
                 ceilingMat: document.getElementById('ceilingMaterial').value,
                 ceilingInsulation: document.getElementById('ceilingInsulation').value,
@@ -789,22 +839,28 @@
                     floor: adjFloorCoches
                 },
                 windows: windows,
-                equipment: {
-                    heating: {
-                        system: document.getElementById('heatingSystem').value,
-                        regulation: heatingRegCoches,
-                        intermittency: document.getElementById('heatingIntermittency').value
-                    },
-                    cooling: {
-                        system: document.getElementById('coolingSystem').value,
-                        regulation: coolingRegCoches,
-                        intermittency: document.getElementById('coolingIntermittency').value
-                    },
-                    fanSystem: document.getElementById('fanSystem').value,
-                    vmcSystem: document.getElementById('vmcSystem').value
-                },
-                updatedAt: new Date().toISOString()
-            };
+                uWall: parseFloat(document.getElementById('customWallU').value) || null,
+    equipment: {
+        heating: {
+            system: document.getElementById('heatingSystem').value,
+            energySource: document.getElementById('heatingEnergySource').value === 'inherit' 
+                ? (SolsticeStore.getAllZones().global?.mainEnergySource || 'elec_direct')
+                : document.getElementById('heatingEnergySource').value,
+            regulation: heatingRegCoches,
+            intermittency: document.getElementById('heatingIntermittency').value
+        },
+        cooling: {
+            system: document.getElementById('coolingSystem').value,
+            regulation: coolingRegCoches,
+            intermittency: document.getElementById('coolingIntermittency').value
+        },
+        fanSystem: document.getElementById('fanSystem').value,
+        vmcSystem: document.getElementById('vmcSystem').value,
+        vmcType: document.getElementById('vmcType').value,
+        vmcAirflow: parseFloat(document.getElementById('vmcAirflow').value) || null
+    },
+    updatedAt: new Date().toISOString()
+};
 
             const isSaved = SolsticeStore.saveZone(currentZoneId, zoneConfig);
             if (isSaved) {
