@@ -623,33 +623,48 @@ document.addEventListener('DOMContentLoaded', function() {
             const selectedZone = zoneSelect ? zoneSelect.value : currentZoneId;
             const zonesMap = getAvailableZonesMap();
 
-            // Structure conditionnelle unique et propre
+            // Alignement strict avec le Tableau de Bord (engine.js)
             if (selectedZone === 'all') {
                 let totalVol = 0;
                 let weightedPmvInit = 0;
                 let weightedPmvSim = 0;
 
-                Object.keys(zonesMap).forEach(zId => {
-                    const rName = zonesMap[zId];
-                    const zConfig = houseConfig[zId] || { area: 15, height: 2.5 };
-                    
-                    if (isExteriorZone(zId, zConfig) || isBufferZone(zId, zConfig)) return;
+                // 1. Prise en compte dynamique du toggle 'Inclure pièces tampons' du Tableau de Bord
+                const includeBuffer = localStorage.getItem('SOLSTICE_INCLUDE_BUFFER') !== 'false';
+                const scanData = (store.getScanData && store.getScanData()) || {};
 
-                    const rData = donneesHabitat[rName];
-                    if (!rData || rData.ta === undefined) return;
+                // 2. Parcours direct des mesures réelles (comme calculateGlobalHabitatMetrics dans engine.js)
+                Object.keys(scanData).forEach(nomPiece => {
+                    if (nomPiece === '__ENV__' || nomPiece === '__BUFFER_TOGGLE__') return;
+                    const rData = scanData[nomPiece];
+                    if (!rData || rData.ta === undefined || isNaN(rData.ta) || rData.rh === undefined || isNaN(rData.rh)) return;
 
-                    const vol = (parseFloat(zConfig.area) || 15) * (parseFloat(zConfig.height) || 2.5);
+                    const zConfig = (engine.getZoneConfigByName ? engine.getZoneConfigByName(nomPiece) : null) 
+                                 || houseConfig[nomPiece] 
+                                 || Object.values(houseConfig).find(z => z && z.name === nomPiece)
+                                 || { area: 15, height: 2.5 };
+
+                    const zId = Object.keys(houseConfig).find(k => houseConfig[k]?.name === nomPiece) || nomPiece.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+                    // 3. Filtrage identique à engine.js
+                    if (engine.isOutdoorZone ? engine.isOutdoorZone(nomPiece, zConfig) : isExteriorZone(zId, zConfig)) return;
+                    if (!includeBuffer && (engine.isBufferZone ? engine.isBufferZone(nomPiece, zConfig) : isBufferZone(zId, zConfig))) return;
+
+                    const area = parseFloat(zConfig.area) || 15;
+                    const height = parseFloat(zConfig.height) || 2.5;
+                    const vol = area * height;
 
                     const baseTa = rData.ta;
                     const baseRh = rData.rh ?? 50;
                     const baseTr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(zConfig, baseTa) : baseTa;
-                    const baseVel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zConfig, rName) : 0.1;
+                    const baseVel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zConfig, nomPiece) : 0.1;
                     const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(zConfig) : { met: 1.2, totalClo: 1.0 };
 
                     const pmvI = engine.calculatePMV ? engine.calculatePMV(baseTa, baseTr, baseVel, baseRh, met, totalClo) : 0;
 
+                    // Actions cochées pour cette pièce
                     const checkedActionKeys = [];
-                    allRecs.filter(r => r.zoneId === zId).forEach(r => {
+                    allRecs.filter(r => r.zoneId === zId || r.zoneName === nomPiece).forEach(r => {
                         const item = lifecycleState.recos[r.id];
                         if (item && item.status === 'completed') checkedActionKeys.push(r.actionKey);
                     });
