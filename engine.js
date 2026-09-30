@@ -1609,6 +1609,13 @@ function actualiserCockpitGlobal() {
         }
     }
 
+    const timeEl = document.getElementById('global-calc-timestamp');
+if (timeEl) {
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    timeEl.textContent = `(Calculé à ${timeStr})`;
+}
+
     const actionEl = document.getElementById('global-reserve-action');
     if (actionEl) {
         actionEl.textContent = globalReserve.actionText;
