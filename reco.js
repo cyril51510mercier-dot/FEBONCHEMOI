@@ -1,7 +1,7 @@
 /**
  * ==================================================================
- * SOLSTICE — MOTEUR DE RECOMMANDATIONS & CYCLE DE VIE (V7.3)
- * Hygrométrie absolue stricte, matrice 18°C, gains réels & refonte scores
+ * SOLSTICE — MOTEUR DE RECOMMANDATIONS & CYCLE DE VIE (V7.4)
+ * CALCUL THERMODYNAMIQUE DYNAMIQUE DES KWH (Béton / DPE 3CL)
  * ==================================================================
  */
 
@@ -23,14 +23,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const containerCompleted = document.getElementById('container-completed');
         const profileIndicator = document.getElementById('profileIndicator');
 
-        // --- 1. GESTION DU STOCKAGE DU CYCLE DE VIE ET RÉINITIALISATION QUOTIDIENNE ---
         const TODAY_KEY = new Date().toISOString().slice(0, 10);
         
         function getRecoLifecycleState() {
             try {
                 const raw = localStorage.getItem('SOLSTICE_RECO_LIFECYCLE');
                 const state = raw ? JSON.parse(raw) : { lastDate: TODAY_KEY, recos: {} };
-                
                 if (state.lastDate !== TODAY_KEY) {
                     state.lastDate = TODAY_KEY;
                     state.recos = {}; 
@@ -48,7 +46,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let lifecycleState = getRecoLifecycleState();
 
-        // Configuration Globale & Saison de chauffe
         const globalConfig = houseConfig.global || {};
         const activeProfileKey = globalConfig.userProfile || 'mid_term';
 
@@ -80,6 +77,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const tExtMaxDay = envDataGlobal.t_ext_max || (envDataGlobal.t_ext + 3);
         const tExtMinDay = envDataGlobal.t_ext_min || (envDataGlobal.t_ext - 5);
+
+        // Irradiance solaire estimée (W/m²) selon statut météo
+        function getSolarIrradiance() {
+            const status = (envDataGlobal.sun_status || '').toLowerCase();
+            if (status.includes('clear') || status.includes('sun') || status.includes('ensoleillé')) return 700;
+            if (status.includes('partly') || status.includes('éclaircies')) return 350;
+            return 120;
+        }
 
         function isExteriorZone(zId, zone) {
             const id = zId.toLowerCase();
@@ -114,6 +119,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 fioul: 0.1350
             };
             return energyCosts[energyType] || 0.2516;
+        }
+
+        function getGeneratorEfficiency(zoneConfig) {
+            const energyType = zoneConfig?.equipment?.heating?.energySource || globalConfig?.mainEnergySource || 'elec_direct';
+            const efficiencies = {
+                elec_direct: 1.0,
+                pac_air_eau: 3.2,
+                pac_air_air: 3.0,
+                gaz_condens: 0.95,
+                granules: 0.85,
+                fioul: 0.88
+            };
+            return efficiencies[energyType] || 1.0;
         }
 
         function getAvailableZonesMap() {
@@ -155,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // ============================================================
-        // GÉNÉRATION DES RECOMMANDATIONS CONDITIONNÉES
+        // GENERATION DES RECOMMANDATIONS CONDITIONNEES
         // ============================================================
         function generateRecommendationsForZone(zone, zoneId, roomData) {
             const recs = [];
@@ -187,9 +205,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const ahInt = getAbsoluteHumidity(ta, rh);
             const ahExt = getAbsoluteHumidity(envDataGlobal.t_ext, envDataGlobal.rh_ext || 60);
 
-            const tr = engine.calculateMeanRadiantTemp(zone, ta);
-            const vel = engine.calculateAirVelocity(zone, zoneName);
-            const { met, totalClo } = engine.getBaseCloAndMet(zone);
+            const tr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(zone, ta) : ta;
+            const vel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zone, zoneName) : 0.1;
+            const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(zone) : { met: 1.2, totalClo: 1.0 };
 
             const roomPmv = engine.calculatePMV(ta, tr, vel, rh, met, totalClo);
             const needsHeat = roomPmv < -0.4;
@@ -206,8 +224,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const adj = zone?.adj || {};
             const hasUnheatedDoor = zone?.hasBufferDoor || adj.hasBufferDoor || 
                                     [1, 2, 3, 4].some(i => adj[`wall${i}`] === 'unheated' && adj[`doorWall${i}`]);
-            
-            const hasHeatedDoor = [1, 2, 3, 4].some(i => adj[`wall${i}`] === 'heated' && adj[`doorWall${i}`]);
 
             const hasEastWestWin = zone?.windows?.some(w => ['E', 'W'].includes(w.orient));
             const hasRoofWin = zone?.windows?.some(w => w.tilt === 'inclinee');
@@ -215,17 +231,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // --- NIVEAU 1 : ACTIONS IMMÉDIATES (< 1h) ---
 
-            // 1. Purge d'humidité générale (Sauf pièces d'eau déjà gérées spécifiquement)
             if (rh > 65 && ahExt < ahInt && !isWetRoom) {
                 if (hasVmc) {
-                    recs.push({ id: `${zoneId}_vmc_boost`, level: 1, actionKey: 'vmc_boost', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: 'Boost VMC anti-humidité', text: `L'humidité atteint ${rh} % (air extérieur plus sec). Passez la VMC en vitesse rapide.`, impactWeight: 15 });
+                    recs.push({ id: `${zoneId}_vmc_boost`, level: 1, actionKey: 'vmc_boost', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: 'Boost VMC anti-humidité', text: `L'humidité atteint ${rh} % (air ext. plus sec). Passez la VMC en vitesse rapide.`, impactWeight: 15 });
                 } else if (hasNonFixedWindow) {
                     const dur = (mainVentType === 'oscillante' || mainVentType === 'oscillo_battante' || mainVentType === 'partial') ? '12 à 15 minutes' : '5 minutes';
                     recs.push({ id: `${zoneId}_open_win_humidity`, level: 1, actionKey: 'open_win_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: 'Aération flash ciblée', text: `Ouvrez la fenêtre (${dur}) pour évacuer la vapeur d'eau.`, impactWeight: 12 });
                 }
             }
 
-            // 2. Purge ciblée Cuisine / SDB (Exige strict AH_ext < AH_int)
             if (isWetRoom && rh > 60 && ahExt < ahInt) {
                 let purgeText = "";
                 if (hasVmc && hasNonFixedWindow) {
@@ -303,7 +317,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // --- NIVEAU 3 : STRATÉGIE MÉTÉO (48h-72h) ---
-            // Alignment exact avec la matrice Masse & Inertie de BEM (Exige Tmin_day >= 18°C)
             const surchauffeInterieure = (tStruct >= 24.0 || ta >= 24.0);
             const vraieSurchauffeExterieure = (envDataGlobal.t_ext >= 22.0 && tExtMinDay >= 18.0);
             const nuitsFraichesOuIntersaison = (tExtMinDay < 18.0 || envDataGlobal.t_ext < 19.0 || isHeatingSeasonActive);
@@ -451,15 +464,16 @@ document.addEventListener('DOMContentLoaded', function() {
             render();
         }
 
+        // ============================================================
+        // MOTEUR DE CALCUL THERMODYNAMIQUE DYNAMIQUE
+        // ============================================================
         function calculateFinancialImpact(allRecs) {
             let savedKwhDay = 0;
             let earnedPointsToday = 0;
 
             const selectedZone = zoneSelect ? zoneSelect.value : currentZoneId;
-            const targetZoneConfig = houseConfig[selectedZone] || null;
-            const costPerKwh = getEnergyCostPerKwh(targetZoneConfig);
-
             const isCoolingActive = (envDataGlobal.t_ext > 26 || tExtMaxDay > 27);
+            const gSol = getSolarIrradiance(); // W/m²
 
             allRecs.forEach(r => {
                 const item = lifecycleState.recos[r.id];
@@ -472,24 +486,87 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
 
                     earnedPointsToday += Math.round(r.impactWeight * reactivityFactor);
-                    
-                    let baseKwh = 0.0;
+
+                    const zoneConfig = houseConfig[r.zoneId] || {};
+                    const roomName = r.zoneName;
+                    const roomData = donneesHabitat[roomName] || { ta: 20, rh: 50 };
+                    const ta = roomData.ta || 20;
+
+                    // Paramètres physiques réels ou valeurs DPE par défaut
+                    const area = parseFloat(zoneConfig.area) || 15;
+                    const windowArea = parseFloat(zoneConfig.windowArea) || (area * 0.15); // 15% de la surface si non précisé
+                    const uWindow = parseFloat(zoneConfig.uWindow) || 2.8; // W/m².K
+                    const deltaR = parseFloat(zoneConfig.shutterDeltaR) || 0.15; // m².K/W
+                    const etaGen = getGeneratorEfficiency(zoneConfig);
+                    const eerClim = 3.0; // EER clim standard
+
+                    let dynamicKwh = 0.0;
+
+                    // 1. Fermeture des volets / Protection solaire / Bouclier nocturne
                     if (r.actionKey === 'shutter_close' || r.actionKey === 'anticipate_sun') {
-                        if (isCoolingActive || isHeatingSeasonActive) baseKwh = 2.5;
-                    } else if (r.actionKey === 'bedroom_temp' || r.actionKey === 'heating_cut') {
-                        if (isHeatingSeasonActive) baseKwh = 1.8;
-                    } else if (r.actionKey === 'free_cooling') {
-                        if (isCoolingActive || isHeatingSeasonActive) baseKwh = 1.2;
-                    } else if (r.actionKey === 'vmc_boost' || r.actionKey === 'open_win_humidity') {
-                        if (isHeatingSeasonActive) baseKwh = 0.8;
-                    } else if (r.actionKey === 'floor_inertia' || r.actionKey === 'sun_heat') {
-                        if (isHeatingSeasonActive) baseKwh = 2.0;
+                        if (isCoolingActive) {
+                            // Énergie solaire évitée en été = A_vitre * G_sol * (g_nu - g_clos) * delta_t / 1000
+                            const solEnergyKw = (windowArea * gSol * (0.65 - 0.05) * 6) / 1000; // 6h d'ensoleillement
+                            dynamicKwh = solEnergyKw / eerClim;
+                        } else if (isHeatingSeasonActive) {
+                            // Gain par réduction des déperditions nocturnes (Delta U * A * DeltaT * dt)
+                            const uWithShutter = 1 / ((1 / uWindow) + deltaR);
+                            const deltaU = uWindow - uWithShutter;
+                            const deltaT = Math.max(0, ta - envDataGlobal.t_ext);
+                            const thermalGain = (windowArea * deltaU * deltaT * 10) / 1000; // 10h de nuit
+                            dynamicKwh = thermalGain / etaGen;
+                        }
+                    } 
+                    // 2. Chauffage solaire passif en hiver
+                    else if (r.actionKey === 'sun_heat') {
+                        if (isHeatingSeasonActive) {
+                            const solGainKw = (windowArea * gSol * 0.60 * 5) / 1000; // 5h d'apports directs
+                            dynamicKwh = solGainKw / etaGen;
+                        }
+                    }
+                    // 3. Consigne nocturne / Coupure du chauffage (Réduction de déperdition transm. + vent.)
+                    else if (r.actionKey === 'bedroom_temp' || r.actionKey === 'heating_cut') {
+                        if (isHeatingSeasonActive) {
+                            const uWall = parseFloat(zoneConfig.uWall) || 0.8;
+                            const wallArea = (Math.sqrt(area) * 4 * 2.5); // Périmètre x Hauteur
+                            const hTransm = (wallArea * uWall) + (windowArea * uWindow);
+                            const hVent = 0.34 * 45; // Débit VMC 45 m³/h
+                            const deltaConsigne = (r.actionKey === 'bedroom_temp') ? 2.0 : 1.5; // -2°C ou -1.5°C
+                            
+                            const thermalSavedKw = ((hTransm + hVent) * deltaConsigne * 8) / 1000; // 8h de baisse
+                            dynamicKwh = thermalSavedKw / etaGen;
+                        }
+                    }
+                    // 4. Surventilation traversante (Free-cooling)
+                    else if (r.actionKey === 'free_cooling') {
+                        if (isCoolingActive || ta > 23) {
+                            const deltaT = Math.max(0, ta - envDataGlobal.t_ext);
+                            const flowRate = 350; // m³/h par aération traversante
+                            const thermalExtractedKw = (0.34 * flowRate * deltaT * 3) / 1000; // 3h de surventilation
+                            dynamicKwh = thermalExtractedKw / eerClim;
+                        }
+                    }
+                    // 5. Purge VMC / Aération d'humidité
+                    else if (r.actionKey === 'vmc_boost' || r.actionKey === 'open_win_humidity') {
+                        if (isHeatingSeasonActive) {
+                            const deltaFlow = (r.actionKey === 'vmc_boost') ? 60 : 200; // Surdébit m³/h
+                            const deltaT = Math.max(0, ta - envDataGlobal.t_ext);
+                            const energyToHeatAir = (0.34 * deltaFlow * deltaT * 0.5) / 1000; // 30 min de purge
+                            dynamicKwh = energyToHeatAir / etaGen;
+                        }
+                    }
+                    // 6. Inertie et déphasage des dalles
+                    else if (r.actionKey === 'floor_inertia') {
+                        if (isHeatingSeasonActive) {
+                            dynamicKwh = (area * 0.12) / etaGen; // Reprise d'inertie dalle
+                        }
                     }
 
-                    savedKwhDay += (baseKwh * reactivityFactor);
+                    savedKwhDay += (dynamicKwh * reactivityFactor);
                 }
             });
 
+            const costPerKwh = getEnergyCostPerKwh(houseConfig[selectedZone] || null);
             const savedEurDay = savedKwhDay * costPerKwh;
             return { savedKwhDay, savedEurDay, earnedPointsToday };
         }
@@ -505,7 +582,6 @@ document.addEventListener('DOMContentLoaded', function() {
             let totalHistoricalScorePts = parseInt(localStorage.getItem('SOLSTICE_CAGNOTTE_SCORE_PTS')) || 0;
             let totalCagnotteEur = parseFloat(localStorage.getItem('SOLSTICE_CAGNOTTE_EUR')) || 0.0;
 
-            // 1. Éco-Score du jour
             const todayScoreEl = document.getElementById('disp-today-score');
             const scoreBarEl = document.getElementById('scoreBar');
             if (todayScoreEl) {
@@ -516,22 +592,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 scoreBarEl.style.width = `${pctToday}%`;
             }
 
-            // 2. Éco-Score Cumulé (XP)
             const totalXpEl = document.getElementById('disp-total-xp');
             if (totalXpEl) {
                 totalXpEl.textContent = `${totalHistoricalScorePts + earnedPointsToday} pts XP`;
             }
 
-            // 3. Cagnotte financière & énergie du jour
             const eurDayEl = document.getElementById('disp-daily-savings-eur');
             const kwhDayEl = document.getElementById('disp-daily-savings-kwh');
             const totalEurEl = document.getElementById('disp-cagnotte-total');
 
             if (eurDayEl) eurDayEl.textContent = `${savedEurDay.toFixed(2)} €`;
-            if (kwhDayEl) kwhDayEl.textContent = `${savedKwhDay.toFixed(1)} kWh/j évités aujourd'hui`;
+            if (kwhDayEl) kwhDayEl.textContent = `${savedKwhDay.toFixed(2)} kWh/j évités aujourd'hui`;
             if (totalEurEl) totalEurEl.textContent = `${(totalCagnotteEur + savedEurDay).toFixed(2)} €`;
 
-            // 4. Calcul du PMV volumique mesuré / simulé pour la zone
             const dispInitEl = document.getElementById('disp-pmv-init');
             const simEl = document.getElementById('disp-pmv-sim');
             const selectedZone = zoneSelect ? zoneSelect.value : currentZoneId;
