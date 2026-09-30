@@ -1143,7 +1143,6 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
     } else if (tExtMoy >= tCible) {
         autonomyText = "N/A (T° ext ≥ 19°C)";
     } else {
-        // Utilisation du tau issu du paramétrage BEM expert
         const hoursTo19 = tauReel * Math.log((tStruct - tExtMoy) / (tCible - tExtMoy));
 
         if (hoursTo19 >= 48) {
@@ -1154,7 +1153,7 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
         }
     }
 
-    // --- ANALYSE DES PRÉVISIONS PAR PROFIL ET RÉPARATION DE LA LOGIQUE DÉCHARGE ---
+    // --- ANALYSE FIABILISÉE DES CONSEILS D'INERTIE ---
     const rawConfig = localStorage.getItem('HOUSE_CONFIG');
     const houseConfig = rawConfig ? JSON.parse(rawConfig) : {};
     
@@ -1165,7 +1164,7 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
                     || 'long_term';
 
     let tMaxPrevue = outdoorTemp;
-    let tMinPrevue = outdoorTemp;
+    let tMinPrevue = outdoorTemp - 8.0; // Fallback cohérent si prévisions indisponibles
 
     if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length > 0) {
         const tempsMeteo = window.hourlyExtForecast.map(s => s.temp);
@@ -1173,34 +1172,26 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
         tMinPrevue = Math.min(...tempsMeteo);
     }
 
-    const mursChauds = tStruct > 22.5;
-    const vraieVagueDeChaleur = tMaxPrevue >= 25.0 && tMinPrevue >= 16.0;
-    const nuitsFraichesOuChauffe = tMinPrevue < 15.0 || isHeatingSeasonActive();
+    // Conditions strictes de décharge :
+    // 1. Surchauffe avérée (parois >= 24.0°C ou air >= 24.0°C)
+    const surchauffeInterieure = (tStruct >= 24.0 || tAir >= 24.0);
+    // 2. Chaleur extérieure durable (moyenne 24h >= 20°C et nuit >= 17°C)
+    const vraieSurchauffeExterieure = (tExtMoy >= 20.0 && tMinPrevue >= 17.0);
+    // 3. Présence de nuits fraîches ou d'intersaison
+    const nuitsFraichesOuIntersaison = (tMinPrevue < 16.0 || tExtMoy < 19.0 || isHeatingSeasonActive());
 
     let actionText = "";
 
-    if (profileKey === 'short_term') {
-        if (outdoorTemp > 25.0) actionText = "🛡️ Préserver fraîcheur";
-        else if (outdoorTemp < 18.0) actionText = "☀️ Stocker chaleur";
-        else actionText = "⚖️ Maintenir équilibre";
-
-    } else if (profileKey === 'mid_term') {
-        if (nuitsFraichesOuChauffe) {
-            actionText = (tStruct <= 22.0) ? "☀️ Stocker chaleur" : "🛡️ Conserver chaleur";
-        } else if (vraieVagueDeChaleur && mursChauds) {
-            actionText = "🌙 Décharger chaleur";
+    if (surchauffeInterieure && vraieSurchauffeExterieure && !nuitsFraichesOuIntersaison) {
+        actionText = "🌙 Décharger chaleur";
+    } else if (nuitsFraichesOuIntersaison || !surchauffeInterieure) {
+        if (tStruct < 22.0) {
+            actionText = (profileKey === 'short_term') ? "☀️ Stocker chaleur" : "☀️ Anticiper & stocker";
         } else {
-            actionText = "⚖️ Maintenir équilibre";
+            actionText = "🛡️ Conserver chaleur";
         }
-
-    } else { // long_term
-        if (nuitsFraichesOuChauffe) {
-            actionText = (tStruct <= 22.0) ? "☀️ Anticiper & stocker" : "🛡️ Conserver chaleur";
-        } else if (vraieVagueDeChaleur && mursChauds) {
-            actionText = "🌙 Décharger chaleur";
-        } else {
-            actionText = "⚖️ Maintenir équilibre";
-        }
+    } else {
+        actionText = "⚖️️ Maintenir équilibre";
     }
     
     let actionColor = "#F8FAFC";
