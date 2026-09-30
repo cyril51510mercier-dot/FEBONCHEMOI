@@ -34,8 +34,8 @@ if (typeof supabase !== 'undefined') {
 function applySharedEnvironment(data) {
     if (!data) return;
     
-    // Aligner la météo pour que le PMV et les bilans thermiques soient identiques
-    if (data['__ENV__']) {
+    // Ne restaurer l'environnement que si aucune prévision en direct n'est déjà chargée
+    if (data['__ENV__'] && (!window.hourlyExtForecast || window.hourlyExtForecast.length === 0)) {
         const env = data['__ENV__'];
         outdoorTemp = env.outdoorTemp ?? outdoorTemp;
         outdoorHumidity = env.outdoorHumidity ?? outdoorHumidity;
@@ -1784,6 +1784,19 @@ function fetchOneCallWeather(lat, lon, cityName = 'Reims') {
             localStorage.setItem('outdoorHumidity', outdoorHumidity);
             localStorage.setItem('outdoorWind', outdoorWind);
             localStorage.setItem('sunshineStatus', sunshineStatus);
+            
+            if (typeof DONNEES_HABITAT === 'object') {
+    DONNEES_HABITAT['__ENV__'] = {
+        outdoorTemp,
+        outdoorHumidity,
+        outdoorWind,
+        sunshineStatus,
+        hourlyExtForecast: window.hourlyExtForecast
+    };
+    if (window.SolsticeStore && window.SolsticeStore.saveScanData) {
+        window.SolsticeStore.saveScanData(DONNEES_HABITAT);
+    }
+}
 
             updateWeatherUI();
             updateClothingDisplay(); 
