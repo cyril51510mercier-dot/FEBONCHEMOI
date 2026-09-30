@@ -610,49 +610,56 @@ document.addEventListener('DOMContentLoaded', function() {
             const selectedZone = zoneSelect ? zoneSelect.value : currentZoneId;
             const zonesMap = getAvailableZonesMap();
 
-            if (selectedZone === 'all') {
-                let totalVol = 0;
-                let weightedPmvInit = 0;
-                let weightedPmvSim = 0;
+// alignement strict avec la Synthèse Globale (exclut extérieur ET pièces tampons)
+if (selectedZone === 'all') {
+    let totalVol = 0;
+    let weightedPmvInit = 0;
+    let weightedPmvSim = 0;
 
-                Object.keys(zonesMap).forEach(zId => {
-                    const rName = zonesMap[zId];
-                    const zConfig = houseConfig[zId] || { area: 15, height: 2.5 };
-                    if (isExteriorZone(zId, zConfig)) return;
+    Object.keys(zonesMap).forEach(zId => {
+        const rName = zonesMap[zId];
+        const zConfig = houseConfig[zId] || { area: 15, height: 2.5 };
+        
+        // EXCLUSION : Extérieurs ET Pièces Tampons (comme dans la Synthèse Globale)
+        if (isExteriorZone(zId, zConfig) || isBufferZone(zId, zConfig)) return;
 
-                    const rData = donneesHabitat[rName] || { ta: 20, rh: 50 };
-                    const vol = (parseFloat(zConfig.area) || 15) * (parseFloat(zConfig.height) || 2.5);
+        // Récupération des données réelles du scan
+        const rData = donneesHabitat[rName];
+        if (!rData || rData.ta === undefined) return; // Ignore les pièces sans mesures réelles
 
-                    const baseTa = rData.ta ?? 20;
-                    const baseRh = rData.rh ?? 50;
-                    const baseTr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(zConfig, baseTa) : baseTa;
-                    const baseVel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zConfig, rName) : 0.1;
-                    const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(zConfig) : { met: 1.2, totalClo: 1.0 };
+        const vol = (parseFloat(zConfig.area) || 15) * (parseFloat(zConfig.height) || 2.5);
 
-                    const pmvI = engine.calculatePMV(baseTa, baseTr, baseVel, baseRh, met, totalClo);
+        const baseTa = rData.ta;
+        const baseRh = rData.rh ?? 50;
+        const baseTr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(zConfig, baseTa) : baseTa;
+        const baseVel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zConfig, rName) : 0.1;
+        const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(zConfig) : { met: 1.2, totalClo: 1.0 };
 
-                    const checkedActionKeys = [];
-                    allRecs.filter(r => r.zoneId === zId).forEach(r => {
-                        const item = lifecycleState.recos[r.id];
-                        if (item && item.status === 'completed') checkedActionKeys.push(r.actionKey);
-                    });
+        const pmvI = engine.calculatePMV(baseTa, baseTr, baseVel, baseRh, met, totalClo);
 
-                    const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: baseRh, met, clo: totalClo };
-                    const simRes = engine.evaluateSimulatedPMV ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal) : { pmv: pmvI };
+        const checkedActionKeys = [];
+        allRecs.filter(r => r.zoneId === zId).forEach(r => {
+            const item = lifecycleState.recos[r.id];
+            if (item && item.status === 'completed') checkedActionKeys.push(r.actionKey);
+        });
 
-                    totalVol += vol;
-                    weightedPmvInit += pmvI * vol;
-                    weightedPmvSim += simRes.pmv * vol;
-                });
+        const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: baseRh, met, clo: totalClo };
+        const simRes = engine.evaluateSimulatedPMV ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal) : { pmv: pmvI };
 
-                const finalPmvInit = totalVol > 0 ? (weightedPmvInit / totalVol) : 0;
-                const finalPmvSim = totalVol > 0 ? (weightedPmvSim / totalVol) : 0;
+        totalVol += vol;
+        weightedPmvInit += pmvI * vol;
+        weightedPmvSim += simRes.pmv * vol;
+    });
 
-                if (dispInitEl) dispInitEl.textContent = (finalPmvInit > 0 ? "+" : "") + finalPmvInit.toFixed(2);
-                if (simEl) {
-                    simEl.textContent = (finalPmvSim > 0 ? "+" : "") + finalPmvSim.toFixed(2);
-                    simEl.style.color = Math.abs(finalPmvSim) <= 0.5 ? 'var(--eco, #2ecc71)' : (finalPmvSim > 0.5 ? 'var(--hot, #e74c3c)' : 'var(--cold, #3498db)');
-                }
+    const finalPmvInit = totalVol > 0 ? (weightedPmvInit / totalVol) : 0;
+    const finalPmvSim = totalVol > 0 ? (weightedPmvSim / totalVol) : 0;
+
+    if (dispInitEl) dispInitEl.textContent = (finalPmvInit > 0 ? "+" : "") + finalPmvInit.toFixed(2);
+    if (simEl) {
+        simEl.textContent = (finalPmvSim > 0 ? "+" : "") + finalPmvSim.toFixed(2);
+        simEl.style.color = Math.abs(finalPmvSim) <= 0.5 ? '#4ade80' : (finalPmvSim > 0.5 ? '#f87171' : '#38bdf8');
+    }
+}
             } else {
                 const roomName = zonesMap[selectedZone] || selectedZone;
                 const targetZoneConfig = houseConfig[selectedZone] || null;
