@@ -1,9 +1,9 @@
 /**
- * SOLSTICE - SERVICE WORKER (V7.1)
+ * SOLSTICE - SERVICE WORKER (V7.15)
  * Stratégie : Network-First + Purge Automatique des Caches Obsolètes
  */
 
-const CACHE_NAME = 'solstice-v7.15'; // ⚡ Pense à incrémenter ce numéro lors de grosses mises à jour
+const CACHE_NAME = 'solstice-v7.15'; // ⚡ Incremente uniquement ce numéro lors des mises à jour !
 
 const ASSETS = [
   './',
@@ -24,50 +24,41 @@ self.addEventListener('install', (e) => {
   );
 });
 
-// 2. Activation & Purge des anciens caches (solstice-v6, solstice-v5, etc.)
+// 2. Activation & Purge automatique des anciens caches
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
-            console.log('[SW] Suppression de l'ancien cache :', key);
+            console.log('[Service Worker] Suppression de l\'ancien cache :', key);
             return caches.delete(key);
           }
         })
       );
-    }).then(() => self.clients.claim()) // Prendre le contrôle immédiat de tous les onglets/PWA ouverts
+    }).then(() => self.clients.claim()) // Prend le contrôle immédiat de tous les onglets ouverts
   );
 });
 
-// 3. Stratégie Fetch : Network-First (Tenter le réseau, sinon basculer sur le cache)
+// 3. Interception des requêtes : Réseau d'abord (Network-First), fallback Cache
 self.addEventListener('fetch', (e) => {
-  const url = e.request.url;
-
-  // Ignorer les requêtes d'API externes et Supabase (toujours en direct sur le réseau)
-  if (
-    e.request.method !== 'GET' ||
-    url.includes('supabase.co') ||
-    url.includes('openweathermap.org') ||
-    url.includes('hook.eu1.make.com')
-  ) {
+  // On ne gère en cache que les requêtes GET locales (on ignore Supabase / API tierces)
+  if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) {
     return;
   }
 
   e.respondWith(
     fetch(e.request)
       .then((networkResponse) => {
-        // Si le réseau répond correctement, on met à jour le cache au passage
+        // Si le réseau répond correctement, on met à jour le cache et on sert le fichier frais
         if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(e.request, responseToCache);
-          });
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseToCache));
         }
         return networkResponse;
       })
       .catch(() => {
-        // En cas de panne réseau / hors-ligne, on utilise le secours en cache
+        // En cas de coupure réseau (hors-ligne), on bascule sur la version en cache
         return caches.match(e.request);
       })
   );
