@@ -445,3 +445,173 @@ tr:last-child td {
     padding: 10px 15px;
     border-bottom: 1px solid #1E293B;
 }
+
+/* ==================================================================
+   SOLSTICE DESIGN SYSTEM — SCOREBOARD & COCKPIT
+   ================================================================== */
+
+.solstice-dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.solstice-card {
+    background: rgba(30, 41, 59, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.solstice-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.card-icon {
+    font-size: 1.1rem;
+}
+
+.card-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+}
+
+/* Typographie des Scores */
+.score-display-main {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #f8fafc;
+    line-height: 1.1;
+}
+
+.score-display-xp {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #38bdf8;
+    line-height: 1.1;
+}
+
+.score-display-eur {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #4ade80;
+    line-height: 1.1;
+}
+
+.unit {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #64748b;
+}
+
+/* Barre de progression néon */
+.progress-container {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 12px 0 8px 0;
+}
+
+.progress-bar-glow {
+    height: 100%;
+    background: linear-gradient(90deg, #22c55e, #10b981);
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+    border-radius: 999px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Badges & Pilules */
+.xp-badge {
+    display: inline-block;
+    background: rgba(56, 189, 248, 0.12);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    margin: 8px 0;
+}
+
+.cagnotte-pill {
+    margin-top: 10px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    font-size: 0.78rem;
+    color: #cbd5e1;
+}
+
+.energy-avoided {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-top: 4px;
+}
+
+.card-subtext {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 6px;
+}
+
+/* Module PMV */
+.pmv-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.pmv-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 8px 12px;
+    border-radius: 10px;
+    flex: 1;
+}
+
+.pmv-box.highlight {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pmv-tag {
+    font-size: 0.7rem;
+    color: #64748b;
+    text-transform: uppercase;
+}
+
+.pmv-val {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+
+.pmv-arrow {
+    color: #64748b;
+    font-size: 0.9rem;
+}
