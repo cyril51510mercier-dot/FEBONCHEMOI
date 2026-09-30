@@ -186,12 +186,23 @@ window.SolsticeStore = {
     },
 
     getEnvData() {
+    try {
+        const raw = localStorage.getItem('SOLSTICE_ENV_DATA');
+        const data = raw ? JSON.parse(raw) : {};
+        
+        // Structure garantie à la source pour toute l'application
         return {
-            t_ext: parseFloat(localStorage.getItem('outdoorTemp')) || outdoorTemp,
-            rh_ext: parseFloat(localStorage.getItem('outdoorHumidity')) || outdoorHumidity,
-            sun_status: localStorage.getItem('sunshineStatus') || sunshineStatus
+            t_ext: typeof data.t_ext === 'number' ? data.t_ext : 15,
+            rh_ext: typeof data.rh_ext === 'number' ? data.rh_ext : 60,
+            sun_status: data.sun_status || 'clear',
+            t_ext_max: typeof data.t_ext_max === 'number' ? data.t_ext_max : ((data.t_ext || 15) + 3),
+            t_ext_min: typeof data.t_ext_min === 'number' ? data.t_ext_min : ((data.t_ext || 15) - 5)
         };
-    },
+    } catch (e) {
+        console.error("[SolsticeStore] Erreur lecture EnvData :", e);
+        return { t_ext: 15, rh_ext: 60, sun_status: 'clear', t_ext_max: 18, t_ext_min: 10 };
+    }
+}
 
     getCheckedRecos() {
         try {
