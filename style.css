@@ -447,24 +447,22 @@ tr:last-child td {
 }
 
 /* ==================================================================
-   SOLSTICE DESIGN SYSTEM — SCOREBOARD & COCKPIT
+   SOLSTICE DESIGN SYSTEM — SCOREBOARD & COCKPIT (CONTRASTE ÉLEVÉ)
    ================================================================== */
 
 .solstice-dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 16px;
     margin-bottom: 24px;
 }
 
 .solstice-card {
-    background: rgba(30, 41, 59, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #334155; /* Ardoise sombre */
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 16px;
     padding: 18px;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.15);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -473,9 +471,10 @@ tr:last-child td {
 
 .solstice-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.25);
 }
 
+/* En-têtes de cartes */
 .card-header {
     display: flex;
     align-items: center;
@@ -487,47 +486,48 @@ tr:last-child td {
     font-size: 1.1rem;
 }
 
+/* Titres des tuiles en gris clair très lisible */
 .card-label {
-    font-size: 0.82rem;
-    font-weight: 600;
+    font-size: 0.8rem;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #94a3b8;
+    color: #cbd5e1; /* Gris clair contrasté */
 }
 
-/* Typographie des Scores */
+/* Typographies de valeurs principales */
 .score-display-main {
     font-size: 1.8rem;
     font-weight: 800;
-    color: #f8fafc;
+    color: #ffffff;
     line-height: 1.1;
 }
 
 .score-display-xp {
     font-size: 1.8rem;
     font-weight: 800;
-    color: #38bdf8;
+    color: #38bdf8; /* Bleu néon */
     line-height: 1.1;
 }
 
 .score-display-eur {
     font-size: 1.8rem;
     font-weight: 800;
-    color: #4ade80;
+    color: #4ade80; /* Vert néon */
     line-height: 1.1;
 }
 
 .unit {
     font-size: 0.9rem;
-    font-weight: 500;
-    color: #64748b;
+    font-weight: 600;
+    color: #94a3b8;
 }
 
-/* Barre de progression néon */
+/* Barre de progression */
 .progress-container {
     width: 100%;
     height: 8px;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.12);
     border-radius: 999px;
     overflow: hidden;
     margin: 12px 0 8px 0;
@@ -535,44 +535,47 @@ tr:last-child td {
 
 .progress-bar-glow {
     height: 100%;
-    background: linear-gradient(90deg, #22c55e, #10b981);
-    box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+    background: linear-gradient(90deg, #d96b43, #10b981);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
     border-radius: 999px;
-    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 0.5s ease;
 }
 
-/* Badges & Pilules */
+/* Badges & Textes secondaires réhaussés */
 .xp-badge {
     display: inline-block;
-    background: rgba(56, 189, 248, 0.12);
-    color: #38bdf8;
-    border: 1px solid rgba(56, 189, 248, 0.25);
+    background: rgba(56, 189, 248, 0.18);
+    color: #7dd3fc;
+    border: 1px solid rgba(56, 189, 248, 0.35);
     font-size: 0.75rem;
-    font-weight: 600;
-    padding: 3px 8px;
+    font-weight: 700;
+    padding: 3px 10px;
     border-radius: 6px;
     margin: 8px 0;
 }
 
 .cagnotte-pill {
     margin-top: 10px;
-    padding: 6px 10px;
-    background: rgba(255, 255, 255, 0.04);
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    font-size: 0.78rem;
-    color: #cbd5e1;
+    font-size: 0.8rem;
+    color: #f1f5f9; /* Texte blanc cassé lisible */
 }
 
 .energy-avoided {
-    font-size: 0.8rem;
-    color: #94a3b8;
+    font-size: 0.82rem;
+    color: #cbd5e1; /* Gris argenté */
     margin-top: 4px;
 }
 
+/* Textes bas de tuile bien visibles */
 .card-subtext {
-    font-size: 0.75rem;
-    color: #64748b;
-    margin-top: 6px;
+    font-size: 0.78rem;
+    color: #cbd5e1; /* Gris argenté haute lisibilité */
+    margin-top: 8px;
+    font-weight: 500;
 }
 
 /* Module PMV */
@@ -588,30 +591,32 @@ tr:last-child td {
     display: flex;
     flex-direction: column;
     align-items: center;
-    background: rgba(255, 255, 255, 0.03);
-    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 8px 10px;
     border-radius: 10px;
     flex: 1;
 }
 
 .pmv-box.highlight {
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
 }
 
 .pmv-tag {
     font-size: 0.7rem;
-    color: #64748b;
+    color: #94a3b8;
     text-transform: uppercase;
+    font-weight: 700;
 }
 
 .pmv-val {
     font-size: 1.2rem;
-    font-weight: 700;
-    color: #f1f5f9;
+    font-weight: 800;
+    color: #ffffff;
 }
 
 .pmv-arrow {
-    color: #64748b;
-    font-size: 0.9rem;
+    color: #cbd5e1;
+    font-size: 1rem;
 }
