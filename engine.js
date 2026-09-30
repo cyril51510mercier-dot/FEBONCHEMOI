@@ -1829,22 +1829,33 @@ function fetchOneCallWeather(lat, lon, cityName = 'Reims') {
 
 function updateWeatherUI(loading = false, error = false, errorMsg = "") {
     const summaryEl = document.getElementById('weatherSummary');
-    if (!summaryEl) return;
+    const inlineEl = document.getElementById('summary-weather-inline');
 
     if (loading) {
-        summaryEl.innerHTML = '<span style="color: #64748B;">⏳ Chargement météo...</span>';
+        if (summaryEl) summaryEl.innerHTML = '<span style="color: #94A3B8;">⏳ Chargement météo...</span>';
+        if (inlineEl) inlineEl.textContent = '⏳ Chargement...';
         return;
     }
     if (error) {
-        summaryEl.innerHTML = `<span style="color: #EF4444; font-weight: bold;">❌ ${errorMsg || "Météo indisponible"}</span>`;
+        if (summaryEl) summaryEl.innerHTML = `<span style="color: #F87171; font-weight: bold;">❌ ${errorMsg || "Météo indisponible"}</span>`;
+        if (inlineEl) inlineEl.textContent = '❌ Indisponible';
         return;
     }
 
-    summaryEl.innerHTML = `
-        <span>
-            🌡️ ${outdoorTemp.toFixed(1)} °C &nbsp;|&nbsp; 💧 ${outdoorHumidity}% HR &nbsp;|&nbsp; 💨 ${outdoorWind.toFixed(0)} km/h (${sunshineStatus})
-        </span>
-    `;
+    // 1. Mise à jour de l'affichage permanent dans l'en-tête
+    if (inlineEl) {
+        inlineEl.innerHTML = `🌡️ ${outdoorTemp.toFixed(1)} °C &nbsp;|&nbsp; 💧 ${outdoorHumidity}% HR &nbsp;|&nbsp; 💨 ${outdoorWind.toFixed(0)} km/h`;
+    }
+
+    // 2. Mise à jour de l'encart détaillé en texte blanc clair (#F8FAFC)
+    if (summaryEl) {
+        summaryEl.style.color = "#F8FAFC";
+        summaryEl.innerHTML = `
+            <span style="color: #F8FAFC;">
+                🌡️ ${outdoorTemp.toFixed(1)} °C &nbsp;|&nbsp; 💧 ${outdoorHumidity}% HR &nbsp;|&nbsp; 💨 ${outdoorWind.toFixed(0)} km/h (${sunshineStatus})
+            </span>
+        `;
+    }
 }
 
 // ============================================================
