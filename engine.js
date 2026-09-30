@@ -988,7 +988,6 @@ if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length =
             bilanNocturnekWh += netHour;
         }
     });
-}
     } else {
         deperditionskWh = depKw * 24;
         gainsConductionkWh = gainsConductionKw * 24;
