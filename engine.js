@@ -207,7 +207,7 @@ window.SolsticeStore = {
         console.error("[SolsticeStore] Erreur lecture EnvData :", e);
         return { t_ext: 15, rh_ext: 60, sun_status: 'clear', t_ext_max: 18, t_ext_min: 10 };
     }
-}
+},
 
     getCheckedRecos() {
         try {
