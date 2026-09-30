@@ -941,53 +941,52 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const sunriseH = window.solsticeEphemeris?.sunriseHour || 7;
     const sunsetH = window.solsticeEphemeris?.sunsetHour || 19;
 
-// On fixe la température intérieure de référence à 20°C (ou la consigne) pour stabiliser le bilan de la journée
-const tIntRef = 20.0; 
+    // Fixation de la température intérieure de référence à 20°C pour stabiliser la projection
+    const tIntRef = 20.0; 
 
-if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length === 24) {
-    window.hourlyExtForecast.forEach(slot => {
-        const tExtHour = slot.temp;
-        let depHour = 0;
-        let gainsCondHour = 0;
-        let gainsSolHour = 0;
+    if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length === 24) {
+        window.hourlyExtForecast.forEach(slot => {
+            const tExtHour = slot.temp;
+            let depHour = 0;
+            let gainsCondHour = 0;
+            let gainsSolHour = 0;
 
-        // Calcul des déperditions/gains basés sur la consigne fixe tIntRef
-        if (tIntRef > tExtHour) {
-            depHour = (hTotal * (tIntRef - tExtHour)) / 1000;
-        } else {
-            gainsCondHour = (hTotal * (tExtHour - tIntRef)) / 1000;
-        }
+            if (tIntRef > tExtHour) {
+                depHour = (hTotal * (tIntRef - tExtHour)) / 1000;
+            } else {
+                gainsCondHour = (hTotal * (tExtHour - tIntRef)) / 1000;
+            }
 
-        if (slot.isSunny && Array.isArray(zoneConfig.windows)) {
-            zoneConfig.windows.forEach(win => {
-                const wArea = parseFloat(win.area) || 0;
-                if (wArea <= 0) return;
+            if (slot.isSunny && Array.isArray(zoneConfig.windows)) {
+                zoneConfig.windows.forEach(win => {
+                    const wArea = parseFloat(win.area) || 0;
+                    if (wArea <= 0) return;
 
-                const gFactor = glassMap[win.glass] ?? 0.60;
-                const maskFactor = maskMap[win.mask] ?? 1.0;
-                const shutterFactor = shutterMap[win.shutter] ?? 1.0;
+                    const gFactor = glassMap[win.glass] ?? 0.60;
+                    const maskFactor = maskMap[win.mask] ?? 1.0;
+                    const shutterFactor = shutterMap[win.shutter] ?? 1.0;
 
-                const orients = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
-                let sumI = 0;
-                orients.forEach(o => { sumI += (orientMap[o] || 1.5); });
-                let iSolar = orients.length > 0 ? (sumI / orients.length) : 1.5;
+                    const orients = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
+                    let sumI = 0;
+                    orients.forEach(o => { sumI += (orientMap[o] || 1.5); });
+                    let iSolar = orients.length > 0 ? (sumI / orients.length) : 1.5;
 
-                gainsSolHour += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 12));
-            });
-        }
+                    gainsSolHour += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 12));
+                });
+            }
 
-        deperditionskWh += depHour;
-        gainsConductionkWh += gainsCondHour;
-        gainsSolaireskWh += gainsSolHour;
+            deperditionskWh += depHour;
+            gainsConductionkWh += gainsCondHour;
+            gainsSolaireskWh += gainsSolHour;
 
-        const netHour = (gainsCondHour + gainsSolHour) - depHour;
-        
-        if (slot.hour >= sunriseH && slot.hour < sunsetH) {
-            bilanDiurnekWh += netHour;
-        } else {
-            bilanNocturnekWh += netHour;
-        }
-    });
+            const netHour = (gainsCondHour + gainsSolHour) - depHour;
+            
+            if (slot.hour >= sunriseH && slot.hour < sunsetH) {
+                bilanDiurnekWh += netHour;
+            } else {
+                bilanNocturnekWh += netHour;
+            }
+        });
     } else {
         deperditionskWh = depKw * 24;
         gainsConductionkWh = gainsConductionKw * 24;
