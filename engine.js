@@ -1226,6 +1226,7 @@ function calculateGlobalHabitatMetrics() {
     let weightedAH = 0;
     let weightedPMV = 0;
     let weightedTStruct = 0;
+    let weightedDryingIndex = 0;
 
     let totalDeperditionsKw = 0;
     let totalGainsConductionKw = 0;
@@ -1236,13 +1237,8 @@ function calculateGlobalHabitatMetrics() {
     let totalBilanNocturnekWh = 0;
 
     for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
-        // Ignorer les métadonnées de synchronisation
         if (nomPiece === '__ENV__' || nomPiece === '__BUFFER_TOGGLE__') continue;
-        
         if (!data || isNaN(data.ta) || isNaN(data.rh)) continue;
-        
-        // LA LIGNE QUI FAISAIT VARIER LA SYNTHÈSE A ÉTÉ SUPPRIMÉE ICI.
-        // Désormais la maison entière est calculée sans dépendre de ta sélection écran.
 
         const zoneConfig = getZoneConfigByName(nomPiece) || { area: 15, height: 2.5 };
 
@@ -1259,6 +1255,7 @@ function calculateGlobalHabitatMetrics() {
         const { met, totalClo } = getBaseCloAndMet(zoneConfig);
         const pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
         
+        const drying = calculateDryingPotential(data.ta, data.rh, vel);
         const energy = calculateDailyThermalBalance(zoneConfig, data.ta);
         const tStruct = updateStructureTemperature(nomPiece, data.ta);
 
@@ -1268,6 +1265,7 @@ function calculateGlobalHabitatMetrics() {
         weightedAH += ah * volume;
         weightedPMV += pmv * volume;
         weightedTStruct += tStruct * volume;
+        weightedDryingIndex += drying.dryingIndex * volume;
 
         totalDeperditionsKw += energy.depKw;
         totalGainsConductionKw += energy.gainsConductionKw;
@@ -1280,12 +1278,22 @@ function calculateGlobalHabitatMetrics() {
 
     if (totalVolume === 0) return null;
 
+    // Calcul du séchage extérieur (Météo)
+    const velExt = (outdoorWind || 0) / 3.6;
+    const dryingOutdoor = calculateDryingPotential(outdoorTemp, outdoorHumidity, velExt);
+
+    // Calcul de la moyenne pondérée du séchage intérieur
+    const avgDryingIndoorIndex = weightedDryingIndex / totalVolume;
+    const indoorDryingScore10 = (Math.min(100, Math.max(0, Math.round((avgDryingIndoorIndex / 1.8) * 100))) / 10).toFixed(1);
+
     return {
         avgTemp: parseFloat((weightedTemp / totalVolume).toFixed(1)),
         avgRH: parseFloat((weightedRH / totalVolume).toFixed(0)),
         avgAH: parseFloat((weightedAH / totalVolume).toFixed(2)),
         avgPMV: parseFloat((weightedPMV / totalVolume).toFixed(2)),
         avgTStruct: parseFloat((weightedTStruct / totalVolume).toFixed(1)),
+        indoorDryingScore10: indoorDryingScore10,
+        outdoorDryingScore10: dryingOutdoor.score10,
         totalDeperditionsKw: parseFloat(totalDeperditionsKw.toFixed(2)),
         totalGainsConductionKw: parseFloat(totalGainsConductionKw.toFixed(2)),
         totalGainsSolairesKw: parseFloat(totalGainsSolairesKw.toFixed(2)),
@@ -1524,6 +1532,14 @@ function actualiserCockpitGlobal() {
             descEl.textContent = "📊 Microclimat stable";
             descEl.style.color = "#94A3B8";
         }
+    }
+
+    // Injection des valeurs de séchage dans le DOM
+    if (document.getElementById('global-drying-indoor')) {
+        document.getElementById('global-drying-indoor').textContent = `${metrics.indoorDryingScore10}/10`;
+    }
+    if (document.getElementById('global-drying-outdoor')) {
+        document.getElementById('global-drying-outdoor').textContent = `${metrics.outdoorDryingScore10}/10`;
     }
 
     // 3. CARTE BILAN THERMIQUE
