@@ -98,9 +98,10 @@ window.SolsticeStore = {
                     const remoteScan = data.donnees_habitat || {};
                     const remoteRecos = data.checked_recos || {};
 
-                    const mergedConfig = { ...remoteConfig, ...localConfig };
-                    const mergedScan = { ...remoteScan, ...localScan };
-                    const mergedRecos = { ...remoteRecos, ...localRecos };
+                    // ✅ NOUVEAU CODE : Le Cloud (Supabase) devient la source de vérité prioritaire
+const mergedConfig = { ...localConfig, ...remoteConfig };
+const mergedScan = { ...localScan, ...remoteScan };
+const mergedRecos = { ...localRecos, ...remoteRecos };
 
                     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(mergedConfig));
                     localStorage.setItem('SOLSTICE_DONNEES_HABITAT', JSON.stringify(mergedScan));
