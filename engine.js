@@ -941,13 +941,18 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
         });
     }
 
+    const puissanceNetteKw = (gainsConductionKw + gainsSolairesKw) - depKw;
+
     let deperditionskWh = 0;
     let gainsConductionkWh = 0;
     let gainsSolaireskWh = 0;
     
     let bilanDiurnekWh = 0;
     let bilanNocturnekWh = 0;
+    let bilanPasseKwh = 0;
+    let bilanFuturKwh = 0;
 
+    const currentHour = new Date().getHours();
     const sunriseH = window.solsticeEphemeris?.sunriseHour || 7;
     const sunsetH = window.solsticeEphemeris?.sunsetHour || 19;
 
@@ -996,6 +1001,13 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
             } else {
                 bilanNocturnekWh += netHour;
             }
+
+            // Progression temporelle au cours de la journée
+            if (slot.hour < currentHour) {
+                bilanPasseKwh += netHour;
+            } else {
+                bilanFuturKwh += netHour;
+            }
         });
     } else {
         deperditionskWh = depKw * 24;
@@ -1003,6 +1015,11 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
         gainsSolaireskWh = gainsSolairesKw * 24;
         bilanDiurnekWh = (gainsConductionKw + gainsSolairesKw - depKw) * 12;
         bilanNocturnekWh = (gainsConductionKw - depKw) * 12;
+
+        const fractionPassee = Math.min(24, Math.max(0, currentHour)) / 24;
+        const totalNetJour = (gainsConductionKw + gainsSolairesKw - depKw) * 24;
+        bilanPasseKwh = totalNetJour * fractionPassee;
+        bilanFuturKwh = totalNetJour * (1 - fractionPassee);
     }
 
     const gainsTotauxkWh = gainsSolaireskWh + gainsConductionkWh;
@@ -1013,13 +1030,17 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
         depKw: parseFloat(depKw.toFixed(2)),
         gainsConductionKw: parseFloat(gainsConductionKw.toFixed(2)),
         gainsSolairesKw: parseFloat(gainsSolairesKw.toFixed(2)),
+        puissanceNetteKw: parseFloat(puissanceNetteKw.toFixed(2)),
         deperditionskWh: parseFloat(deperditionskWh.toFixed(2)),
         gainsConductionkWh: parseFloat(gainsConductionkWh.toFixed(2)),
         gainsSolaireskWh: parseFloat(gainsSolaireskWh.toFixed(2)),
         gainsTotauxkWh: parseFloat(gainsTotauxkWh.toFixed(2)),
         bilanNetkWh: parseFloat(bilanNetkWh.toFixed(2)),
+        bilanPasseKwh: parseFloat(bilanPasseKwh.toFixed(2)),
+        bilanFuturKwh: parseFloat(bilanFuturKwh.toFixed(2)),
         bilanDiurnekWh: parseFloat(bilanDiurnekWh.toFixed(2)),
-        bilanNocturnekWh: parseFloat(bilanNocturnekWh.toFixed(2))
+        bilanNocturnekWh: parseFloat(bilanNocturnekWh.toFixed(2)),
+        currentHour
     };
 }
 
@@ -1028,21 +1049,42 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
 // ============================================================
 
 function calculateDynamicTau(zoneConfig) {
-    if (!zoneConfig) return 18.0;
-    let tau = 18.0;
+    if (!zoneConfig) return 20.0;
 
+    // Capacité thermique surfacique efficace Cm (Wh / (m²·K)) selon ISO 13790
     const wallMat = zoneConfig.wallMat || 'cinderblock';
-    if (['concrete', 'stone'].includes(wallMat)) tau += 12.0;
-    else if (wallMat === 'wood') tau -= 6.0;
-
     const ins = zoneConfig.insulation || 'iti_recent';
-    if (ins.startsWith('ite')) tau += 10.0;
-    else if (ins.startsWith('iti')) tau -= 4.0;
+    const floorMat = zoneConfig.floorMat || 'lourd';
+    const ceilingMat = zoneConfig.ceilingMat || 'leger';
 
-    if (zoneConfig.floorMat === 'lourd') tau += 4.0;
-    if (zoneConfig.ceilingMat === 'lourd') tau += 4.0;
+    let cmPerM2 = 45; // Base inertie moyenne (parpaing + plâtre intérieur)
 
-    return Math.max(6.0, Math.min(48.0, tau));
+    // Impact matériau des murs
+    if (['concrete', 'stone'].includes(wallMat)) {
+        cmPerM2 += 35; // Forte masse minérale
+    } else if (wallMat === 'wood' || wallMat === 'brique_creuse') {
+        cmPerM2 -= 15; // Inertie plus faible
+    }
+
+    // Impact position de l'isolation (l'ITE permet de mobiliser toute la masse des murs)
+    if (ins.startsWith('ite')) {
+        cmPerM2 += 30; // Murs lourds inclus dans le volume chauffé
+    } else if (ins.startsWith('iti')) {
+        cmPerM2 -= 15; // L'isolation intérieure coupe l'inertie du mur porteur
+    }
+
+    if (floorMat === 'lourd') cmPerM2 += 15; // Dalle béton
+    if (ceilingMat === 'lourd') cmPerM2 += 10; // Dalle / plafond béton
+
+    // Estimation de la résistance thermique moyenne
+    let rMoyen = 2.2;
+    if (ins.includes('recent') || ins.includes('heavy')) rMoyen = 3.6;
+    else if (ins.includes('old')) rMoyen = 1.8;
+    else if (ins === 'none') rMoyen = 0.6;
+
+    // Constante de temps tau = R * C (heures)
+    const tauEstime = (cmPerM2 * rMoyen) / 4.0;
+    return Math.max(8.0, Math.min(72.0, parseFloat(tauEstime.toFixed(1))));
 }
 
 function calculateEquilibriumTstruct(zoneConfig, tOp, tExt24h) {
@@ -1133,8 +1175,10 @@ function updateStructureTemperature(nomPiece, currentTa) {
     return roomData.tStruct;
 }
 
-function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel = 18.0) {
+function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel = 18.0, options = {}) {
     const deltaFlux = tStruct - tAir;
+    // Conductance volumique surfacique d'échange convectif & radiatif intérieur h_i * S_parois / V
+    // En résidentiel standard : h_i ~ 7.7 W/(m²K), ratio S_parois/V ~ 2.2 m²/m³ => ~ 17 W/(K·m³)
     const fluxPowerKw = (totalVolumeM3 * 17 * deltaFlux) / 1000;
     const absPowerKw = Math.abs(fluxPowerKw).toFixed(2);
 
@@ -1152,24 +1196,65 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
         fluxColor = "#4ADE80";
     }
 
-    // --- CALCUL DE L'AUTONOMIE INERTIELLE T_STRUCT -> 19°C ---
-    const tExtMoy = getDailyOutdoorTemp(); 
+    // --- CALCUL THERMODYNAMIQUE DE L'AUTONOMIE T_STRUCT -> 19°C ---
+    // En régime libre sans chauffage, le bâtiment tend vers sa température d'équilibre libre :
+    // T_eq = T_ext + (Apports_internes + Apports_solaires) / H_total
+    const tExtMoy = (options.tExt !== undefined) ? options.tExt : getDailyOutdoorTemp(); 
     const tCible = 19.0;
 
+    // Détermination de H_total (W/K) et des apports gratuits (W)
+    const hTotalWPerK = (options.hTotalWPerK && options.hTotalWPerK > 0)
+        ? options.hTotalWPerK
+        : (totalVolumeM3 * 0.6); // Estimation de sécurité ~0.6 W/(K·m³)
+
+    // Apports internes moyens (~1.5 W/m³ de présence et équipements)
+    const internalGainsW = (options.internalGainsKw !== undefined)
+        ? (options.internalGainsKw * 1000)
+        : (totalVolumeM3 * 1.5);
+
+    // Apports solaires moyens
+    const solarGainsW = (options.gainsSolairesKw !== undefined)
+        ? (options.gainsSolairesKw * 1000)
+        : 0;
+
+    const totalFreeGainsW = internalGainsW + solarGainsW;
+    const deltaTeq = totalFreeGainsW / Math.max(10, hTotalWPerK);
+    const tEquilibre = tExtMoy + deltaTeq;
+
     let autonomyText = "";
+    let hoursTo19 = 0;
 
     if (tStruct <= tCible) {
-        autonomyText = "Parois ≤ 19°C";
-    } else if (tExtMoy >= tCible) {
-        autonomyText = "N/A (T° ext ≥ 19°C)";
+        autonomyText = "Parois ≤ 19°C (0 h)";
+    } else if (tEquilibre >= tCible) {
+        // La température asymptotique d'équilibre libre est supérieure à 19°C :
+        // L'habitat reste naturellement au-dessus de 19°C sans chauffage grâce aux apports gratuits !
+        autonomyText = "Illimitée (Équilibre ≥ 19°C)";
     } else {
-        const hoursTo19 = tauReel * Math.log((tStruct - tExtMoy) / (tCible - tExtMoy));
+        // Décroissance exponentielle vers T_eq :
+        // T(t) = T_eq + (T_struct - T_eq) * exp(-t / tau)
+        // t_19 = tau * ln( (T_struct - T_eq) / (19 - T_eq) )
+        const denom = tCible - tEquilibre;
+        const num = tStruct - tEquilibre;
 
-        if (hoursTo19 >= 48) {
-            const days = (hoursTo19 / 24).toFixed(1);
-            autonomyText = `~${days} jours`;
+        if (denom <= 0.05) {
+            autonomyText = "> 5 jours";
         } else {
-            autonomyText = `~${hoursTo19.toFixed(1)} h`;
+            const ratio = num / denom;
+            if (ratio <= 1.0) {
+                autonomyText = "Parois ≤ 19°C (0 h)";
+            } else {
+                hoursTo19 = tauReel * Math.log(ratio);
+
+                if (hoursTo19 >= 120) {
+                    autonomyText = "> 5 jours";
+                } else if (hoursTo19 >= 48) {
+                    const days = (hoursTo19 / 24).toFixed(1);
+                    autonomyText = `~${days} jours`;
+                } else {
+                    autonomyText = `~${hoursTo19.toFixed(1)} h`;
+                }
+            }
         }
     }
 
@@ -1221,11 +1306,14 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
 
     return {
         tStruct: parseFloat(tStruct.toFixed(1)),
+        tEquilibre: parseFloat(tEquilibre.toFixed(1)),
+        deltaTeq: parseFloat(deltaTeq.toFixed(1)),
         fluxPowerKw: parseFloat(fluxPowerKw.toFixed(2)),
         fluxStatusText,
         fluxColor,
         actionColor,
         autonomyText,
+        hoursTo19: parseFloat(hoursTo19.toFixed(1)),
         actionText
     };
 }
@@ -1246,10 +1334,14 @@ function calculateGlobalHabitatMetrics() {
     let totalDeperditionsKw = 0;
     let totalGainsConductionKw = 0;
     let totalGainsSolairesKw = 0;
+    let totalPuissanceNetteKw = 0;
     let totalBilanNetKwh = 0;
+    let totalBilanPasseKwh = 0;
+    let totalBilanFuturKwh = 0;
 
     let totalBilanDiurnekWh = 0;
     let totalBilanNocturnekWh = 0;
+    let totalHTotalWPerK = 0;
 
     for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
         if (nomPiece === '__ENV__' || nomPiece === '__BUFFER_TOGGLE__') continue;
@@ -1287,10 +1379,14 @@ function calculateGlobalHabitatMetrics() {
         totalDeperditionsKw += energy.depKw;
         totalGainsConductionKw += energy.gainsConductionKw;
         totalGainsSolairesKw += energy.gainsSolairesKw;
+        totalPuissanceNetteKw += energy.puissanceNetteKw;
         totalBilanNetKwh += energy.bilanNetkWh;
+        totalBilanPasseKwh += energy.bilanPasseKwh;
+        totalBilanFuturKwh += energy.bilanFuturKwh;
 
         totalBilanDiurnekWh += energy.bilanDiurnekWh;
         totalBilanNocturnekWh += energy.bilanNocturnekWh;
+        totalHTotalWPerK += energy.hTotalWPerK;
     }
 
     if (totalVolume === 0) return null;
@@ -1314,9 +1410,13 @@ function calculateGlobalHabitatMetrics() {
         totalDeperditionsKw: parseFloat(totalDeperditionsKw.toFixed(2)),
         totalGainsConductionKw: parseFloat(totalGainsConductionKw.toFixed(2)),
         totalGainsSolairesKw: parseFloat(totalGainsSolairesKw.toFixed(2)),
+        totalPuissanceNetteKw: parseFloat(totalPuissanceNetteKw.toFixed(2)),
         totalBilanNetKwh: parseFloat(totalBilanNetKwh.toFixed(2)),
+        totalBilanPasseKwh: parseFloat(totalBilanPasseKwh.toFixed(2)),
+        totalBilanFuturKwh: parseFloat(totalBilanFuturKwh.toFixed(2)),
         totalBilanDiurnekWh: parseFloat(totalBilanDiurnekWh.toFixed(2)),
         totalBilanNocturnekWh: parseFloat(totalBilanNocturnekWh.toFixed(2)),
+        totalHTotalWPerK: parseFloat(totalHTotalWPerK.toFixed(1)),
         totalVolumeM3: parseFloat(totalVolume.toFixed(1))
     };
 }
@@ -1416,6 +1516,7 @@ function mettreAJourTuile(nomPiece) {
         const prefix = netVal > 0 ? "+" : "";
         energyEl.textContent = `${prefix}${netVal.toFixed(2)} kWh/j`;
         energyEl.style.color = netVal >= 0 ? "#10B981" : "#EF4444";
+        energyEl.title = `Bilan cumulé (${energyBalance.currentHour}h) : ${energyBalance.bilanPasseKwh > 0 ? '+' : ''}${energyBalance.bilanPasseKwh} kWh | Flux direct : ${energyBalance.puissanceNetteKw > 0 ? '+' : ''}${energyBalance.puissanceNetteKw} kW`;
     }
 
     if (tStructEl) tStructEl.textContent = tStruct.toFixed(1) + " °C";
@@ -1568,9 +1669,20 @@ function actualiserCockpitGlobal() {
     const netStatusEl = document.getElementById('global-net-status');
     if (netMainEl && netStatusEl) {
         const valNet = metrics.totalBilanNetKwh;
-        netMainEl.textContent = `${valNet > 0 ? '+' : ''}${valNet} kWh aujourd'hui`;
-        netMainEl.style.color = valNet >= 0 ? "#4ADE80" : "#F87171";
-        netStatusEl.textContent = valNet >= 0 ? "(Maison en gain)" : "(Maison en perte)";
+        const valPasse = metrics.totalBilanPasseKwh;
+        const fluxNet = metrics.totalPuissanceNetteKw;
+        const currentH = new Date().getHours();
+
+        const signPasse = valPasse > 0 ? '+' : '';
+        netMainEl.textContent = `${signPasse}${valPasse} kWh (${currentH}h)`;
+        netMainEl.style.color = valPasse >= 0 ? "#4ADE80" : "#F87171";
+
+        const signFlux = fluxNet > 0 ? '+' : '';
+        const statutFlux = fluxNet > 0.1 
+            ? `☀️ Recharge (${signFlux}${fluxNet} kW)`
+            : (fluxNet < -0.1 ? `❄️ Décharge (${signFlux}${fluxNet} kW)` : `⚖️ Équilibre (0 kW)`);
+        const signNet = valNet > 0 ? '+' : '';
+        netStatusEl.textContent = `${statutFlux} • Prév. 24h : ${signNet}${valNet} kWh`;
     }
     
     if (document.getElementById('global-net-day')) {
@@ -1590,7 +1702,12 @@ function actualiserCockpitGlobal() {
         metrics.avgTStruct, 
         metrics.avgTemp, 
         metrics.totalVolumeM3, 
-        metrics.avgTau
+        metrics.avgTau,
+        {
+            hTotalWPerK: metrics.totalHTotalWPerK,
+            gainsSolairesKw: metrics.totalGainsSolairesKw,
+            tExt: outdoorTemp
+        }
     );
 
     if (document.getElementById('global-tstruct')) {
