@@ -18,13 +18,55 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const houseConfig = (store.getZones && store.getZones()) || {};
         const donneesHabitat = (store.getScanData && store.getScanData()) || {};
-        const envDataGlobal = (store.getEnvData && store.getEnvData()) || { 
-            t_ext: 15, 
-            rh_ext: 60, 
-            sun_status: 'clear',
-            t_ext_max: 18,
-            t_ext_min: 10
-        };
+        
+        function loadCurrentEnvData() {
+            let tExt = 15, rhExt = 60, sunStatus = 'clear';
+
+            // 1. SessionStorage (passé au clic depuis index.html)
+            const sessT = sessionStorage.getItem('outdoorTemp');
+            const sessRh = sessionStorage.getItem('outdoorHumidity');
+            const sessSun = sessionStorage.getItem('sunshineStatus');
+            if (sessT !== null && !isNaN(parseFloat(sessT))) tExt = parseFloat(sessT);
+            if (sessRh !== null && !isNaN(parseFloat(sessRh))) rhExt = parseFloat(sessRh);
+            if (sessSun) sunStatus = sessSun;
+
+            // 2. LocalStorage SOLSTICE_ENV_DATA
+            try {
+                const rawEnv = localStorage.getItem('SOLSTICE_ENV_DATA');
+                if (rawEnv) {
+                    const p = JSON.parse(rawEnv);
+                    if (typeof p.t_ext === 'number') tExt = p.t_ext;
+                    if (typeof p.rh_ext === 'number') rhExt = p.rh_ext;
+                    if (p.sun_status) sunStatus = p.sun_status;
+                }
+            } catch (e) {}
+
+            // 3. Direct outdoorTemp / outdoorHumidity
+            const locT = localStorage.getItem('outdoorTemp');
+            const locRh = localStorage.getItem('outdoorHumidity');
+            if (locT !== null && !isNaN(parseFloat(locT))) tExt = parseFloat(locT);
+            if (locRh !== null && !isNaN(parseFloat(locRh))) rhExt = parseFloat(locRh);
+            if (localStorage.getItem('sunshineStatus')) sunStatus = localStorage.getItem('sunshineStatus');
+
+            // 4. Scan Data __ENV__
+            const scanData = (store.getScanData && store.getScanData()) || {};
+            if (scanData['__ENV__']) {
+                const env = scanData['__ENV__'];
+                if (typeof env.outdoorTemp === 'number') tExt = env.outdoorTemp;
+                if (typeof env.outdoorHumidity === 'number') rhExt = env.outdoorHumidity;
+                if (env.sunshineStatus) sunStatus = env.sunshineStatus;
+            }
+
+            return {
+                t_ext: tExt,
+                rh_ext: rhExt,
+                sun_status: sunStatus,
+                t_ext_max: tExt + 3,
+                t_ext_min: tExt - 5
+            };
+        }
+
+        const envDataGlobal = loadCurrentEnvData();
 
         let currentZoneId = sessionStorage.getItem('currentZoneId') || 'all';
 
@@ -223,7 +265,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const ahExt = getAbsoluteHumidity(envDataGlobal.t_ext, envDataGlobal.rh_ext || 60);
             const deltaAh = ahInt - ahExt;
             const mEau = Math.max(0, Math.round(deltaAh * volume));
-            const verresTxt = mEau >= 80 ? ` (~${(mEau / 150).toFixed(1)} verre${mEau >= 225 ? 's' : ''} d'eau)` : '';
+            const nbVerres = Math.max(1, Math.round(mEau / 150));
+            const verresTxt = `~${nbVerres} verre${nbVerres > 1 ? 's' : ''} d'eau`;
 
             const tr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(zone, ta) : ta;
             const vel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zone, zoneName) : 0.1;
@@ -234,7 +277,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const needsCooling = roomPmv > 0.4;
             const isSunny = (envDataGlobal.sun_status || '').toLowerCase().includes('clear') || (envDataGlobal.sun_status || '').toLowerCase().includes('sun');
 
-            const hasNonFixedWindow = !zone?.windows || zone.windows.length === 0 || zone.windows.some(w => !w.vent || (w.vent !== 'fixe' && w.vent !== 'fixed'));
+            function hasOpenableWindows(z) {
+                if (!z || !Array.isArray(z.windows) || z.windows.length === 0) return false;
+                return z.windows.some(w => {
+                    if (!w || !w.vent) return false;
+                    const v = String(w.vent).toLowerCase().trim();
+                    return v === 'total' || v === 'battante' || v === 'partial' || v === 'oscillo_battante' || v === 'oscillante' || v === 'coulissante';
+                });
+            }
+
+            const canOpenWindows = hasOpenableWindows(zone);
             const mainVentType = zone?.windows?.find(w => w.vent && w.vent !== 'fixe' && w.vent !== 'fixed')?.vent || 'battante';
             
             const hasShutters = !zone?.windows || zone.windows.length === 0 || zone.windows.some(w => !w.shutter || w.shutter !== 'aucun');
@@ -251,45 +303,45 @@ document.addEventListener('DOMContentLoaded', function() {
             // --- NIVEAU 1 : ACTIONS IMMÉDIATES (< 1h) ---
 
             // Aération flash intelligente si humidité élevée et air extérieur asséchant
-            if (rh > 60 && deltaAh >= 0.4 && !isWetRoom) {
+            if (rh > 60 && deltaAh >= 0.4 && ahExt < ahInt && !isWetRoom) {
                 if (hasVmc) {
                     recs.push({ id: `${zoneId}_vmc_boost`, level: 1, actionKey: 'vmc_boost', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: 'Boost VMC anti-humidité', text: `L'humidité atteint ${rh} % (air ext. asséchant). Passez la VMC en vitesse rapide pour extraire la vapeur d'eau.`, impactWeight: 15 });
-                } else if (hasNonFixedWindow) {
+                } else if (canOpenWindows) {
                     const dur = (mainVentType === 'oscillante' || mainVentType === 'oscillo_battante' || mainVentType === 'partial') ? '12 à 15 minutes' : '5 à 7 minutes';
-                    recs.push({ id: `${zoneId}_open_win_humidity`, level: 1, actionKey: 'open_win_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: `Aération flash ciblée (-${Math.round(mEau)}g d'eau)`, text: `Ouvrez la fenêtre en grand (${dur}) : vous évacuerez ~${Math.round(mEau)} g de vapeur d'eau${verresTxt} sans entamer la chaleur des murs massifs.`, impactWeight: 15 });
+                    recs.push({ id: `${zoneId}_open_win_humidity`, level: 1, actionKey: 'open_win_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: `Aération flash ciblée (${verresTxt})`, text: `Ouvrez la fenêtre en grand (${dur}) : vous évacuerez ${verresTxt} sans entamer la chaleur des murs massifs.`, impactWeight: 15 });
                 }
             }
 
             // Alerte défensive : Blocage de l'aération si air extérieur saturé
-            if (rh >= 60 && deltaAh < 0.2 && !isWetRoom) {
-                recs.push({ id: `${zoneId}_block_ventilation_humid`, level: 1, actionKey: 'window_block_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-alert', title: '🛡️ Bloquer l\'aération (Air ext. saturé)', text: `L'air extérieur est plus chargé en humidité (${ahExt.toFixed(1)} g/m³) que l'intérieur (${ahInt.toFixed(1)} g/m³). Gardez les fenêtres bien fermées pour éviter d'imprégner vos murs.`, impactWeight: 15 });
+            if (rh >= 60 && (deltaAh < 0.2 || ahExt >= ahInt) && !isWetRoom) {
+                recs.push({ id: `${zoneId}_block_ventilation_humid`, level: 1, actionKey: 'window_block_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-alert', title: '🛡️ Bloquer l\'aération (Air ext. saturé)', text: `L'air extérieur est plus chargé en humidité (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Gardez les fenêtres bien fermées pour éviter d'imprégner vos murs.`, impactWeight: 15 });
             }
 
             // Purge à la source en pièce humide
             if (isWetRoom && rh > 55) {
-                if (deltaAh >= 0.4) {
+                if (deltaAh >= 0.4 && ahExt < ahInt) {
                     let purgeText = "";
-                    if (hasVmc && hasNonFixedWindow) {
-                        purgeText = `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide et aérez 5 à 7 min en grand pour évacuer ~${Math.round(mEau)} g d'eau${verresTxt}.`;
+                    if (hasVmc && canOpenWindows) {
+                        purgeText = `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide et aérez 5 à 7 min en grand pour évacuer ${verresTxt}.`;
                     } else if (hasVmc) {
                         purgeText = `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide pour extraire la vapeur d'eau à la source.`;
-                    } else if (hasNonFixedWindow) {
-                        purgeText = `L'humidité atteint ${rh} %. Ouvrez la fenêtre 5 à 7 min en grand pour évacuer ~${Math.round(mEau)} g d'eau${verresTxt} sans refroidir les parois.`;
+                    } else if (canOpenWindows) {
+                        purgeText = `L'humidité atteint ${rh} %. Ouvrez la fenêtre 5 à 7 min en grand pour évacuer ${verresTxt} sans refroidir les parois.`;
                     }
                     if (purgeText) {
-                        recs.push({ id: `${zoneId}_humidity_source_purge`, level: 1, actionKey: hasVmc ? 'vmc_boost' : 'open_win_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: `Purge à la source (Cuisine / SDB : -${Math.round(mEau)}g)`, text: purgeText, impactWeight: 15 });
+                        recs.push({ id: `${zoneId}_humidity_source_purge`, level: 1, actionKey: hasVmc ? 'vmc_boost' : 'open_win_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: `Purge à la source (Cuisine / SDB : ${verresTxt})`, text: purgeText, impactWeight: 15 });
                     }
                 } else {
-                    recs.push({ id: `${zoneId}_wetroom_block_humid`, level: 1, actionKey: 'window_block_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-alert', title: '🛡️ Bloquer l\'aération extérieure (Air ext. saturé)', text: `Dehors l'air est plus humide (${ahExt.toFixed(1)} g/m³). Fermez la porte de la pièce et utilisez la VMC / hotte plutôt que d'ouvrir vers l'extérieur.`, impactWeight: 15 });
+                    recs.push({ id: `${zoneId}_wetroom_block_humid`, level: 1, actionKey: 'window_block_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-alert', title: '🛡️ Bloquer l\'aération extérieure (Air ext. saturé)', text: `Dehors l'air est plus humide (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Fermez la fenêtre et la porte de la pièce, et activez la VMC / hotte à la source plutôt que d'ouvrir vers l'extérieur.`, impactWeight: 15 });
                 }
             }
 
             const isOutdoorHeatwaveThreat = tExtMaxDay > (ta + 1.5);
-            if (needsCooling && envDataGlobal.t_ext < ta && hasNonFixedWindow && (isOutdoorHeatwaveThreat || ta > 23)) {
+            if (needsCooling && envDataGlobal.t_ext < ta && canOpenWindows && (isOutdoorHeatwaveThreat || ta > 23)) {
                 recs.push({ id: `${zoneId}_free_cooling`, level: 1, actionKey: 'free_cooling', zoneId, zoneName, timing: 'immediate', type: 'type-cool', title: 'Surventilation traversante (Free-cooling)', text: `Il fait plus frais dehors (${envDataGlobal.t_ext} °C). Ouvrez pour décharger l'air chaud.`, impactWeight: 20 });
             }
 
-            if (isHeatingSeasonActive && needsHeat && envDataGlobal.t_ext < 10 && (zone?.equipment?.heating?.system && zone.equipment.heating.system !== 'none') && hasNonFixedWindow) {
+            if (isHeatingSeasonActive && needsHeat && envDataGlobal.t_ext < 10 && (zone?.equipment?.heating?.system && zone.equipment.heating.system !== 'none') && canOpenWindows) {
                 recs.push({ id: `${zoneId}_heating_cut_during_ventilation`, level: 1, actionKey: 'heating_cut', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Coupure du chauffage pendant l\'aération', text: `Coupez le chauffage dans cette pièce pendant l'ouverture des fenêtres.`, impactWeight: 10 });
             }
 
@@ -351,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const vraieSurchauffeExterieure = (envDataGlobal.t_ext >= 22.0 && tExtMinDay >= 18.0);
             const nuitsFraichesOuIntersaison = (tExtMinDay < 18.0 || envDataGlobal.t_ext < 19.0 || isHeatingSeasonActive);
 
-            if (surchauffeInterieure && vraieSurchauffeExterieure && !nuitsFraichesOuIntersaison && reserve.chargeFrigories < 35) {
+            if (surchauffeInterieure && vraieSurchauffeExterieure && !nuitsFraichesOuIntersaison && reserve.chargeFrigories < 35 && canOpenWindows) {
                 recs.push({ id: `${zoneId}_low_frigorie_stock`, level: 3, actionKey: 'free_cooling', zoneId, zoneName, timing: 'strategic', type: 'type-cool', title: 'Décharge nocturne prioritaire (Canicule)', text: `La structure est saturée en chaleur. Ouvrez les fenêtres cette nuit pour refroidir la masse des murs.`, impactWeight: 22 });
             }
 
@@ -372,7 +424,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Stratégie 48h : Sur-ventilation nocturne profonde avant pic caniculaire
-            if (!isHeatingSeasonActive && tExtMaxDay >= 28.0 && envDataGlobal.t_ext < tStruct && hasNonFixedWindow) {
+            if (!isHeatingSeasonActive && tExtMaxDay >= 28.0 && envDataGlobal.t_ext < tStruct && canOpenWindows) {
                 recs.push({
                     id: `${zoneId}_heatwave_preventive_flush`,
                     level: 3,
@@ -449,82 +501,159 @@ document.addEventListener('DOMContentLoaded', function() {
             if (containerStrategic) containerStrategic.innerHTML = '';
             if (containerCompleted) containerCompleted.innerHTML = '';
 
-            const immediatePending = recs.filter(r => (r.timing === 'immediate' || r.level === 1) && lifecycleState.recos[r.id]?.status !== 'completed');
-            const anticipatedPending = recs.filter(r => (r.timing === 'anticipated' || r.level === 2) && lifecycleState.recos[r.id]?.status !== 'completed');
-            const strategicPending = recs.filter(r => (r.timing === 'strategic' || r.level === 3) && lifecycleState.recos[r.id]?.status !== 'completed');
-            const completedList = recs.filter(r => lifecycleState.recos[r.id]?.status === 'completed');
+            // Regroupement visuel des recommandations identiques par action / timing
+            const groupsMap = new Map();
 
-            renderGroup(immediatePending, containerImmediate, "Aucune action immédiate requise.");
+            recs.forEach(rec => {
+                const groupKey = `${rec.actionKey}__${rec.level}__${rec.timing}`;
+                if (!groupsMap.has(groupKey)) {
+                    groupsMap.set(groupKey, {
+                        groupKey,
+                        actionKey: rec.actionKey,
+                        level: rec.level,
+                        timing: rec.timing,
+                        type: rec.type,
+                        title: rec.title.replace(/\s*\([^)]*Cuisine[^)]*\)/i, '').trim(),
+                        text: rec.text,
+                        impactWeightPerRoom: rec.impactWeight,
+                        items: []
+                    });
+                }
+                groupsMap.get(groupKey).items.push(rec);
+            });
+
+            const groups = Array.from(groupsMap.values());
+
+            const immediatePending = [];
+            const anticipatedPending = [];
+            const strategicPending = [];
+            const completedGroups = [];
+
+            groups.forEach(group => {
+                const totalRooms = group.items.length;
+                const completedRooms = group.items.filter(item => lifecycleState.recos[item.id]?.status === 'completed').length;
+                const isAllCompleted = (completedRooms === totalRooms && totalRooms > 0);
+
+                if (isAllCompleted) {
+                    completedGroups.push(group);
+                } else {
+                    if (group.timing === 'immediate' || group.level === 1) {
+                        immediatePending.push(group);
+                    } else if (group.timing === 'anticipated' || group.level === 2) {
+                        anticipatedPending.push(group);
+                    } else if (group.timing === 'strategic' || group.level === 3) {
+                        strategicPending.push(group);
+                    }
+                }
+            });
+
+            renderGroupedCards(immediatePending, containerImmediate, "Aucune action immédiate requise.");
             
             if (containerStrategic) {
-                renderGroup(anticipatedPending, containerAnticipated, "Aucune action anticipée 24h requise.");
-                renderGroup(strategicPending, containerStrategic, "Aucune action stratégique météo 48-72h requise.");
+                renderGroupedCards(anticipatedPending, containerAnticipated, "Aucune action anticipée 24h requise.");
+                renderGroupedCards(strategicPending, containerStrategic, "Aucune action stratégique météo 48-72h requise.");
             } else {
-                renderGroup([...anticipatedPending, ...strategicPending], containerAnticipated, "Aucune action anticipée ou stratégique requise.");
+                renderGroupedCards([...anticipatedPending, ...strategicPending], containerAnticipated, "Aucune action anticipée ou stratégique requise.");
             }
 
-            renderGroup(completedList, containerCompleted, "Aucune action réalisée pour le moment.");
+            renderGroupedCards(completedGroups, containerCompleted, "Aucune action réalisée pour le moment.", true);
 
             updateMetrics(recs);
         }
 
-        function renderGroup(list, container, emptyText) {
+        function renderGroupedCards(groupList, container, emptyText, isCompletedSection = false) {
             if (!container) return;
-            if (list.length === 0) {
+            if (groupList.length === 0) {
                 container.innerHTML = `<div style="color: #7f8c8d; font-style: italic; padding: 0.5rem 0;">${emptyText}</div>`;
                 return;
             }
 
-            list.forEach(rec => {
-                const isChecked = lifecycleState.recos[rec.id]?.status === 'completed';
+            groupList.forEach(group => {
+                const totalRooms = group.items.length;
+                const completedRooms = group.items.filter(item => lifecycleState.recos[item.id]?.status === 'completed').length;
+                const isAllCompleted = (completedRooms === totalRooms && totalRooms > 0);
+                const totalGroupPts = group.items.reduce((sum, item) => sum + item.impactWeight, 0);
+
                 const card = document.createElement('div');
-                card.className = `reco-card ${rec.type || ''} ${isChecked ? 'checked' : ''}`;
-                card.onclick = (e) => toggleAction(rec.id, e);
+                card.className = `reco-card ${group.type || ''} ${isAllCompleted ? 'checked' : ''}`;
+                card.style.cssText = "display: flex; flex-direction: column; width: 100%; box-sizing: border-box;";
+
+                // Texte dynamique du bouton de groupe maître
+                const masterBtnText = isAllCompleted 
+                    ? '↩️ Tout décocher' 
+                    : (totalRooms > 1 ? `⚡ Tout appliquer (${totalRooms - completedRooms})` : '⚡ Tout appliquer');
 
                 card.innerHTML = `
-                    <div style="margin-top: 0.25rem;">
-                        <input type="checkbox" id="${rec.id}" ${isChecked ? 'checked' : ''} style="width: 20px; height: 20px; cursor: pointer;">
-                    </div>
-                    <div style="flex: 1;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
-                            <div style="display: flex; gap: 6px; align-items: center;">
-                                <span class="room-badge-bold">📍 ${rec.zoneName}</span>
-                                <span class="level-badge level-${rec.level}">Niveau ${rec.level}</span>
-                            </div>
-                            <span class="tag-weight">+${rec.impactWeight} pts</span>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 0.4rem; flex-wrap: wrap;">
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <span class="level-badge level-${group.level}">Niveau ${group.level}</span>
+                            <span class="tag-weight">+${totalGroupPts} pts ${totalRooms > 1 ? `(+${group.impactWeightPerRoom} pts / pièce)` : ''}</span>
                         </div>
-                        <div class="reco-title">${rec.title}</div>
-                        <div class="reco-text">${rec.text}</div>
+                        <button type="button" class="btn-group-toggle" onclick="window.solsticeToggleGroup('${group.groupKey}', ${!isAllCompleted})">
+                            ${masterBtnText}
+                        </button>
+                    </div>
+
+                    <div class="reco-title" style="margin-bottom: 0.25rem;">${group.title}</div>
+                    <div class="reco-text" style="margin-bottom: 0.6rem;">${group.text}</div>
+
+                    <div class="room-chips-container">
+                        ${group.items.map(item => {
+                            const isChecked = lifecycleState.recos[item.id]?.status === 'completed';
+                            return `
+                                <button type="button" 
+                                        class="room-chip ${isChecked ? 'chip-completed' : 'chip-pending'}" 
+                                        onclick="window.solsticeToggleSingle('${item.id}', event)"
+                                        title="${isChecked ? 'Cliquer pour décocher ' + item.zoneName : 'Cliquer pour appliquer dans ' + item.zoneName}">
+                                    <span class="chip-check">${isChecked ? '✅' : '⬜'}</span>
+                                    <span class="chip-name">📍 ${item.zoneName}</span>
+                                    <span class="chip-pts">+${item.impactWeight} pts</span>
+                                </button>
+                            `;
+                        }).join('')}
                     </div>
                 `;
+
                 container.appendChild(card);
             });
         }
 
-        function toggleAction(id, event) {
-            if (event.target.tagName !== 'INPUT') {
-                const cb = document.getElementById(id);
-                if (cb) cb.checked = !cb.checked;
+        window.solsticeToggleSingle = function(id, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
             }
-
-            const cb = document.getElementById(id);
             const now = Date.now();
-
             if (!lifecycleState.recos[id]) {
                 lifecycleState.recos[id] = { id, appearedAt: now, completedAt: null, status: 'active' };
             }
 
-            if (cb && cb.checked) {
-                lifecycleState.recos[id].status = 'completed';
-                lifecycleState.recos[id].completedAt = now;
-            } else {
+            if (lifecycleState.recos[id].status === 'completed') {
                 lifecycleState.recos[id].status = 'active';
                 lifecycleState.recos[id].completedAt = null;
+            } else {
+                lifecycleState.recos[id].status = 'completed';
+                lifecycleState.recos[id].completedAt = now;
             }
 
             saveRecoLifecycleState(lifecycleState);
             render();
-        }
+        };
+
+        window.solsticeToggleGroup = function(groupKey, targetState) {
+            const now = Date.now();
+            const allRecs = getAllRecommendations();
+            allRecs.filter(r => `${r.actionKey}__${r.level}__${r.timing}` === groupKey).forEach(item => {
+                if (!lifecycleState.recos[item.id]) {
+                    lifecycleState.recos[item.id] = { id: item.id, appearedAt: now, completedAt: null, status: 'active' };
+                }
+                lifecycleState.recos[item.id].status = targetState ? 'completed' : 'active';
+                lifecycleState.recos[item.id].completedAt = targetState ? now : null;
+            });
+
+            saveRecoLifecycleState(lifecycleState);
+            render();
+        };
 
         // ============================================================
         // MOTEUR DE CALCUL THERMODYNAMIQUE DYNAMIQUE
@@ -763,17 +892,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // Mise à jour dynamique du Score d'Accordage de l'Habitat (sur 100)
-            const completedRatio = totalPossiblePointsToday > 0 ? (earnedPointsToday / totalPossiblePointsToday) : 1.0;
+            // Mise à jour dynamique du Score d'Harmonie de l'Habitat (sur 100)
+            const completedRatio = totalPossiblePointsToday > 0 ? (earnedPointsToday / totalPossiblePointsToday) : 0.0;
             const habitatMetrics = (engine.calculateGlobalHabitatMetrics ? engine.calculateGlobalHabitatMetrics() : null) || {
                 avgPMV: 0,
                 avgRH: 50,
                 avgTau: 20,
                 totalBilanNetKwh: 0
             };
-            const accordage = (engine.calculateHabitatAccordageScore ? engine.calculateHabitatAccordageScore(habitatMetrics, completedRatio) : null) || {
-                score: Math.min(100, Math.round(75 + (completedRatio * 25))),
-                badge: "Accord Parfait",
+            const harmonyFn = engine.calculateHabitatHarmonyScore || engine.calculateHabitatAccordageScore;
+            const harmony = (harmonyFn ? harmonyFn(habitatMetrics, completedRatio) : null) || {
+                score: Math.min(100, Math.round(70 + (completedRatio * 30))),
+                badge: "Harmonie Parfaite",
                 color: "#10B981"
             };
 
@@ -781,12 +911,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const accordageBadgeEl = document.getElementById('disp-accordage-badge');
             const accordageBarEl = document.getElementById('accordageBar');
 
-            if (accordageScoreEl) accordageScoreEl.innerHTML = `${accordage.score} <span class="unit" style="font-size: 1rem; color: #94A3B8;">/ 100</span>`;
+            if (accordageScoreEl) accordageScoreEl.innerHTML = `${harmony.score} <span class="unit" style="font-size: 1rem; color: #94A3B8;">/ 100</span>`;
             if (accordageBadgeEl) {
-                accordageBadgeEl.textContent = accordage.badge;
-                accordageBadgeEl.style.color = accordage.color;
+                accordageBadgeEl.textContent = harmony.badge;
+                accordageBadgeEl.style.color = harmony.color;
             }
-            if (accordageBarEl) accordageBarEl.style.width = `${accordage.score}%`;
+            if (accordageBarEl) accordageBarEl.style.width = `${harmony.score}%`;
         }
 
         window.resetCagnotte = function() {

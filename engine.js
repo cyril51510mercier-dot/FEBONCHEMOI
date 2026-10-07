@@ -13,6 +13,27 @@ let SELECTION_PIECES = [];
 let capteursMaison = {};
 window.hourlyExtForecast = []; // Tableau des 24h de la journée (00h à 23h)
 
+// Préchargement synchrone immédiat depuis le cache local (évite tout état transitoire vide)
+try {
+    const rawCfg = localStorage.getItem('HOUSE_CONFIG');
+    if (rawCfg) GLOBAL_HOUSE_CONFIG = JSON.parse(rawCfg);
+    const rawScan = localStorage.getItem('SOLSTICE_DONNEES_HABITAT') || sessionStorage.getItem('SOLSTICE_DONNEES_HABITAT');
+    if (rawScan) DONNEES_HABITAT = JSON.parse(rawScan);
+    if (localStorage.getItem('outdoorTemp')) outdoorTemp = parseFloat(localStorage.getItem('outdoorTemp'));
+    if (localStorage.getItem('outdoorHumidity')) outdoorHumidity = parseFloat(localStorage.getItem('outdoorHumidity'));
+    if (localStorage.getItem('outdoorWind')) outdoorWind = parseFloat(localStorage.getItem('outdoorWind'));
+    if (localStorage.getItem('sunshineStatus')) sunshineStatus = localStorage.getItem('sunshineStatus');
+    const rawEnv = localStorage.getItem('SOLSTICE_ENV_DATA');
+    if (rawEnv) {
+        const pEnv = JSON.parse(rawEnv);
+        if (typeof pEnv.t_ext === 'number') outdoorTemp = pEnv.t_ext;
+        if (typeof pEnv.rh_ext === 'number') outdoorHumidity = pEnv.rh_ext;
+        if (pEnv.sun_status) sunshineStatus = pEnv.sun_status;
+    }
+} catch (e) {
+    console.warn("[Solstice Engine] Pré-chargement synchrone initial:", e);
+}
+
 // Variables d'état pour le tri du tableau
 let currentSortCol = null;
 let currentSortAsc = true;
@@ -854,6 +875,15 @@ function calculateDryingPotential(ta, rh, vel = 0.1) {
 // (Magnus-Tetens, ISO 7730 & Préservation de l'Inertie)
 // ============================================================
 
+function hasOpenableWindows(zoneConfig) {
+    if (!zoneConfig || !Array.isArray(zoneConfig.windows) || zoneConfig.windows.length === 0) return false;
+    return zoneConfig.windows.some(w => {
+        if (!w || !w.vent) return false;
+        const v = String(w.vent).toLowerCase().trim();
+        return v === 'total' || v === 'battante' || v === 'partial' || v === 'oscillo_battante' || v === 'oscillante' || v === 'coulissante';
+    });
+}
+
 function calculateDifferentialVentilation(zoneConfig, roomData, envData) {
     const ta = (roomData && roomData.ta !== undefined) ? roomData.ta : 20;
     const rh = (roomData && roomData.rh !== undefined) ? roomData.rh : 50;
@@ -868,36 +898,55 @@ function calculateDifferentialVentilation(zoneConfig, roomData, envData) {
     const height = parseFloat(zoneConfig?.height) || 2.5;
     const volume = area * height;
 
-    // Masse d'eau potentiellement extraite par 1 renouvellement d'air complet (en grammes)
+    // Masse d'eau potentiellement extraite par 1 renouvellement d'air complet
     const waterMassGrams = Math.max(0, Math.round(deltaAh * volume));
-    const glassesOfWater = parseFloat((waterMassGrams / 150).toFixed(1)); // 1 verre ≈ 150 ml
+    const nbVerres = Math.max(1, Math.round(waterMassGrams / 150)); // 1 verre ≈ 150 ml
+    const verresTxt = `~${nbVerres} verre${nbVerres > 1 ? 's' : ''} d'eau`;
 
     const isWetRoom = Array.isArray(zoneConfig?.usages) && (zoneConfig.usages.includes('kitchen') || zoneConfig.usages.includes('bath'));
     const winType = zoneConfig?.windows?.find(w => w.vent && w.vent !== 'fixe' && w.vent !== 'fixed')?.vent || 'battante';
     const isOscillo = (winType === 'oscillante' || winType === 'oscillo_battante' || winType === 'partial');
     const optimalDurationMin = isOscillo ? 12 : 6;
+    const canOpenWin = hasOpenableWindows(zoneConfig);
+    const hasVmc = zoneConfig?.equipment?.vmcSystem && zoneConfig.equipment.vmcSystem !== 'none' && zoneConfig.equipment.vmcSystem !== 'aucun';
 
     let status = 'comfort'; // 'urgent_dry', 'recommended_dry', 'blocked_humid', 'comfort', 'dry_air'
-    let canVentilate = deltaAh > 0.2;
+    let canVentilate = deltaAh > 0.2 && ahExt < ahInt && canOpenWin;
     let title = "Hygrométrie équilibrée";
     let detail = `Humidité saine (${rh}%). Pas d'action corrective requise.`;
 
     if (rh > 68) {
-        if (deltaAh >= 0.5) {
+        if (deltaAh >= 0.5 && ahExt < ahInt) {
             status = 'urgent_dry';
-            title = `Aération flash requise (-${waterMassGrams}g)`;
-            detail = `Humidité très élevée (${rh}%). Ouvrez en grand ${optimalDurationMin} min : évacuez ~${waterMassGrams}g d'eau (${glassesOfWater} verres) sans refroidir vos parois.`;
+            if (canOpenWin) {
+                title = `Aération flash requise (${verresTxt})`;
+                detail = `Humidité très élevée (${rh}%). Ouvrez en grand ${optimalDurationMin} min : évacuez ${verresTxt} sans refroidir vos parois.`;
+            } else if (hasVmc) {
+                title = `Boost VMC anti-humidité requise`;
+                detail = `Humidité très élevée (${rh}%). Enclenchez la VMC en vitesse rapide pour extraire la vapeur d'eau (pièce sans fenêtre ouvrable).`;
+            } else {
+                title = `Hygrométrie critique (Sans ouvrant)`;
+                detail = `Humidité critique (${rh}%). Ouvrez la porte intérieure vers une pièce aérée ou activez un déshumidificateur.`;
+            }
         } else {
             status = 'blocked_humid';
             canVentilate = false;
             title = "🛡️ Bloquer l'aération (Air ext. saturé)";
-            detail = `L'air extérieur est trop humide (${ahExt.toFixed(1)} g/m³ > ${ahInt.toFixed(1)} g/m³). Ne pas ouvrir : risque de condensation sur parois froides.`;
+            detail = `L'air extérieur est trop humide (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Ne pas ouvrir : risque d'imprégner vos parois massives.`;
         }
     } else if (rh >= 58 || (isWetRoom && rh >= 54)) {
-        if (deltaAh >= 0.4) {
+        if (deltaAh >= 0.4 && ahExt < ahInt) {
             status = 'recommended_dry';
-            title = `Aération flash conseillée (-${waterMassGrams}g)`;
-            detail = `Ouvrez en grand ${optimalDurationMin} min pour renouveler l'air et chasser ~${waterMassGrams}g de vapeur d'eau sans impacter la masse des murs.`;
+            if (canOpenWin) {
+                title = `Aération flash conseillée (${verresTxt})`;
+                detail = `Ouvrez en grand ${optimalDurationMin} min pour renouveler l'air et chasser ${verresTxt} sans impacter la masse des murs.`;
+            } else if (hasVmc) {
+                title = `Boost VMC conseillé`;
+                detail = `Humidité élevée (${rh}%). Activez la vitesse rapide de la VMC pour assainir l'air (pièce sans fenêtre ouvrable).`;
+            } else {
+                title = `Ventiler via les pièces voisines`;
+                detail = `Humidité élevée (${rh}%). Ouvrez la porte vers le couloir ventilé pour évacuer l'humidité.`;
+            }
         } else {
             status = 'blocked_humid';
             canVentilate = false;
@@ -916,7 +965,9 @@ function calculateDifferentialVentilation(zoneConfig, roomData, envData) {
         deltaAh,
         volume,
         waterMassGrams,
-        glassesOfWater,
+        nbVerres,
+        verresTxt,
+        glassesOfWater: nbVerres,
         optimalDurationMin,
         status,
         canVentilate,
@@ -957,6 +1008,8 @@ function getRoomActionNudge(nomPiece, zoneConfig, roomData, envData) {
     const sunsetH = window.solsticeEphemeris?.sunsetHour || 19;
     const isNight = currentH < sunriseH || currentH >= sunsetH;
     const hasShutters = !zoneConfig?.windows || zoneConfig.windows.length === 0 || zoneConfig.windows.some(w => !w.shutter || w.shutter !== 'aucun');
+    const canOpenWin = hasOpenableWindows(zoneConfig);
+    const hasVmcSys = zoneConfig?.equipment?.vmcSystem && zoneConfig.equipment.vmcSystem !== 'aucun' && zoneConfig.equipment.vmcSystem !== 'none';
 
     let badgeIcon = "✨";
     let badgeLabel = "Équilibré";
@@ -964,20 +1017,34 @@ function getRoomActionNudge(nomPiece, zoneConfig, roomData, envData) {
     let tooltip = "Conditions thermiques et hygrométriques idéales.";
     let actionKey = 'comfort';
 
-    // Règle 1 : Humidité & Aération flash prioritaire
+    // Règle 1 : Humidité & Aération flash prioritaire (avec test ouvrant expert)
     if (vent.status === 'urgent_dry' || vent.status === 'recommended_dry') {
-        badgeIcon = "🪟";
-        badgeLabel = `Aérer ${vent.optimalDurationMin} min`;
-        badgeStyle = "background: #ECFDF5; border: 1px solid #6EE7B7; color: #065F46; font-weight: 700;";
-        tooltip = `💧 Évacuer ~${vent.waterMassGrams}g d'eau (${vent.glassesOfWater} verres) sans refroidir vos parois.`;
-        actionKey = 'open_win_humidity';
+        if (canOpenWin) {
+            badgeIcon = "🪟";
+            badgeLabel = `Aérer ${vent.optimalDurationMin} min`;
+            badgeStyle = "background: #ECFDF5; border: 1px solid #6EE7B7; color: #065F46; font-weight: 700;";
+            tooltip = `💧 Évacuer ${vent.verresTxt} sans refroidir vos parois.`;
+            actionKey = 'open_win_humidity';
+        } else if (hasVmcSys) {
+            badgeIcon = "🌀";
+            badgeLabel = "Boost VMC";
+            badgeStyle = "background: #ECFDF5; border: 1px solid #6EE7B7; color: #065F46; font-weight: 700;";
+            tooltip = `💧 Extraire l'humidité via la VMC (pièce sans fenêtre ouvrable).`;
+            actionKey = 'vmc_boost';
+        } else {
+            badgeIcon = "🚪";
+            badgeLabel = "Ouvrir porte";
+            badgeStyle = "background: #F1F5F9; border: 1px solid #CBD5E1; color: #334155; font-weight: 700;";
+            tooltip = `💧 Aérer via les pièces adjacentes (aucun ouvrant direct).`;
+            actionKey = 'comfort';
+        }
     } 
     // Règle 2 : Blocage strict de l'aération (extérieur saturé)
     else if (vent.status === 'blocked_humid') {
         badgeIcon = "🛡️";
         badgeLabel = "Fenêtres closes";
         badgeStyle = "background: #FFFBEB; border: 1px solid #FCD34D; color: #92400E; font-weight: 700;";
-        tooltip = `⚠️ Air extérieur trop humide (${vent.ahExt} g/m³ > ${vent.ahInt} g/m³). Ne pas ouvrir : risque d'imprégner vos parois.`;
+        tooltip = `⚠️ Air extérieur trop humide (${vent.ahExt} g/m³ ≥ ${vent.ahInt} g/m³). Ne pas ouvrir : risque d'imprégner vos parois.`;
         actionKey = 'window_block_humidity';
     }
     // Règle 3 : Surchauffe avec ensoleillement direct (Bouclier solaire)
@@ -988,8 +1055,8 @@ function getRoomActionNudge(nomPiece, zoneConfig, roomData, envData) {
         tooltip = "☀️ Bloquer le rayonnement direct avant le vitrage pour stopper la surchauffe.";
         actionKey = 'shutter_close';
     }
-    // Règle 4 : Surchauffe avec fraîcheur extérieure (Free cooling)
-    else if (pmv > 0.4 && (envData?.t_ext ?? outdoorTemp) < ta - 1.5) {
+    // Règle 4 : Surchauffe avec fraîcheur extérieure (Free cooling - nécessite fenêtres ouvrables)
+    else if (pmv > 0.4 && (envData?.t_ext ?? outdoorTemp) < ta - 1.5 && canOpenWin) {
         badgeIcon = "💨";
         badgeLabel = "Surventiler";
         badgeStyle = "background: #E0F2FE; border: 1px solid #38BDF8; color: #0369A1; font-weight: 700;";
@@ -1025,13 +1092,13 @@ function getRoomActionNudge(nomPiece, zoneConfig, roomData, envData) {
 }
 
 // ============================================================
-// SCORE D'ACCORDAGE DE L'HABITAT (SUR 100)
-// Confort PMV (40 pts) + Résilience/Autonomie (30 pts) + Gestes (30 pts)
+// SCORE D'HARMONIE DE L'HABITAT (SUR 100)
+// Confort PMV (40 pts max) + Résilience/Autonomie (30 pts max) + Gestes (30 pts max)
 // ============================================================
 
-function calculateHabitatAccordageScore(metrics, completedRatio = 1.0) {
+function calculateHabitatAccordageScore(metrics, completedRatio = 0.0) {
     if (!metrics) {
-        return { score: 75, hygrothermalPts: 30, resiliencePts: 20, behaviorPts: 25, badge: "Harmonieux", color: "#06B6D4" };
+        metrics = { avgPMV: 0, avgRH: 50, avgTau: 20, totalBilanNetKwh: 0 };
     }
 
     // 1. Confort hygrothermique (40 pts max)
@@ -1062,30 +1129,33 @@ function calculateHabitatAccordageScore(metrics, completedRatio = 1.0) {
         else resiliencePts = 12;
     }
 
-    // 3. Comportement & Prise en main (30 pts max)
-    const validRatio = (completedRatio !== undefined && !isNaN(completedRatio)) ? Math.max(0, Math.min(1, completedRatio)) : 1.0;
+    const baseScore = hygrothermalPts + resiliencePts; // Max 70 pts
+
+    // 3. Comportement & Prise en main (30 pts max - 100% réversible)
+    const validRatio = (completedRatio !== undefined && !isNaN(completedRatio)) ? Math.max(0, Math.min(1, completedRatio)) : 0.0;
     const behaviorPts = Math.round(validRatio * 30);
 
-    const totalScore = Math.min(100, Math.max(0, hygrothermalPts + resiliencePts + behaviorPts));
+    const totalScore = Math.min(100, Math.max(0, baseScore + behaviorPts));
 
-    let badge = "Accord Parfait";
+    let badge = "Harmonie Parfaite";
     let color = "#10B981";
     if (totalScore >= 85) {
-        badge = "Accord Parfait";
+        badge = "Harmonie Parfaite";
         color = "#10B981";
     } else if (totalScore >= 70) {
         badge = "Harmonieux";
         color = "#06B6D4";
     } else if (totalScore >= 50) {
-        badge = "À Accorder";
+        badge = "En Équilibre";
         color = "#F59E0B";
     } else {
-        badge = "Désaccordé";
+        badge = "À Améliorer";
         color = "#EF4444";
     }
 
     return {
         score: totalScore,
+        baseScore,
         hygrothermalPts,
         resiliencePts,
         behaviorPts,
@@ -1093,6 +1163,8 @@ function calculateHabitatAccordageScore(metrics, completedRatio = 1.0) {
         color
     };
 }
+
+const calculateHabitatHarmonyScore = calculateHabitatAccordageScore;
 
 // ============================================================
 // BALANCEMENT THERMIQUE : INSTANTANÉ (kW) ET PROJECTION 24H (kWh)
@@ -2315,6 +2387,15 @@ function fetchOneCallWeather(lat, lon, cityName = 'Reims') {
             localStorage.setItem('outdoorHumidity', outdoorHumidity);
             localStorage.setItem('outdoorWind', outdoorWind);
             localStorage.setItem('sunshineStatus', sunshineStatus);
+
+            const envPayload = {
+                t_ext: outdoorTemp,
+                rh_ext: outdoorHumidity,
+                sun_status: sunshineStatus,
+                wind_speed: outdoorWind,
+                p_ext: outdoorPressure
+            };
+            localStorage.setItem('SOLSTICE_ENV_DATA', JSON.stringify(envPayload));
             
             if (typeof DONNEES_HABITAT === 'object') {
                 DONNEES_HABITAT['__ENV__'] = {
@@ -2466,7 +2547,17 @@ window.voirRecommandations = function(nomPiece) {
     sessionStorage.setItem('indoorAirTemp', DONNEES_HABITAT[nomPiece].ta);
     sessionStorage.setItem('indoorHumidity', DONNEES_HABITAT[nomPiece].rh);
     sessionStorage.setItem('outdoorTemp', outdoorTemp);
+    sessionStorage.setItem('outdoorHumidity', outdoorHumidity);
     sessionStorage.setItem('sunshineStatus', sunshineStatus);
+
+    const envPayload = {
+        t_ext: outdoorTemp,
+        rh_ext: outdoorHumidity,
+        sun_status: sunshineStatus,
+        wind_speed: outdoorWind,
+        p_ext: outdoorPressure
+    };
+    localStorage.setItem('SOLSTICE_ENV_DATA', JSON.stringify(envPayload));
 
     window.location.href = `reco.html?zone=${encodeURIComponent(zoneKey)}`;
 };
@@ -2504,6 +2595,8 @@ window.SolsticeEngine = {
     calculateDifferentialVentilation: typeof calculateDifferentialVentilation !== 'undefined' ? calculateDifferentialVentilation : null,
     getRoomActionNudge: typeof getRoomActionNudge !== 'undefined' ? getRoomActionNudge : null,
     calculateHabitatAccordageScore: typeof calculateHabitatAccordageScore !== 'undefined' ? calculateHabitatAccordageScore : null,
+    calculateHabitatHarmonyScore: typeof calculateHabitatHarmonyScore !== 'undefined' ? calculateHabitatHarmonyScore : (typeof calculateHabitatAccordageScore !== 'undefined' ? calculateHabitatAccordageScore : null),
+    hasOpenableWindows: typeof hasOpenableWindows !== 'undefined' ? hasOpenableWindows : null,
 
     evaluateSimulatedPMV(baseState, checkedActionKeys, envData) {
         let simTa = baseState.ta;

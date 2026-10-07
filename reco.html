@@ -60,6 +60,19 @@
         .reco-card.type-cool { border-left: 4px solid #3b82f6; }
         .reco-card.type-heat { border-left: 4px solid #ef4444; }
         .reco-card.type-eco { border-left: 4px solid #10b981; }
+
+        /* Styles spécifiques aux groupes de pièces & chips */
+        .room-chips-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #f1f5f9; }
+        .room-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; }
+        .room-chip:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.06); }
+        .room-chip.chip-pending { border-color: #cbd5e1; background: #f8fafc; color: #334155; }
+        .room-chip.chip-pending:hover { border-color: #e67e22; background: #fff7ed; color: #c2410c; }
+        .room-chip.chip-completed { border-color: #86efac; background: #f0fdf4; color: #166534; }
+        .room-chip.chip-completed .chip-name { text-decoration: line-through; opacity: 0.85; }
+        .chip-pts { font-size: 0.75rem; background: #e2e8f0; padding: 1px 6px; border-radius: 10px; color: #475569; }
+        .room-chip.chip-completed .chip-pts { background: #bbf7d0; color: #15803d; }
+        .btn-group-toggle { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer; color: #334155; transition: all 0.15s ease; }
+        .btn-group-toggle:hover { background: #e2e8f0; color: #0f172a; }
     </style>
 </head>
 <body>
@@ -94,14 +107,14 @@
     <!-- BANDEAU DE DASHBOARD SOLSTICE — RECO & SCORES -->
 <div class="solstice-dashboard-grid">
 
-    <!-- Carte 1 : Accordage & Éco-Score du Jour -->
+    <!-- Carte 1 : Harmonie & Éco-Score du Jour -->
     <div class="solstice-card card-primary">
         <div class="card-header" style="justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span class="card-icon">🎯</span>
-                <span class="card-label">Score d'Accordage</span>
+                <span class="card-label">Score d'Harmonie</span>
             </div>
-            <span id="disp-accordage-badge" style="font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 9999px; background: #D1FAE5; color: #065F46;">Accord Parfait</span>
+            <span id="disp-accordage-badge" style="font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 9999px; background: #D1FAE5; color: #065F46;">Harmonie Parfaite</span>
         </div>
         <div class="card-body">
             <div class="score-display-main" id="disp-accordage-score" style="font-size: 2.1rem; font-weight: 900; color: #10B981; line-height: 1;">-- <span class="unit" style="font-size: 1rem; color: #94A3B8;">/ 100</span></div>
