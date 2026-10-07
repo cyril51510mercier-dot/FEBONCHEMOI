@@ -1034,31 +1034,26 @@ function getRoomActionNudge(nomPiece, zoneConfig, roomData, envData) {
         } else {
             badgeIcon = "🚪";
             badgeLabel = "Ouvrir porte";
-            badgeStyle = "background: #F1F5F9; border: 1px solid #CBD5E1; color: #334155; font-weight: 700;";
+            badgeStyle = "background: #ECFDF5; border: 1px solid #6EE7B7; color: #065F46; font-weight: 700;";
             tooltip = `💧 Aérer via les pièces adjacentes (aucun ouvrant direct).`;
-            actionKey = 'comfort';
+            actionKey = 'open_door_humidity';
         }
     } 
-    // Règle 2 : Blocage strict de l'aération (extérieur saturé avec test VMC et ouvrants)
+    // Règle 2 : Air extérieur saturé (fenêtres réputées fermées de base)
     else if (vent.status === 'blocked_humid') {
-        if (hasVmcSys) {
-            badgeIcon = "🛡️";
-            badgeLabel = "VMC seule";
-            badgeStyle = "background: #F0FDF4; border: 1px solid #86EFAC; color: #166534; font-weight: 700;";
-            tooltip = `⚠️ Air extérieur saturé (${vent.ahExt} g/m³ ≥ ${vent.ahInt} g/m³). Garder les fenêtres fermées : la VMC régule l'hygiène sans mouiller les parois.`;
-            actionKey = 'window_block_humidity';
-        } else if (canOpenWin) {
-            badgeIcon = "🛡️";
-            badgeLabel = "Fenêtres closes";
-            badgeStyle = "background: #FFFBEB; border: 1px solid #FCD34D; color: #92400E; font-weight: 700;";
-            tooltip = `⚠️ Air extérieur trop humide (${vent.ahExt} g/m³ ≥ ${vent.ahInt} g/m³). Ne pas ouvrir : risque d'imprégner vos parois.`;
-            actionKey = 'window_block_humidity';
+        if (hasVmcSys && rh > 60) {
+            badgeIcon = "🌀";
+            badgeLabel = "Boost VMC";
+            badgeStyle = "background: #ECFDF5; border: 1px solid #6EE7B7; color: #065F46; font-weight: 700;";
+            tooltip = `⚠️ Air extérieur trop humide (${vent.ahExt} g/m³ ≥ ${vent.ahInt} g/m³). La VMC extrait l'humidité sans ouvrir vers l'extérieur.`;
+            actionKey = 'vmc_boost';
         } else {
+            // Fenêtres fermées de base : ambiance protégée, aucun geste d'urgence requis
             badgeIcon = "🛡️";
-            badgeLabel = "Porte fermée";
-            badgeStyle = "background: #FFFBEB; border: 1px solid #FCD34D; color: #92400E; font-weight: 700;";
-            tooltip = `⚠️ Air extérieur plus humide (${vent.ahExt} g/m³ ≥ ${vent.ahInt} g/m³). Garder les portes fermées pour protéger la pièce.`;
-            actionKey = 'window_block_humidity';
+            badgeLabel = "Air saturé";
+            badgeStyle = "background: #F8FAFC; border: 1px solid #E2E8F0; color: #64748B; font-weight: 600;";
+            tooltip = `Air extérieur saturé (${vent.ahExt} g/m³ ≥ ${vent.ahInt} g/m³). Fenêtres fermées : l'inertie intérieure est protégée.`;
+            actionKey = 'comfort';
         }
     }
     // Règle 3 : Surchauffe avec ensoleillement direct (Bouclier solaire)
@@ -1097,27 +1092,42 @@ function getRoomActionNudge(nomPiece, zoneConfig, roomData, envData) {
     // Vérifier si l'action prioritaire a déjà été réalisée aujourd'hui dans le plan d'action
     try {
         const rawLifecycle = localStorage.getItem('SOLSTICE_RECO_LIFECYCLE');
-        if (rawLifecycle) {
+        if (rawLifecycle && actionKey !== 'comfort') {
             const lState = JSON.parse(rawLifecycle);
             const todayStr = new Date().toISOString().slice(0, 10);
             if (lState.lastDate === todayStr && lState.recos) {
                 const zoneKey = Object.keys(GLOBAL_HOUSE_CONFIG || {}).find(k => GLOBAL_HOUSE_CONFIG[k]?.name === nomPiece) 
                              || nomPiece.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                
                 const isDone = Object.values(lState.recos).some(item => {
                     if (item.status !== 'completed') return false;
                     const iId = (item.id || '').toLowerCase();
                     const matchesZone = iId.startsWith(zoneKey.toLowerCase() + '_') || iId.startsWith(nomPiece.toLowerCase() + '_');
                     if (!matchesZone) return false;
                     if (actionKey === 'open_win_humidity' && (iId.includes('open_win') || iId.includes('humidity'))) return true;
+                    if (actionKey === 'open_door_humidity' && (iId.includes('door') || iId.includes('open_door'))) return true;
                     if (actionKey === 'vmc_boost' && iId.includes('vmc_boost')) return true;
-                    if (actionKey === 'window_block_humidity' && (iId.includes('block') || iId.includes('humid'))) return true;
                     if (actionKey === 'shutter_close' && (iId.includes('shutter') || iId.includes('shield'))) return true;
                     if (actionKey === 'free_cooling' && iId.includes('cooling')) return true;
                     if (actionKey === 'sun_heat' && iId.includes('sun_heat')) return true;
                     return false;
                 });
 
-                if (isDone) {
+                const hasPendingOccurrence = Object.values(lState.recos).some(item => {
+                    if (item.status !== 'active') return false;
+                    const iId = (item.id || '').toLowerCase();
+                    const matchesZone = iId.startsWith(zoneKey.toLowerCase() + '_') || iId.startsWith(nomPiece.toLowerCase() + '_');
+                    if (!matchesZone) return false;
+                    if (actionKey === 'open_win_humidity' && (iId.includes('open_win') || iId.includes('humidity'))) return true;
+                    if (actionKey === 'open_door_humidity' && (iId.includes('door') || iId.includes('open_door'))) return true;
+                    if (actionKey === 'vmc_boost' && iId.includes('vmc_boost')) return true;
+                    if (actionKey === 'shutter_close' && (iId.includes('shutter') || iId.includes('shield'))) return true;
+                    if (actionKey === 'free_cooling' && iId.includes('cooling')) return true;
+                    if (actionKey === 'sun_heat' && iId.includes('sun_heat')) return true;
+                    return false;
+                });
+
+                if (isDone && !hasPendingOccurrence) {
                     badgeIcon = "✅";
                     badgeLabel = "Fait";
                     badgeStyle = "background: #F0FDF4; border: 1px solid #86EFAC; color: #166534; font-weight: 700;";
