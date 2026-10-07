@@ -53,6 +53,13 @@
         .reco-title { font-weight: 700; font-size: 1rem; color: #1e293b; margin-bottom: 0.2rem; }
         .reco-card.checked .reco-title { text-decoration: line-through; color: #94a3b8; }
         .reco-text { font-size: 0.9rem; color: #475569; line-height: 1.45; }
+
+        .reco-card.type-alert { border-left: 4px solid #f59e0b; background: #fffdf5; }
+        .reco-card.type-air { border-left: 4px solid #06b6d4; }
+        .reco-card.type-sun { border-left: 4px solid #eab308; }
+        .reco-card.type-cool { border-left: 4px solid #3b82f6; }
+        .reco-card.type-heat { border-left: 4px solid #ef4444; }
+        .reco-card.type-eco { border-left: 4px solid #10b981; }
     </style>
 </head>
 <body>
@@ -87,18 +94,25 @@
     <!-- BANDEAU DE DASHBOARD SOLSTICE — RECO & SCORES -->
 <div class="solstice-dashboard-grid">
 
-    <!-- Carte 1 : Éco-Score du Jour -->
+    <!-- Carte 1 : Accordage & Éco-Score du Jour -->
     <div class="solstice-card card-primary">
-        <div class="card-header">
-            <span class="card-icon">🎯</span>
-            <span class="card-label">Éco-Score du Jour</span>
+        <div class="card-header" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="card-icon">🎯</span>
+                <span class="card-label">Score d'Accordage</span>
+            </div>
+            <span id="disp-accordage-badge" style="font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 9999px; background: #D1FAE5; color: #065F46;">Accord Parfait</span>
         </div>
         <div class="card-body">
-            <div class="score-display-main" id="disp-today-score">+0 / +0 <span class="unit">pts</span></div>
-            <div class="progress-container">
-                <div class="progress-bar-glow" id="scoreBar" style="width: 0%;"></div>
+            <div class="score-display-main" id="disp-accordage-score" style="font-size: 2.1rem; font-weight: 900; color: #10B981; line-height: 1;">-- <span class="unit" style="font-size: 1rem; color: #94A3B8;">/ 100</span></div>
+            <div class="progress-container" style="margin-top: 8px; margin-bottom: 6px;">
+                <div class="progress-bar-glow" id="accordageBar" style="width: 80%; background: linear-gradient(90deg, #10B981, #06B6D4);"></div>
+                <div id="scoreBar" style="display: none;"></div>
             </div>
-            <div class="card-subtext" id="roomScoreTitle">Optimisation en temps réel</div>
+            <div class="card-subtext" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
+                <span id="roomScoreTitle">Actions du jour :</span>
+                <strong id="disp-today-score" style="color: #0F172A; font-weight: 800;">+0 / +0 pts</strong>
+            </div>
         </div>
     </div>
 

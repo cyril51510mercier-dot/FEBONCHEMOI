@@ -221,6 +221,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const ahInt = getAbsoluteHumidity(ta, rh);
             const ahExt = getAbsoluteHumidity(envDataGlobal.t_ext, envDataGlobal.rh_ext || 60);
+            const deltaAh = ahInt - ahExt;
+            const mEau = Math.max(0, Math.round(deltaAh * volume));
+            const verresTxt = mEau >= 80 ? ` (~${(mEau / 150).toFixed(1)} verre${mEau >= 225 ? 's' : ''} d'eau)` : '';
 
             const tr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(zone, ta) : ta;
             const vel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zone, zoneName) : 0.1;
@@ -247,26 +250,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // --- NIVEAU 1 : ACTIONS IMMÉDIATES (< 1h) ---
 
-            if (rh > 65 && ahExt < ahInt && !isWetRoom) {
+            // Aération flash intelligente si humidité élevée et air extérieur asséchant
+            if (rh > 60 && deltaAh >= 0.4 && !isWetRoom) {
                 if (hasVmc) {
-                    recs.push({ id: `${zoneId}_vmc_boost`, level: 1, actionKey: 'vmc_boost', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: 'Boost VMC anti-humidité', text: `L'humidité atteint ${rh} % (air ext. plus sec). Passez la VMC en vitesse rapide.`, impactWeight: 15 });
+                    recs.push({ id: `${zoneId}_vmc_boost`, level: 1, actionKey: 'vmc_boost', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: 'Boost VMC anti-humidité', text: `L'humidité atteint ${rh} % (air ext. asséchant). Passez la VMC en vitesse rapide pour extraire la vapeur d'eau.`, impactWeight: 15 });
                 } else if (hasNonFixedWindow) {
-                    const dur = (mainVentType === 'oscillante' || mainVentType === 'oscillo_battante' || mainVentType === 'partial') ? '12 à 15 minutes' : '5 minutes';
-                    recs.push({ id: `${zoneId}_open_win_humidity`, level: 1, actionKey: 'open_win_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: 'Aération flash ciblée', text: `Ouvrez la fenêtre (${dur}) pour évacuer la vapeur d'eau.`, impactWeight: 12 });
+                    const dur = (mainVentType === 'oscillante' || mainVentType === 'oscillo_battante' || mainVentType === 'partial') ? '12 à 15 minutes' : '5 à 7 minutes';
+                    recs.push({ id: `${zoneId}_open_win_humidity`, level: 1, actionKey: 'open_win_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: `Aération flash ciblée (-${Math.round(mEau)}g d'eau)`, text: `Ouvrez la fenêtre en grand (${dur}) : vous évacuerez ~${Math.round(mEau)} g de vapeur d'eau${verresTxt} sans entamer la chaleur des murs massifs.`, impactWeight: 15 });
                 }
             }
 
-            if (isWetRoom && rh > 60 && ahExt < ahInt) {
-                let purgeText = "";
-                if (hasVmc && hasNonFixedWindow) {
-                    purgeText = `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide et/ou ouvrez la fenêtre 5 à 10 min.`;
-                } else if (hasVmc) {
-                    purgeText = `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide pour extraire la vapeur d'eau.`;
-                } else if (hasNonFixedWindow) {
-                    purgeText = `L'humidité atteint ${rh} %. Ouvrez la fenêtre 5 à 10 min pour évacuer la vapeur d'eau localement.`;
-                }
-                if (purgeText) {
-                    recs.push({ id: `${zoneId}_humidity_source_purge`, level: 1, actionKey: hasVmc ? 'vmc_boost' : 'open_win_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: 'Purge à la source (Cuisine / SDB)', text: purgeText, impactWeight: 14 });
+            // Alerte défensive : Blocage de l'aération si air extérieur saturé
+            if (rh >= 60 && deltaAh < 0.2 && !isWetRoom) {
+                recs.push({ id: `${zoneId}_block_ventilation_humid`, level: 1, actionKey: 'window_block_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-alert', title: '🛡️ Bloquer l\'aération (Air ext. saturé)', text: `L'air extérieur est plus chargé en humidité (${ahExt.toFixed(1)} g/m³) que l'intérieur (${ahInt.toFixed(1)} g/m³). Gardez les fenêtres bien fermées pour éviter d'imprégner vos murs.`, impactWeight: 15 });
+            }
+
+            // Purge à la source en pièce humide
+            if (isWetRoom && rh > 55) {
+                if (deltaAh >= 0.4) {
+                    let purgeText = "";
+                    if (hasVmc && hasNonFixedWindow) {
+                        purgeText = `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide et aérez 5 à 7 min en grand pour évacuer ~${Math.round(mEau)} g d'eau${verresTxt}.`;
+                    } else if (hasVmc) {
+                        purgeText = `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide pour extraire la vapeur d'eau à la source.`;
+                    } else if (hasNonFixedWindow) {
+                        purgeText = `L'humidité atteint ${rh} %. Ouvrez la fenêtre 5 à 7 min en grand pour évacuer ~${Math.round(mEau)} g d'eau${verresTxt} sans refroidir les parois.`;
+                    }
+                    if (purgeText) {
+                        recs.push({ id: `${zoneId}_humidity_source_purge`, level: 1, actionKey: hasVmc ? 'vmc_boost' : 'open_win_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: `Purge à la source (Cuisine / SDB : -${Math.round(mEau)}g)`, text: purgeText, impactWeight: 15 });
+                    }
+                } else {
+                    recs.push({ id: `${zoneId}_wetroom_block_humid`, level: 1, actionKey: 'window_block_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-alert', title: '🛡️ Bloquer l\'aération extérieure (Air ext. saturé)', text: `Dehors l'air est plus humide (${ahExt.toFixed(1)} g/m³). Fermez la porte de la pièce et utilisez la VMC / hotte plutôt que d'ouvrir vers l'extérieur.`, impactWeight: 15 });
                 }
             }
 
@@ -339,6 +353,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (surchauffeInterieure && vraieSurchauffeExterieure && !nuitsFraichesOuIntersaison && reserve.chargeFrigories < 35) {
                 recs.push({ id: `${zoneId}_low_frigorie_stock`, level: 3, actionKey: 'free_cooling', zoneId, zoneName, timing: 'strategic', type: 'type-cool', title: 'Décharge nocturne prioritaire (Canicule)', text: `La structure est saturée en chaleur. Ouvrez les fenêtres cette nuit pour refroidir la masse des murs.`, impactWeight: 22 });
+            }
+
+            // Stratégie 48h : Pré-charge solaire de la dalle avant vague de froid
+            if (isHeatingSeasonActive && isSunny && (tExtMinDay < 8.0 || tExtMaxDay < 13.0)) {
+                recs.push({
+                    id: `${zoneId}_solar_precharge_cold_snap`,
+                    level: 3,
+                    actionKey: 'sun_heat',
+                    zoneId,
+                    zoneName,
+                    timing: 'strategic',
+                    type: 'type-sun',
+                    title: '🧱 Pré-charge solaire de la dalle (Anticipation 48h)',
+                    text: `Baisse de température annoncée. Laissez le soleil darder les parois et sols tout l'après-midi pour stocker un maximum de calories gratuites avant la vague de fraîcheur.`,
+                    impactWeight: 20
+                });
+            }
+
+            // Stratégie 48h : Sur-ventilation nocturne profonde avant pic caniculaire
+            if (!isHeatingSeasonActive && tExtMaxDay >= 28.0 && envDataGlobal.t_ext < tStruct && hasNonFixedWindow) {
+                recs.push({
+                    id: `${zoneId}_heatwave_preventive_flush`,
+                    level: 3,
+                    actionKey: 'free_cooling',
+                    zoneId,
+                    zoneName,
+                    timing: 'strategic',
+                    type: 'type-cool',
+                    title: '🌊 Sur-ventilation nocturne profonde (Anticipation pic chaud)',
+                    text: `Fortes chaleurs annoncées demain (${tExtMaxDay}°C). Faites circuler l'air nocturne (${envDataGlobal.t_ext}°C) pour refroidir la masse des murs (${tStruct.toFixed(1)}°C) et régénérer votre réserve de fraîcheur.`,
+                    impactWeight: 25
+                });
             }
 
             return recs.filter(rec => activeProfile.allowedLevels.includes(rec.level));
@@ -432,7 +478,7 @@ document.addEventListener('DOMContentLoaded', function() {
             list.forEach(rec => {
                 const isChecked = lifecycleState.recos[rec.id]?.status === 'completed';
                 const card = document.createElement('div');
-                card.className = `reco-card ${isChecked ? 'checked' : ''}`;
+                card.className = `reco-card ${rec.type || ''} ${isChecked ? 'checked' : ''}`;
                 card.onclick = (e) => toggleAction(rec.id, e);
 
                 card.innerHTML = `
@@ -567,6 +613,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             const energyToHeatAir = (0.34 * deltaFlow * deltaT * 0.5) / 1000;
                             dynamicKwh = energyToHeatAir / etaGen;
                         }
+                    }
+                    // 5bis. Blocage de l'aération si air extérieur saturé (protection isolant)
+                    else if (r.actionKey === 'window_block_humidity') {
+                        dynamicKwh = 0.4 / etaGen;
                     }
                     // 6. Inertie et déphasage des dalles
                     else if (r.actionKey === 'floor_inertia') {
@@ -712,6 +762,31 @@ document.addEventListener('DOMContentLoaded', function() {
                     simEl.style.color = Math.abs(pmvSimulated) <= 0.5 ? 'var(--eco, #2ecc71)' : (pmvSimulated > 0.5 ? 'var(--hot, #e74c3c)' : 'var(--cold, #3498db)');
                 }
             }
+
+            // Mise à jour dynamique du Score d'Accordage de l'Habitat (sur 100)
+            const completedRatio = totalPossiblePointsToday > 0 ? (earnedPointsToday / totalPossiblePointsToday) : 1.0;
+            const habitatMetrics = (engine.calculateGlobalHabitatMetrics ? engine.calculateGlobalHabitatMetrics() : null) || {
+                avgPMV: 0,
+                avgRH: 50,
+                avgTau: 20,
+                totalBilanNetKwh: 0
+            };
+            const accordage = (engine.calculateHabitatAccordageScore ? engine.calculateHabitatAccordageScore(habitatMetrics, completedRatio) : null) || {
+                score: Math.min(100, Math.round(75 + (completedRatio * 25))),
+                badge: "Accord Parfait",
+                color: "#10B981"
+            };
+
+            const accordageScoreEl = document.getElementById('disp-accordage-score');
+            const accordageBadgeEl = document.getElementById('disp-accordage-badge');
+            const accordageBarEl = document.getElementById('accordageBar');
+
+            if (accordageScoreEl) accordageScoreEl.innerHTML = `${accordage.score} <span class="unit" style="font-size: 1rem; color: #94A3B8;">/ 100</span>`;
+            if (accordageBadgeEl) {
+                accordageBadgeEl.textContent = accordage.badge;
+                accordageBadgeEl.style.color = accordage.color;
+            }
+            if (accordageBarEl) accordageBarEl.style.width = `${accordage.score}%`;
         }
 
         window.resetCagnotte = function() {
