@@ -1450,12 +1450,14 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
 
     // Calcul physique de la température d'équilibre libre T_eq :
     let tEquilibre;
+    let deltaTeq = 0;
     if (options.bilanNetKwh !== undefined) {
         // Méthode rigoureuse liée au bilan thermique réel sur 24h (déperditions et apports réels) :
         // P_net_moy = (Bilan Net 24h en Wh) / 24h
         // Si bilanNetKwh < 0 => la maison perd plus d'énergie qu'elle n'en gagne => T_eq < 20°C
         const pNetMoyenneW = (options.bilanNetKwh * 1000) / 24;
         tEquilibre = 20.0 + (pNetMoyenneW / Math.max(10, hTotalWPerK));
+        deltaTeq = tEquilibre - tExtMoy;
     } else {
         // Fallback par sommation des apports gratuits
         const internalGainsW = (options.internalGainsKw !== undefined)
@@ -1465,7 +1467,7 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
             ? (options.gainsSolairesKw * 1000)
             : 0;
         const totalFreeGainsW = internalGainsW + solarGainsW;
-        const deltaTeq = totalFreeGainsW / Math.max(10, hTotalWPerK);
+        deltaTeq = totalFreeGainsW / Math.max(10, hTotalWPerK);
         tEquilibre = tExtMoy + deltaTeq;
     }
 
