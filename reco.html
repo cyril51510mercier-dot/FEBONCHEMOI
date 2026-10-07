@@ -61,18 +61,172 @@
         .reco-card.type-heat { border-left: 4px solid #ef4444; }
         .reco-card.type-eco { border-left: 4px solid #10b981; }
 
-        /* Styles spécifiques aux groupes de pièces & chips */
-        .room-chips-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #f1f5f9; }
-        .room-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; }
-        .room-chip:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.06); }
-        .room-chip.chip-pending { border-color: #cbd5e1; background: #f8fafc; color: #334155; }
-        .room-chip.chip-pending:hover { border-color: #e67e22; background: #fff7ed; color: #c2410c; }
-        .room-chip.chip-completed { border-color: #86efac; background: #f0fdf4; color: #166534; }
-        .room-chip.chip-completed .chip-name { text-decoration: line-through; opacity: 0.85; }
-        .chip-pts { font-size: 0.75rem; background: #e2e8f0; padding: 1px 6px; border-radius: 10px; color: #475569; }
-        .room-chip.chip-completed .chip-pts { background: #bbf7d0; color: #15803d; }
-        .btn-group-toggle { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer; color: #334155; transition: all 0.15s ease; }
-        .btn-group-toggle:hover { background: #e2e8f0; color: #0f172a; }
+        /* Cockpit HUD Strip compact & moderne */
+        .hud-cockpit-strip {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 1.1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+        }
+        @media (max-width: 900px) {
+            .hud-cockpit-strip {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 540px) {
+            .hud-cockpit-strip {
+                grid-template-columns: 1fr;
+            }
+        }
+        .hud-col {
+            display: flex;
+            flex-direction: column;
+            padding: 0 0.5rem;
+            border-right: 1px solid #f1f5f9;
+        }
+        .hud-col:last-child {
+            border-right: none;
+        }
+        @media (max-width: 900px) {
+            .hud-col:nth-child(2) { border-right: none; }
+            .hud-col { border-bottom: 1px solid #f1f5f9; padding-bottom: 0.75rem; margin-bottom: 0.75rem; }
+            .hud-col:nth-child(3), .hud-col:nth-child(4) { border-bottom: none; margin-bottom: 0; }
+        }
+        .hud-col-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+        .hud-col-icon { font-size: 1rem; }
+        .hud-col-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: #64748b;
+            flex: 1;
+        }
+        .hud-badge-pill {
+            font-size: 0.68rem;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 9999px;
+            background: #d1fae5;
+            color: #065f46;
+            white-space: nowrap;
+        }
+        .hud-col-main {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+        .hud-score-hero {
+            font-size: 1.7rem;
+            font-weight: 900;
+            color: #10b981;
+            line-height: 1;
+        }
+        .hud-unit { font-size: 0.85rem; color: #94a3b8; font-weight: 600; }
+        .hud-val-highlight {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1;
+        }
+        .hud-val-xp {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #d97706;
+            line-height: 1;
+        }
+        .hud-progress-wrap {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 4px 0 6px 0;
+        }
+        .hud-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #06b6d4);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        .hud-col-sub {
+            font-size: 0.75rem;
+            color: #64748b;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .hud-pmv-flow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0;
+        }
+        .hud-pmv-chip {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 2px 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .hud-pmv-chip-active {
+            background: #f0fdf4;
+            border-color: #86efac;
+        }
+        .hud-pmv-chip-label { font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; }
+        .hud-pmv-chip-val { font-size: 0.95rem; font-weight: 800; color: #0f172a; }
+        .hud-pmv-arrow { color: #94a3b8; font-weight: 800; font-size: 0.85rem; }
+        .hud-badge-tag {
+            display: inline-block;
+            font-size: 0.7rem;
+            font-weight: 700;
+            background: #fef3c7;
+            color: #b45309;
+            padding: 2px 6px;
+            border-radius: 4px;
+            align-self: flex-start;
+        }
+
+        /* Action unitaire (1 seule pièce) */
+        .reco-card-single {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            background: #ffffff;
+            padding: 1.15rem 1.25rem;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        .reco-card-single:hover {
+            border-color: #e67e22;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.04);
+        }
+        .reco-card-single.checked {
+            background: #f8fafc;
+            border-color: #86efac;
+            opacity: 0.9;
+        }
+        .reco-card-single.checked .reco-title {
+            text-decoration: line-through;
+            color: #94a3b8;
+        }
     </style>
 </head>
 <body>
@@ -91,93 +245,93 @@
 
     <main class="reco-container">
 
-        <!-- Sélection de zone -->
-        <div class="summary-card" style="display: flex; justify-content: space-between; align-items: center; margin: 1.5rem 0; padding: 1rem 1.5rem; background: white; border-radius: 10px; border: 1px solid #e2e8f0;">
+        <!-- Bandeau titre global (sans sélecteur par pièce) -->
+        <div class="summary-card" style="display: flex; justify-content: space-between; align-items: center; margin: 1.25rem 0 1rem 0; padding: 0.9rem 1.4rem; background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
             <div>
-                <h2 style="margin: 0; border: none; padding: 0;">📋 Plan d'Action Thermique</h2>
-                <p id="profileIndicator" style="margin: 0.2rem 0 0 0; font-size: 0.85rem; color: #64748b;">Profil : Chargement...</p>
+                <h2 style="margin: 0; border: none; padding: 0; font-size: 1.25rem; font-weight: 800; color: #0f172a;">📋 Plan d'Action Global du Logement</h2>
+                <p id="profileIndicator" style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #64748b;">Profil : Chargement...</p>
             </div>
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <label for="zoneSelect" style="margin: 0; font-weight: 700;">Pièce analysée :</label>
-                <select id="zoneSelect" style="width: auto; margin: 0; padding: 8px 12px; font-weight: 600; border-radius: 6px; border: 1px solid #cbd5e1;"></select>
+            <div style="font-size: 0.82rem; color: #475569; font-weight: 700; display: flex; align-items: center; gap: 6px; background: #f1f5f9; padding: 5px 12px; border-radius: 20px;">
+                <span>🌐 Toutes les pièces analysées</span>
             </div>
         </div>
 
-        <div class="score-card-container">
-    <!-- BANDEAU DE DASHBOARD SOLSTICE — RECO & SCORES -->
-<div class="solstice-dashboard-grid">
+        <!-- BANDEAU COCKPIT UNIFIÉ (HUD COMPACT & MODERNE) -->
+        <div class="hud-cockpit-strip">
+            <!-- Cellule 1 : Score de Maîtrise du Confort -->
+            <div class="hud-col">
+                <div class="hud-col-header">
+                    <span class="hud-col-icon">🎯</span>
+                    <span class="hud-col-title">Maîtrise Confort</span>
+                    <span id="disp-accordage-badge" class="hud-badge-pill">Maîtrise Optimale</span>
+                </div>
+                <div class="hud-col-main">
+                    <div id="disp-accordage-score" class="hud-score-hero">-- <span class="hud-unit">/ 100</span></div>
+                </div>
+                <div class="hud-progress-wrap">
+                    <div id="accordageBar" class="hud-progress-fill" style="width: 80%;"></div>
+                    <div id="scoreBar" style="display: none;"></div>
+                </div>
+                <div class="hud-col-sub">
+                    <span id="roomScoreTitle">Actions du jour :</span>
+                    <strong id="disp-today-score">+0 / +0 pts</strong>
+                </div>
+            </div>
 
-    <!-- Carte 1 : Harmonie & Éco-Score du Jour -->
-    <div class="solstice-card card-primary">
-        <div class="card-header" style="justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="card-icon">🎯</span>
-                <span class="card-label">Score d'Harmonie</span>
+            <!-- Cellule 2 : Confort PMV Volumique -->
+            <div class="hud-col">
+                <div class="hud-col-header">
+                    <span class="hud-col-icon">🌡️</span>
+                    <span class="hud-col-title">Ressenti Thermal (PMV)</span>
+                </div>
+                <div class="hud-col-main hud-pmv-flow">
+                    <div class="hud-pmv-chip">
+                        <span class="hud-pmv-chip-label">Mesuré</span>
+                        <span id="disp-pmv-init" class="hud-pmv-chip-val">0.00</span>
+                    </div>
+                    <div class="hud-pmv-arrow">➔</div>
+                    <div class="hud-pmv-chip hud-pmv-chip-active">
+                        <span class="hud-pmv-chip-label">Simulé</span>
+                        <span id="disp-pmv-sim" class="hud-pmv-chip-val">0.00</span>
+                    </div>
+                </div>
+                <div class="hud-col-sub" style="margin-top: auto;">
+                    <span>Pondération volumique</span>
+                </div>
             </div>
-            <span id="disp-accordage-badge" style="font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 9999px; background: #D1FAE5; color: #065F46;">Harmonie Parfaite</span>
-        </div>
-        <div class="card-body">
-            <div class="score-display-main" id="disp-accordage-score" style="font-size: 2.1rem; font-weight: 900; color: #10B981; line-height: 1;">-- <span class="unit" style="font-size: 1rem; color: #94A3B8;">/ 100</span></div>
-            <div class="progress-container" style="margin-top: 8px; margin-bottom: 6px;">
-                <div class="progress-bar-glow" id="accordageBar" style="width: 80%; background: linear-gradient(90deg, #10B981, #06B6D4);"></div>
-                <div id="scoreBar" style="display: none;"></div>
-            </div>
-            <div class="card-subtext" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
-                <span id="roomScoreTitle">Actions du jour :</span>
-                <strong id="disp-today-score" style="color: #0F172A; font-weight: 800;">+0 / +0 pts</strong>
-            </div>
-        </div>
-    </div>
 
-    <!-- Carte 2 : Expérience Cumulée (XP) -->
-    <div class="solstice-card card-xp">
-        <div class="card-header">
-            <span class="card-icon">⚡</span>
-            <span class="card-label">Éco-Score Cumulé</span>
-        </div>
-        <div class="card-body">
-            <div class="score-display-xp" id="disp-total-xp">0 <span class="unit">pts XP</span></div>
-            <div class="xp-badge">Niveau Bâtiment Passif</div>
-            <div class="card-subtext">Capital sobriété du logement</div>
-        </div>
-    </div>
+            <!-- Cellule 3 : Économies & Cagnotte -->
+            <div class="hud-col">
+                <div class="hud-col-header">
+                    <span class="hud-col-icon">🌱</span>
+                    <span class="hud-col-title">Économies & Cagnotte</span>
+                </div>
+                <div class="hud-col-main">
+                    <div id="disp-daily-savings-eur" class="hud-val-highlight">0,00 €</div>
+                </div>
+                <div class="hud-col-sub" style="margin-top: 2px;">
+                    <span id="disp-daily-savings-kwh">0.00 kWh/j évités</span>
+                </div>
+                <div class="hud-col-sub" style="margin-top: 4px;">
+                    <span>Cagnotte : <strong id="disp-cagnotte-total" style="color: #15803d;">0,00 €</strong></span>
+                </div>
+            </div>
 
-    <!-- Carte 3 : Gains Énergétiques & Financiers -->
-    <div class="solstice-card card-finance">
-        <div class="card-header">
-            <span class="card-icon">🌱</span>
-            <span class="card-label">Cagnotte & Économies</span>
-        </div>
-        <div class="card-body">
-            <div class="score-display-eur" id="disp-daily-savings-eur">0,00 €</div>
-            <div class="energy-avoided" id="disp-daily-savings-kwh">0.00 kWh/j évités aujourd'hui</div>
-            <div class="cagnotte-pill">
-                Cagnotte globale : <strong id="disp-cagnotte-total">0,00 €</strong>
+            <!-- Cellule 4 : Éco-Score Cumulé (XP) -->
+            <div class="hud-col">
+                <div class="hud-col-header">
+                    <span class="hud-col-icon">⚡</span>
+                    <span class="hud-col-title">Éco-Score Cumulé</span>
+                </div>
+                <div class="hud-col-main">
+                    <div id="disp-total-xp" class="hud-val-xp">0 <span class="hud-unit">pts XP</span></div>
+                </div>
+                <div class="hud-badge-tag" style="margin-top: 2px;">Niveau Bâtiment Passif</div>
+                <div class="hud-col-sub" style="margin-top: 4px;">
+                    <span>Capital sobriété</span>
+                </div>
             </div>
         </div>
-    </div>
-
-    <!-- Carte 4 : Confort PMV Volumique -->
-    <div class="solstice-card card-pmv">
-        <div class="card-header">
-            <span class="card-icon">🌡️</span>
-            <span class="card-label">Ressenti Thermal (PMV)</span>
-        </div>
-        <div class="card-body pmv-body">
-            <div class="pmv-box">
-                <span class="pmv-tag">Mesuré</span>
-                <span class="pmv-val" id="disp-pmv-init">0.00</span>
-            </div>
-            <div class="pmv-arrow">➔</div>
-            <div class="pmv-box highlight">
-                <span class="pmv-tag">Simulé</span>
-                <span class="pmv-val" id="disp-pmv-sim">0.00</span>
-            </div>
-        </div>
-        <div class="card-subtext">Pondération volumique des pièces</div>
-    </div>
-
-</div>
 
         <!-- Groupes par Niveau -->
         <section>

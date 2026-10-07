@@ -1039,13 +1039,27 @@ function getRoomActionNudge(nomPiece, zoneConfig, roomData, envData) {
             actionKey = 'comfort';
         }
     } 
-    // Règle 2 : Blocage strict de l'aération (extérieur saturé)
+    // Règle 2 : Blocage strict de l'aération (extérieur saturé avec test VMC et ouvrants)
     else if (vent.status === 'blocked_humid') {
-        badgeIcon = "🛡️";
-        badgeLabel = "Fenêtres closes";
-        badgeStyle = "background: #FFFBEB; border: 1px solid #FCD34D; color: #92400E; font-weight: 700;";
-        tooltip = `⚠️ Air extérieur trop humide (${vent.ahExt} g/m³ ≥ ${vent.ahInt} g/m³). Ne pas ouvrir : risque d'imprégner vos parois.`;
-        actionKey = 'window_block_humidity';
+        if (hasVmcSys) {
+            badgeIcon = "🛡️";
+            badgeLabel = "VMC seule";
+            badgeStyle = "background: #F0FDF4; border: 1px solid #86EFAC; color: #166534; font-weight: 700;";
+            tooltip = `⚠️ Air extérieur saturé (${vent.ahExt} g/m³ ≥ ${vent.ahInt} g/m³). Garder les fenêtres fermées : la VMC régule l'hygiène sans mouiller les parois.`;
+            actionKey = 'window_block_humidity';
+        } else if (canOpenWin) {
+            badgeIcon = "🛡️";
+            badgeLabel = "Fenêtres closes";
+            badgeStyle = "background: #FFFBEB; border: 1px solid #FCD34D; color: #92400E; font-weight: 700;";
+            tooltip = `⚠️ Air extérieur trop humide (${vent.ahExt} g/m³ ≥ ${vent.ahInt} g/m³). Ne pas ouvrir : risque d'imprégner vos parois.`;
+            actionKey = 'window_block_humidity';
+        } else {
+            badgeIcon = "🛡️";
+            badgeLabel = "Porte fermée";
+            badgeStyle = "background: #FFFBEB; border: 1px solid #FCD34D; color: #92400E; font-weight: 700;";
+            tooltip = `⚠️ Air extérieur plus humide (${vent.ahExt} g/m³ ≥ ${vent.ahInt} g/m³). Garder les portes fermées pour protéger la pièce.`;
+            actionKey = 'window_block_humidity';
+        }
     }
     // Règle 3 : Surchauffe avec ensoleillement direct (Bouclier solaire)
     else if (pmv > 0.4 && isSunny && hasShutters) {
@@ -1080,6 +1094,39 @@ function getRoomActionNudge(nomPiece, zoneConfig, roomData, envData) {
         actionKey = 'shutter_close';
     }
 
+    // Vérifier si l'action prioritaire a déjà été réalisée aujourd'hui dans le plan d'action
+    try {
+        const rawLifecycle = localStorage.getItem('SOLSTICE_RECO_LIFECYCLE');
+        if (rawLifecycle) {
+            const lState = JSON.parse(rawLifecycle);
+            const todayStr = new Date().toISOString().slice(0, 10);
+            if (lState.lastDate === todayStr && lState.recos) {
+                const zoneKey = Object.keys(GLOBAL_HOUSE_CONFIG || {}).find(k => GLOBAL_HOUSE_CONFIG[k]?.name === nomPiece) 
+                             || nomPiece.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                const isDone = Object.values(lState.recos).some(item => {
+                    if (item.status !== 'completed') return false;
+                    const iId = (item.id || '').toLowerCase();
+                    const matchesZone = iId.startsWith(zoneKey.toLowerCase() + '_') || iId.startsWith(nomPiece.toLowerCase() + '_');
+                    if (!matchesZone) return false;
+                    if (actionKey === 'open_win_humidity' && (iId.includes('open_win') || iId.includes('humidity'))) return true;
+                    if (actionKey === 'vmc_boost' && iId.includes('vmc_boost')) return true;
+                    if (actionKey === 'window_block_humidity' && (iId.includes('block') || iId.includes('humid'))) return true;
+                    if (actionKey === 'shutter_close' && (iId.includes('shutter') || iId.includes('shield'))) return true;
+                    if (actionKey === 'free_cooling' && iId.includes('cooling')) return true;
+                    if (actionKey === 'sun_heat' && iId.includes('sun_heat')) return true;
+                    return false;
+                });
+
+                if (isDone) {
+                    badgeIcon = "✅";
+                    badgeLabel = "Fait";
+                    badgeStyle = "background: #F0FDF4; border: 1px solid #86EFAC; color: #166534; font-weight: 700;";
+                    tooltip = `✅ Action recommandée déjà effectuée aujourd'hui dans cette pièce. Confort préservé !`;
+                }
+            }
+        }
+    } catch (e) {}
+
     const html = `<button onclick="voirRecommandations('${safeName}')" title="${tooltip}" style="${badgeStyle} padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: transform 0.15s ease;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'"><span>${badgeIcon}</span><span>${badgeLabel}</span></button>`;
 
     return {
@@ -1092,7 +1139,7 @@ function getRoomActionNudge(nomPiece, zoneConfig, roomData, envData) {
 }
 
 // ============================================================
-// SCORE D'HARMONIE DE L'HABITAT (SUR 100)
+// SCORE DE MAÎTRISE DU CONFORT DE L'HABITAT (SUR 100)
 // Confort PMV (40 pts max) + Résilience/Autonomie (30 pts max) + Gestes (30 pts max)
 // ============================================================
 
@@ -1137,19 +1184,19 @@ function calculateHabitatAccordageScore(metrics, completedRatio = 0.0) {
 
     const totalScore = Math.min(100, Math.max(0, baseScore + behaviorPts));
 
-    let badge = "Harmonie Parfaite";
+    let badge = "Maîtrise Optimale";
     let color = "#10B981";
     if (totalScore >= 85) {
-        badge = "Harmonie Parfaite";
+        badge = "Maîtrise Optimale";
         color = "#10B981";
     } else if (totalScore >= 70) {
-        badge = "Harmonieux";
+        badge = "Confort Bien Préservé";
         color = "#06B6D4";
     } else if (totalScore >= 50) {
-        badge = "En Équilibre";
+        badge = "Actions Recommandées";
         color = "#F59E0B";
     } else {
-        badge = "À Améliorer";
+        badge = "Inconfort à Corriger";
         color = "#EF4444";
     }
 
@@ -2542,7 +2589,7 @@ window.voirRecommandations = function(nomPiece) {
     const idCapteur = capteursMaison[nomPiece];
     const pmv = document.getElementById('pmv-badge-' + idCapteur)?.textContent || "0";
 
-    sessionStorage.setItem('currentZoneId', zoneKey); 
+    sessionStorage.setItem('currentZoneId', 'all'); 
     sessionStorage.setItem('calculatedPMV', pmv);
     sessionStorage.setItem('indoorAirTemp', DONNEES_HABITAT[nomPiece].ta);
     sessionStorage.setItem('indoorHumidity', DONNEES_HABITAT[nomPiece].rh);
@@ -2559,7 +2606,7 @@ window.voirRecommandations = function(nomPiece) {
     };
     localStorage.setItem('SOLSTICE_ENV_DATA', JSON.stringify(envPayload));
 
-    window.location.href = `reco.html?zone=${encodeURIComponent(zoneKey)}`;
+    window.location.href = `reco.html?zone=all`;
 };
 
 // ============================================================

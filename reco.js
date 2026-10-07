@@ -68,7 +68,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const envDataGlobal = loadCurrentEnvData();
 
-        let currentZoneId = sessionStorage.getItem('currentZoneId') || 'all';
+        let currentZoneId = 'all';
+        sessionStorage.setItem('currentZoneId', 'all');
 
         const zoneSelect = document.getElementById('zoneSelect');
         const containerImmediate = document.getElementById('container-immediate');
@@ -305,34 +306,118 @@ document.addEventListener('DOMContentLoaded', function() {
             // Aération flash intelligente si humidité élevée et air extérieur asséchant
             if (rh > 60 && deltaAh >= 0.4 && ahExt < ahInt && !isWetRoom) {
                 if (hasVmc) {
-                    recs.push({ id: `${zoneId}_vmc_boost`, level: 1, actionKey: 'vmc_boost', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: 'Boost VMC anti-humidité', text: `L'humidité atteint ${rh} % (air ext. asséchant). Passez la VMC en vitesse rapide pour extraire la vapeur d'eau.`, impactWeight: 15 });
+                    recs.push({ 
+                        id: `${zoneId}_vmc_boost`, 
+                        level: 1, 
+                        actionKey: 'vmc_boost', 
+                        zoneId, 
+                        zoneName, 
+                        timing: 'immediate', 
+                        type: 'type-air', 
+                        title: 'Boost VMC anti-humidité', 
+                        text: `L'humidité atteint ${rh} % (air ext. asséchant). Passez la VMC en vitesse rapide pour extraire la vapeur d'eau (${verresTxt}).`, 
+                        impactWeight: 15,
+                        nbVerres: nbVerres,
+                        mEau: mEau
+                    });
                 } else if (canOpenWindows) {
                     const dur = (mainVentType === 'oscillante' || mainVentType === 'oscillo_battante' || mainVentType === 'partial') ? '12 à 15 minutes' : '5 à 7 minutes';
-                    recs.push({ id: `${zoneId}_open_win_humidity`, level: 1, actionKey: 'open_win_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: `Aération flash ciblée (${verresTxt})`, text: `Ouvrez la fenêtre en grand (${dur}) : vous évacuerez ${verresTxt} sans entamer la chaleur des murs massifs.`, impactWeight: 15 });
+                    recs.push({ 
+                        id: `${zoneId}_open_win_humidity`, 
+                        level: 1, 
+                        actionKey: 'open_win_humidity', 
+                        zoneId, 
+                        zoneName, 
+                        timing: 'immediate', 
+                        type: 'type-air', 
+                        title: `Aération flash ciblée (${verresTxt})`, 
+                        text: `Ouvrez la fenêtre en grand (${dur}) : vous évacuerez ${verresTxt} sans entamer la chaleur des murs massifs.`, 
+                        impactWeight: 15,
+                        nbVerres: nbVerres,
+                        mEau: mEau
+                    });
                 }
             }
 
-            // Alerte défensive : Blocage de l'aération si air extérieur saturé
+            // Alerte défensive : Blocage de l'aération si air extérieur saturé (avec test VMC et ouvrants)
             if (rh >= 60 && (deltaAh < 0.2 || ahExt >= ahInt) && !isWetRoom) {
-                recs.push({ id: `${zoneId}_block_ventilation_humid`, level: 1, actionKey: 'window_block_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-alert', title: '🛡️ Bloquer l\'aération (Air ext. saturé)', text: `L'air extérieur est plus chargé en humidité (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Gardez les fenêtres bien fermées pour éviter d'imprégner vos murs.`, impactWeight: 15 });
+                let blockAdvice = '';
+                if (canOpenWindows) {
+                    if (hasVmc) {
+                        blockAdvice = `L'air extérieur est plus chargé en humidité (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Gardez les fenêtres fermées : votre système VMC assure seul le renouvellement d'air hygiénique sans risque d'imprégner vos murs.`;
+                    } else {
+                        blockAdvice = `L'air extérieur est plus chargé en humidité (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Gardez les fenêtres bien fermées pour éviter d'imprégner vos parois intérieures et vos isolants.`;
+                    }
+                } else {
+                    if (hasVmc) {
+                        blockAdvice = `L'air extérieur est plus chargé en humidité (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Votre système VMC régule la qualité d'air ; veillez à maintenir la porte fermée pour préserver l'équilibre de la pièce.`;
+                    } else {
+                        blockAdvice = `L'air extérieur est plus chargé en humidité (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Maintenez la porte fermée avec l'extérieur pour protéger l'ambiance intérieure.`;
+                    }
+                }
+
+                recs.push({ 
+                    id: `${zoneId}_block_ventilation_humid`, 
+                    level: 1, 
+                    actionKey: 'window_block_humidity', 
+                    zoneId, 
+                    zoneName, 
+                    timing: 'immediate', 
+                    type: 'type-alert', 
+                    title: '🛡️ Bloquer l\'aération extérieure (Air ext. saturé)', 
+                    text: blockAdvice, 
+                    impactWeight: 15 
+                });
             }
 
-            // Purge à la source en pièce humide
+            // Purge à la source en pièce humide (avec test VMC et ouvrants)
             if (isWetRoom && rh > 55) {
                 if (deltaAh >= 0.4 && ahExt < ahInt) {
                     let purgeText = "";
                     if (hasVmc && canOpenWindows) {
-                        purgeText = `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide et aérez 5 à 7 min en grand pour évacuer ${verresTxt}.`;
+                        purgeText = `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide et aérez 5 à 7 min en grand pour évacuer ${verresTxt} sans refroidir les parois.`;
                     } else if (hasVmc) {
-                        purgeText = `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide pour extraire la vapeur d'eau à la source.`;
+                        purgeText = `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide pour extraire la vapeur d'eau (${verresTxt}) à la source.`;
                     } else if (canOpenWindows) {
                         purgeText = `L'humidité atteint ${rh} %. Ouvrez la fenêtre 5 à 7 min en grand pour évacuer ${verresTxt} sans refroidir les parois.`;
                     }
                     if (purgeText) {
-                        recs.push({ id: `${zoneId}_humidity_source_purge`, level: 1, actionKey: hasVmc ? 'vmc_boost' : 'open_win_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-air', title: `Purge à la source (Cuisine / SDB : ${verresTxt})`, text: purgeText, impactWeight: 15 });
+                        recs.push({ 
+                            id: `${zoneId}_humidity_source_purge`, 
+                            level: 1, 
+                            actionKey: hasVmc ? 'vmc_boost' : 'open_win_humidity', 
+                            zoneId, 
+                            zoneName, 
+                            timing: 'immediate', 
+                            type: 'type-air', 
+                            title: `Purge à la source (${verresTxt})`, 
+                            text: purgeText, 
+                            impactWeight: 15,
+                            nbVerres: nbVerres,
+                            mEau: mEau
+                        });
                     }
                 } else {
-                    recs.push({ id: `${zoneId}_wetroom_block_humid`, level: 1, actionKey: 'window_block_humidity', zoneId, zoneName, timing: 'immediate', type: 'type-alert', title: '🛡️ Bloquer l\'aération extérieure (Air ext. saturé)', text: `Dehors l'air est plus humide (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Fermez la fenêtre et la porte de la pièce, et activez la VMC / hotte à la source plutôt que d'ouvrir vers l'extérieur.`, impactWeight: 15 });
+                    let wetBlockText = "";
+                    if (hasVmc) {
+                        wetBlockText = `L'air extérieur est plus humide (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Activez la VMC / hotte à la source et gardez les fenêtres fermées : la VMC extrait l'humidité sans aspirer l'air saturé extérieur.`;
+                    } else if (canOpenWindows) {
+                        wetBlockText = `Dehors l'air est plus humide (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Gardez les fenêtres fermées vers l'extérieur et fermez la porte de la pièce pour confiner la vapeur.`;
+                    } else {
+                        wetBlockText = `L'air extérieur est plus humide (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Maintenez la porte fermée pour éviter la diffusion de l'humidité dans les pièces adjacentes.`;
+                    }
+                    recs.push({ 
+                        id: `${zoneId}_wetroom_block_humid`, 
+                        level: 1, 
+                        actionKey: 'window_block_humidity', 
+                        zoneId, 
+                        zoneName, 
+                        timing: 'immediate', 
+                        type: 'type-alert', 
+                        title: '🛡️ Bloquer l\'aération extérieure (Air ext. saturé)', 
+                        text: wetBlockText, 
+                        impactWeight: 15 
+                    });
                 }
             }
 
@@ -444,25 +529,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function getAllRecommendations() {
             let allRecs = [];
-            const selectedZone = zoneSelect ? zoneSelect.value : currentZoneId;
             const zonesMap = getAvailableZonesMap();
 
-            if (selectedZone === 'all') {
-                Object.keys(zonesMap).forEach(zId => {
-                    const roomName = zonesMap[zId];
-                    const zone = houseConfig[zId] || { id: zId, name: roomName };
-                    const roomData = donneesHabitat[roomName] || { ta: 20, rh: 50 };
-                    allRecs = allRecs.concat(generateRecommendationsForZone(zone, zId, roomData));
-                });
-            } else {
-                const roomName = zonesMap[selectedZone] || selectedZone;
-                const zone = houseConfig[selectedZone] || { id: selectedZone, name: roomName };
-                const roomData = donneesHabitat[roomName] || {
-                    ta: parseFloat(sessionStorage.getItem('indoorAirTemp')) || 20,
-                    rh: parseFloat(sessionStorage.getItem('indoorHumidity')) || 50
-                };
-                allRecs = generateRecommendationsForZone(zone, selectedZone, roomData);
-            }
+            Object.keys(zonesMap).forEach(zId => {
+                const roomName = zonesMap[zId];
+                const zone = houseConfig[zId] || { id: zId, name: roomName };
+                const roomData = donneesHabitat[roomName] || { ta: 20, rh: 50 };
+                allRecs = allRecs.concat(generateRecommendationsForZone(zone, zId, roomData));
+            });
 
             syncRecommendationsLifecycle(allRecs);
             return allRecs;
@@ -574,32 +648,100 @@ document.addEventListener('DOMContentLoaded', function() {
                 const isAllCompleted = (completedRooms === totalRooms && totalRooms > 0);
                 const totalGroupPts = group.items.reduce((sum, item) => sum + item.impactWeight, 0);
 
+                // ============================================================
+                // CAS 1 : UNE SEULE PIÈCE CONCERNÉE (Carte unitaire directe)
+                // Pas de groupe, pas de chips, pas de bouton "Tout appliquer"
+                // ============================================================
+                if (totalRooms === 1) {
+                    const item = group.items[0];
+                    const isChecked = lifecycleState.recos[item.id]?.status === 'completed';
+
+                    const card = document.createElement('div');
+                    card.className = `reco-card reco-card-single ${item.type || group.type || ''} ${isChecked ? 'checked' : ''}`;
+                    card.onclick = (e) => {
+                        if (e.target.tagName !== 'INPUT') {
+                            window.solsticeToggleSingle(item.id, e);
+                        }
+                    };
+
+                    card.innerHTML = `
+                        <div style="padding-top: 2px;">
+                            <input type="checkbox" 
+                                   ${isChecked ? 'checked' : ''} 
+                                   onchange="window.solsticeToggleSingle('${item.id}', event)" 
+                                   style="width: 20px; height: 20px; cursor: pointer; accent-color: #10B981;">
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap;">
+                                <span class="level-badge level-${item.level}">Niveau ${item.level}</span>
+                                <span class="room-badge-bold">📍 ${item.zoneName}</span>
+                                <span class="tag-weight">+${item.impactWeight} pts</span>
+                            </div>
+                            <div class="reco-title" style="margin-bottom: 0.25rem;">${item.title}</div>
+                            <div class="reco-text">${item.text}</div>
+                        </div>
+                    `;
+
+                    container.appendChild(card);
+                    return;
+                }
+
+                // ============================================================
+                // CAS 2 : PLUSIEURS PIÈCES CONCERNÉES (Carte groupée moderne)
+                // Somme des verres d'eau, texte adapté au pluriel et chips
+                // ============================================================
+                const totalVerres = group.items.reduce((sum, item) => sum + (item.nbVerres || 0), 0);
+                const verresGroupTxt = `~${totalVerres} verre${totalVerres > 1 ? 's' : ''} d'eau au total`;
+
+                let groupTitle = group.title;
+                let groupText = group.text;
+
+                if (group.actionKey === 'open_win_humidity') {
+                    groupTitle = `Aération flash ciblée (${totalRooms} pièces — ${verresGroupTxt})`;
+                    groupText = `Ouvrez les fenêtres dans les ${totalRooms} pièces concernées : vous évacuerez ${verresGroupTxt} sans entamer la chaleur des parois massives.`;
+                } else if (group.actionKey === 'vmc_boost') {
+                    groupTitle = `Boost VMC anti-humidité (${totalRooms} pièces)`;
+                    groupText = `L'air extérieur est asséchant. Passez la VMC en vitesse rapide pour extraire la vapeur d'eau générée dans ces ${totalRooms} pièces.`;
+                } else if (group.actionKey === 'shutter_close') {
+                    groupTitle = `Bouclier solaire immédiat (${totalRooms} pièces)`;
+                    groupText = `Fermez les volets dans les ${totalRooms} pièces exposées pour bloquer le rayonnement direct avant le vitrage.`;
+                } else if (group.actionKey === 'free_cooling') {
+                    groupTitle = `Surventilation traversante (${totalRooms} pièces)`;
+                    groupText = `Il fait plus frais dehors (${envDataGlobal.t_ext} °C). Ouvrez pour créer un courant d'air traversant entre ces ${totalRooms} pièces et décharger l'air chaud.`;
+                } else if (group.actionKey === 'window_block_humidity') {
+                    groupTitle = `🛡️ Bloquer l'aération extérieure (${totalRooms} pièces)`;
+                    groupText = `L'air extérieur est plus chargé en humidité. Maintenez les ouvertures fermées dans ces ${totalRooms} pièces pour protéger l'inertie et l'isolation.`;
+                } else if (group.actionKey === 'sun_heat') {
+                    groupTitle = `Chauffage solaire passif (${totalRooms} pièces)`;
+                    groupText = `Ouvrez les protections dans ces ${totalRooms} pièces pour laisser le rayonnement chauffer gratuitement les masses intérieures.`;
+                }
+
+                const masterBtnText = isAllCompleted 
+                    ? '↩️ Tout décocher' 
+                    : `⚡ Tout appliquer (${totalRooms - completedRooms})`;
+
                 const card = document.createElement('div');
                 card.className = `reco-card ${group.type || ''} ${isAllCompleted ? 'checked' : ''}`;
                 card.style.cssText = "display: flex; flex-direction: column; width: 100%; box-sizing: border-box;";
-
-                // Texte dynamique du bouton de groupe maître
-                const masterBtnText = isAllCompleted 
-                    ? '↩️ Tout décocher' 
-                    : (totalRooms > 1 ? `⚡ Tout appliquer (${totalRooms - completedRooms})` : '⚡ Tout appliquer');
 
                 card.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 0.4rem; flex-wrap: wrap;">
                         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                             <span class="level-badge level-${group.level}">Niveau ${group.level}</span>
-                            <span class="tag-weight">+${totalGroupPts} pts ${totalRooms > 1 ? `(+${group.impactWeightPerRoom} pts / pièce)` : ''}</span>
+                            <span class="tag-weight">+${totalGroupPts} pts (+${group.impactWeightPerRoom} pts / pièce)</span>
                         </div>
                         <button type="button" class="btn-group-toggle" onclick="window.solsticeToggleGroup('${group.groupKey}', ${!isAllCompleted})">
                             ${masterBtnText}
                         </button>
                     </div>
 
-                    <div class="reco-title" style="margin-bottom: 0.25rem;">${group.title}</div>
-                    <div class="reco-text" style="margin-bottom: 0.6rem;">${group.text}</div>
+                    <div class="reco-title" style="margin-bottom: 0.25rem;">${groupTitle}</div>
+                    <div class="reco-text" style="margin-bottom: 0.6rem;">${groupText}</div>
 
                     <div class="room-chips-container">
                         ${group.items.map(item => {
                             const isChecked = lifecycleState.recos[item.id]?.status === 'completed';
+                            const chipVerres = item.nbVerres ? `~${item.nbVerres} verre${item.nbVerres > 1 ? 's' : ''}, ` : '';
                             return `
                                 <button type="button" 
                                         class="room-chip ${isChecked ? 'chip-completed' : 'chip-pending'}" 
@@ -607,7 +749,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         title="${isChecked ? 'Cliquer pour décocher ' + item.zoneName : 'Cliquer pour appliquer dans ' + item.zoneName}">
                                     <span class="chip-check">${isChecked ? '✅' : '⬜'}</span>
                                     <span class="chip-name">📍 ${item.zoneName}</span>
-                                    <span class="chip-pts">+${item.impactWeight} pts</span>
+                                    <span class="chip-pts">${chipVerres}+${item.impactWeight} pts</span>
                                 </button>
                             `;
                         }).join('')}
@@ -669,14 +811,8 @@ document.addEventListener('DOMContentLoaded', function() {
             allRecs.forEach(r => {
                 const item = lifecycleState.recos[r.id];
                 if (item && item.status === 'completed') {
-                    let reactivityFactor = 1.0;
-                    if (item.appearedAt && item.completedAt) {
-                        const delayHours = (item.completedAt - item.appearedAt) / (1000 * 3600);
-                        if (delayHours > 2) reactivityFactor = 0.85;
-                        if (delayHours > 6) reactivityFactor = 0.70;
-                    }
-
-                    earnedPointsToday += Math.round(r.impactWeight * reactivityFactor);
+                    earnedPointsToday += r.impactWeight;
+                    const reactivityFactor = 1.0;
 
                     const zoneConfig = houseConfig[r.zoneId] || {};
                     const roomName = r.zoneName;
@@ -892,7 +1028,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // Mise à jour dynamique du Score d'Harmonie de l'Habitat (sur 100)
+            // Mise à jour dynamique du Score de Maîtrise du Confort (sur 100)
             const completedRatio = totalPossiblePointsToday > 0 ? (earnedPointsToday / totalPossiblePointsToday) : 0.0;
             const habitatMetrics = (engine.calculateGlobalHabitatMetrics ? engine.calculateGlobalHabitatMetrics() : null) || {
                 avgPMV: 0,
@@ -903,7 +1039,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const harmonyFn = engine.calculateHabitatHarmonyScore || engine.calculateHabitatAccordageScore;
             const harmony = (harmonyFn ? harmonyFn(habitatMetrics, completedRatio) : null) || {
                 score: Math.min(100, Math.round(70 + (completedRatio * 30))),
-                badge: "Harmonie Parfaite",
+                badge: "Maîtrise Optimale",
                 color: "#10B981"
             };
 
@@ -927,15 +1063,6 @@ document.addEventListener('DOMContentLoaded', function() {
             render();
         };
 
-        if (zoneSelect) {
-            zoneSelect.addEventListener('change', (e) => {
-                currentZoneId = e.target.value;
-                sessionStorage.setItem('currentZoneId', currentZoneId);
-                render();
-            });
-        }
-
-        setupZoneSelector();
         render();
 
     } catch (err) {
