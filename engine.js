@@ -624,10 +624,8 @@ function getUValueParoi(typeParoi, materiau, isolation) {
 
 function getDailyOutdoorTemp() {
     if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length > 0) {
-        const activeHours = window.hourlyExtForecast.filter(slot => slot.hour >= 7 && slot.hour <= 22);
-        const listToUse = activeHours.length > 0 ? activeHours : window.hourlyExtForecast;
-        const sumTemp = listToUse.reduce((acc, slot) => acc + slot.temp, 0);
-        return sumTemp / listToUse.length;
+        const sumTemp = window.hourlyExtForecast.reduce((acc, slot) => acc + slot.temp, 0);
+        return sumTemp / window.hourlyExtForecast.length;
     }
     return outdoorTemp;
 }
@@ -1197,39 +1195,45 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
     }
 
     // --- CALCUL THERMODYNAMIQUE DE L'AUTONOMIE T_STRUCT -> 19°C ---
-    // En régime libre sans chauffage, le bâtiment tend vers sa température d'équilibre libre :
-    // T_eq = T_ext + (Apports_internes + Apports_solaires) / H_total
-    const tExtMoy = (options.tExt !== undefined) ? options.tExt : getDailyOutdoorTemp(); 
     const tCible = 19.0;
+    const tExtMoy = (options.tExt !== undefined) ? options.tExt : getDailyOutdoorTemp(); 
 
-    // Détermination de H_total (W/K) et des apports gratuits (W)
+    // Détermination de H_total (W/K)
     const hTotalWPerK = (options.hTotalWPerK && options.hTotalWPerK > 0)
         ? options.hTotalWPerK
-        : (totalVolumeM3 * 0.6); // Estimation de sécurité ~0.6 W/(K·m³)
+        : (totalVolumeM3 * 0.7);
 
-    // Apports internes moyens (~1.5 W/m³ de présence et équipements)
-    const internalGainsW = (options.internalGainsKw !== undefined)
-        ? (options.internalGainsKw * 1000)
-        : (totalVolumeM3 * 1.5);
-
-    // Apports solaires moyens
-    const solarGainsW = (options.gainsSolairesKw !== undefined)
-        ? (options.gainsSolairesKw * 1000)
-        : 0;
-
-    const totalFreeGainsW = internalGainsW + solarGainsW;
-    const deltaTeq = totalFreeGainsW / Math.max(10, hTotalWPerK);
-    const tEquilibre = tExtMoy + deltaTeq;
+    // Calcul physique de la température d'équilibre libre T_eq :
+    let tEquilibre;
+    if (options.bilanNetKwh !== undefined) {
+        // Méthode rigoureuse liée au bilan thermique réel sur 24h (déperditions et apports réels) :
+        // P_net_moy = (Bilan Net 24h en Wh) / 24h
+        // Si bilanNetKwh < 0 => la maison perd plus d'énergie qu'elle n'en gagne => T_eq < 20°C
+        const pNetMoyenneW = (options.bilanNetKwh * 1000) / 24;
+        tEquilibre = 20.0 + (pNetMoyenneW / Math.max(10, hTotalWPerK));
+    } else {
+        // Fallback par sommation des apports gratuits
+        const internalGainsW = (options.internalGainsKw !== undefined)
+            ? (options.internalGainsKw * 1000)
+            : (totalVolumeM3 * 1.0);
+        const solarGainsW = (options.gainsSolairesKw !== undefined)
+            ? (options.gainsSolairesKw * 1000)
+            : 0;
+        const totalFreeGainsW = internalGainsW + solarGainsW;
+        const deltaTeq = totalFreeGainsW / Math.max(10, hTotalWPerK);
+        tEquilibre = tExtMoy + deltaTeq;
+    }
 
     let autonomyText = "";
     let hoursTo19 = 0;
 
     if (tStruct <= tCible) {
         autonomyText = "Parois ≤ 19°C (0 h)";
+        hoursTo19 = 0;
     } else if (tEquilibre >= tCible) {
-        // La température asymptotique d'équilibre libre est supérieure à 19°C :
-        // L'habitat reste naturellement au-dessus de 19°C sans chauffage grâce aux apports gratuits !
-        autonomyText = "Illimitée (Équilibre ≥ 19°C)";
+        // L'habitat reste naturellement au-dessus de 19°C sans chauffage grâce aux apports solaires/internes !
+        autonomyText = "Illimitée";
+        hoursTo19 = 120;
     } else {
         // Décroissance exponentielle vers T_eq :
         // T(t) = T_eq + (T_struct - T_eq) * exp(-t / tau)
@@ -1239,10 +1243,12 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
 
         if (denom <= 0.05) {
             autonomyText = "> 5 jours";
+            hoursTo19 = 120;
         } else {
             const ratio = num / denom;
             if (ratio <= 1.0) {
                 autonomyText = "Parois ≤ 19°C (0 h)";
+                hoursTo19 = 0;
             } else {
                 hoursTo19 = tauReel * Math.log(ratio);
 
@@ -1250,7 +1256,7 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
                     autonomyText = "> 5 jours";
                 } else if (hoursTo19 >= 48) {
                     const days = (hoursTo19 / 24).toFixed(1);
-                    autonomyText = `~${days} jours`;
+                    autonomyText = `~${days} j`;
                 } else {
                     autonomyText = `~${hoursTo19.toFixed(1)} h`;
                 }
@@ -1649,7 +1655,8 @@ function actualiserCockpitGlobal() {
         {
             hTotalWPerK: metrics.totalHTotalWPerK,
             gainsSolairesKw: metrics.totalGainsSolairesKw,
-            tExt: outdoorTemp
+            bilanNetKwh: metrics.totalBilanNetKwh,
+            tExt: getDailyOutdoorTemp()
         }
     );
 
@@ -1661,7 +1668,7 @@ function actualiserCockpitGlobal() {
     const txtAutonomyBar = document.getElementById('txt-autonomy-bar');
     if (txtAutonomyBar) {
         let barPct = 50;
-        if (globalReserve.hoursTo19 !== undefined && !isNaN(globalReserve.hoursTo19)) {
+        if (globalReserve.hoursTo19 !== undefined && !isNaN(globalReserve.hoursTo19) && !globalReserve.autonomyText.includes('Illimitée')) {
             barPct = Math.min(100, Math.max(5, Math.round((globalReserve.hoursTo19 / 36) * 100)));
         } else if (globalReserve.autonomyText.includes('Illimitée')) {
             barPct = 100;
