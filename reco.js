@@ -471,25 +471,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // --- NIVEAU 1 : ACTIONS IMMÉDIATES (< 1h) ---
 
-            // Aération flash intelligente si humidité élevée et air extérieur asséchant
-            if (rh > 60 && deltaAh >= 0.4 && ahExt < ahInt && !isWetRoom) {
-                if (hasVmc) {
-                    pushRec({ 
-                        id: `${zoneId}_vmc_boost`, 
-                        level: 1, 
-                        actionKey: 'vmc_boost', 
-                        zoneId, 
-                        zoneName, 
-                        timing: 'immediate', 
-                        type: 'type-air', 
-                        title: 'Boost VMC anti-humidité', 
-                        text: `L'humidité atteint ${rh} % (air ext. asséchant). Passez la VMC en vitesse rapide pour extraire la vapeur d'eau (${verresTxt}).`, 
-                        impactWeight: 15,
-                        nbVerres: nbVerres,
-                        mEau: mEau
-                    });
-                } else if (canOpenWindows) {
-                    const dur = (mainVentType === 'oscillante' || mainVentType === 'oscillo_battante' || mainVentType === 'partial') ? '12 à 15 minutes' : '5 à 7 minutes';
+            // Aération différentielle unifiée avec le moteur Solstice
+            const vent = (engine.calculateDifferentialVentilation ? engine.calculateDifferentialVentilation(zone, roomData, envDataGlobal) : null) || {
+                status: (rh > 60 && deltaAh >= 0.4 && ahExt < ahInt) ? 'recommended_dry' : (ahExt >= ahInt ? 'blocked_humid' : 'comfort'),
+                verresTxt,
+                nbVerres,
+                mEau,
+                optimalDurationMin: (mainVentType === 'oscillante' || mainVentType === 'oscillo_battante' || mainVentType === 'partial') ? 12 : 6,
+                hasVmc,
+                canOpenWin: canOpenWindows
+            };
+
+            const ventDuration = `${vent.optimalDurationMin || 6} min`;
+            const effectiveVerresTxt = vent.verresTxt || verresTxt;
+            const effectiveNbVerres = vent.nbVerres || nbVerres;
+            const effectiveMEau = vent.mEau !== undefined ? vent.mEau : mEau;
+
+            if (vent.status === 'urgent_dry' || vent.status === 'recommended_dry') {
+                if (canOpenWindows) {
+                    const titleText = isWetRoom ? `Purge à la source (${effectiveVerresTxt})` : `Aération flash ciblée (${effectiveVerresTxt})`;
+                    const actionText = isWetRoom 
+                        ? `L'humidité atteint ${rh} %. Ouvrez la fenêtre en grand ${ventDuration} pour évacuer ${effectiveVerresTxt} sans refroidir les parois.`
+                        : `Ouvrez la fenêtre en grand ${ventDuration} : vous évacuerez ${effectiveVerresTxt} sans entamer la chaleur des murs massifs.`;
                     pushRec({ 
                         id: `${zoneId}_open_win_humidity`, 
                         level: 1, 
@@ -498,11 +501,28 @@ document.addEventListener('DOMContentLoaded', function() {
                         zoneName, 
                         timing: 'immediate', 
                         type: 'type-air', 
-                        title: `Aération flash ciblée (${verresTxt})`, 
-                        text: `Ouvrez la fenêtre en grand (${dur}) : vous évacuerez ${verresTxt} sans entamer la chaleur des murs massifs.`, 
+                        title: titleText, 
+                        text: actionText, 
                         impactWeight: 15,
-                        nbVerres: nbVerres,
-                        mEau: mEau
+                        nbVerres: effectiveNbVerres,
+                        mEau: effectiveMEau
+                    });
+                } else if (hasVmc) {
+                    const titleText = isWetRoom ? `Boost VMC anti-humidité (${effectiveVerresTxt})` : `Boost VMC anti-humidité`;
+                    const actionText = `L'humidité atteint ${rh} % (air ext. asséchant). Passez la VMC en vitesse rapide pour extraire la vapeur d'eau (${effectiveVerresTxt}).`;
+                    pushRec({ 
+                        id: `${zoneId}_vmc_boost`, 
+                        level: 1, 
+                        actionKey: 'vmc_boost', 
+                        zoneId, 
+                        zoneName, 
+                        timing: 'immediate', 
+                        type: 'type-air', 
+                        title: titleText, 
+                        text: actionText, 
+                        impactWeight: 15,
+                        nbVerres: effectiveNbVerres,
+                        mEau: effectiveMEau
                     });
                 } else {
                     // Pièce sans ouvrant direct vers l'extérieur et sans VMC (Cave, cellier, dégagement)
@@ -514,65 +534,29 @@ document.addEventListener('DOMContentLoaded', function() {
                         zoneName,
                         timing: 'immediate',
                         type: 'type-air',
-                        title: `🚪 Aération indirecte / Ouvrir porte (${verresTxt})`,
-                        text: `Pièce sans ouvrant direct vers l'extérieur : ouvrez la porte vers une zone aérée pour chasser ${verresTxt} et assainir la cave/pièce tampon.`,
+                        title: `🚪 Aération indirecte / Ouvrir porte (${effectiveVerresTxt})`,
+                        text: `Pièce sans ouvrant direct vers l'extérieur : ouvrez la porte vers une zone aérée pour chasser ${effectiveVerresTxt} et assainir la pièce tampon.`,
                         impactWeight: 15,
-                        nbVerres: nbVerres,
-                        mEau: mEau
+                        nbVerres: effectiveNbVerres,
+                        mEau: effectiveMEau
                     });
                 }
-            }
-
-            // Purge à la source en pièce humide (avec test VMC et ouvrants)
-            if (isWetRoom && rh > 55) {
-                if (deltaAh >= 0.4 && ahExt < ahInt) {
-                    let purgeText = "";
-                    let purgeKey = 'open_win_humidity';
-                    if (hasVmc && canOpenWindows) {
-                        purgeText = `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide et aérez 5 à 7 min en grand pour évacuer ${verresTxt} sans refroidir les parois.`;
-                        purgeKey = 'vmc_boost';
-                    } else if (hasVmc) {
-                        purgeText = `L'humidité atteint ${rh} %. Passez la VMC en vitesse rapide pour extraire la vapeur d'eau (${verresTxt}) à la source.`;
-                        purgeKey = 'vmc_boost';
-                    } else if (canOpenWindows) {
-                        purgeText = `L'humidité atteint ${rh} %. Ouvrez la fenêtre 5 à 7 min en grand pour évacuer ${verresTxt} sans refroidir les parois.`;
-                        purgeKey = 'open_win_humidity';
-                    } else {
-                        purgeText = `L'humidité atteint ${rh} %. Ouvrez la porte vers une pièce ventilée pour évacuer ${verresTxt}.`;
-                        purgeKey = 'open_door_humidity';
-                    }
-                    if (purgeText) {
-                        pushRec({ 
-                            id: `${zoneId}_humidity_source_purge`, 
-                            level: 1, 
-                            actionKey: purgeKey, 
-                            zoneId, 
-                            zoneName, 
-                            timing: 'immediate', 
-                            type: 'type-air', 
-                            title: `Purge à la source (${verresTxt})`, 
-                            text: purgeText, 
-                            impactWeight: 15,
-                            nbVerres: nbVerres,
-                            mEau: mEau
-                        });
-                    }
-                } else if (hasVmc) {
-                    pushRec({ 
-                        id: `${zoneId}_vmc_boost_saturated`, 
-                        level: 1, 
-                        actionKey: 'vmc_boost', 
-                        zoneId, 
-                        zoneName, 
-                        timing: 'immediate', 
-                        type: 'type-air', 
-                        title: `Boost VMC anti-humidité (${verresTxt})`, 
-                        text: `L'air extérieur est plus chargé en humidité (${ahExt.toFixed(1)} g/m³). Activez la VMC à la source pour évacuer la vapeur (${verresTxt}) sans ouvrir les fenêtres.`, 
-                        impactWeight: 15,
-                        nbVerres: nbVerres,
-                        mEau: mEau
-                    });
-                }
+            } else if (vent.status === 'blocked_humid' && hasVmc && rh > 60) {
+                // Air extérieur saturé mais présence de VMC dans une pièce humide
+                pushRec({ 
+                    id: `${zoneId}_vmc_boost`, 
+                    level: 1, 
+                    actionKey: 'vmc_boost', 
+                    zoneId, 
+                    zoneName, 
+                    timing: 'immediate', 
+                    type: 'type-air', 
+                    title: `Boost VMC anti-humidité (${effectiveVerresTxt})`, 
+                    text: `L'air extérieur est plus chargé en humidité (${ahExt.toFixed(1)} g/m³). Activez la VMC à la source pour évacuer la vapeur (${effectiveVerresTxt}) sans ouvrir les fenêtres.`, 
+                    impactWeight: 15,
+                    nbVerres: effectiveNbVerres,
+                    mEau: effectiveMEau
+                });
             }
 
             const isOutdoorHeatwaveThreat = tExtMaxDay > (ta + 1.5);
@@ -687,7 +671,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             Object.keys(zonesMap).forEach(zId => {
                 const roomName = zonesMap[zId];
-                const zone = houseConfig[zId] || { id: zId, name: roomName };
+                const zone = (engine.getZoneConfigByName ? engine.getZoneConfigByName(roomName) : null)
+                          || houseConfig[zId] 
+                          || Object.values(houseConfig).find(z => z && z.name === roomName)
+                          || { id: zId, name: roomName };
                 const roomData = donneesHabitat[roomName] || { ta: 20, rh: 50 };
                 allRecs = allRecs.concat(generateRecommendationsForZone(zone, zId, roomData));
             });
@@ -975,6 +962,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 item.completedAt = null;
                 item.earnedPoints = null;
                 item.reactivityPercent = null;
+
+                // Nettoyer les occurrences actives ultérieures redondantes pour ce même baseId
+                const baseId = item.baseId || item.id.split('#')[0];
+                Object.values(lifecycleState.recos || {}).forEach(other => {
+                    if (other.id !== item.id && (other.baseId === baseId || other.id.startsWith(baseId + '#'))) {
+                        if (other.status === 'active') {
+                            delete lifecycleState.recos[other.id];
+                        }
+                    }
+                });
             } else {
                 // Cochage : Calcul précis des points avec dépréciation temporelle
                 const timeInfo = getActionTimeInfo(item, item);
@@ -1281,7 +1278,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Mise à jour dynamique du Score de Maîtrise du Confort (sur 100)
-            const completedRatio = totalPossiblePointsToday > 0 ? (earnedPointsToday / totalPossiblePointsToday) : 1.0;
+            const completedRatio = totalPossiblePointsToday > 0 ? (earnedPointsToday / totalPossiblePointsToday) : 0.0;
             const habitatMetrics = (engine.calculateGlobalHabitatMetrics ? engine.calculateGlobalHabitatMetrics() : null) || {
                 avgPMV: 0,
                 avgRH: 50,

@@ -911,32 +911,42 @@ function calculateDifferentialVentilation(zoneConfig, roomData, envData) {
     const hasVmc = zoneConfig?.equipment?.vmcSystem && zoneConfig.equipment.vmcSystem !== 'none' && zoneConfig.equipment.vmcSystem !== 'aucun';
 
     let status = 'comfort'; // 'urgent_dry', 'recommended_dry', 'blocked_humid', 'comfort', 'dry_air'
-    let canVentilate = deltaAh > 0.2 && ahExt < ahInt && canOpenWin;
-    let title = "Hygrométrie équilibrée";
+    let canVentilate = false;
+    let title = "Hygrométrie saine";
     let detail = `Humidité saine (${rh}%). Pas d'action corrective requise.`;
 
+    // 1. Humidité très élevée (> 68 %)
     if (rh > 68) {
-        if (deltaAh >= 0.5 && ahExt < ahInt) {
+        if (deltaAh >= 0.4 && ahExt < ahInt) {
             status = 'urgent_dry';
+            canVentilate = true;
             if (canOpenWin) {
                 title = `Aération flash requise (${verresTxt})`;
                 detail = `Humidité très élevée (${rh}%). Ouvrez en grand ${optimalDurationMin} min : évacuez ${verresTxt} sans refroidir vos parois.`;
             } else if (hasVmc) {
-                title = `Boost VMC anti-humidité requise`;
+                title = `Boost VMC anti-humidité requis`;
                 detail = `Humidité très élevée (${rh}%). Enclenchez la VMC en vitesse rapide pour extraire la vapeur d'eau (pièce sans fenêtre ouvrable).`;
             } else {
                 title = `Hygrométrie critique (Sans ouvrant)`;
-                detail = `Humidité critique (${rh}%). Ouvrez la porte intérieure vers une pièce aérée ou activez un déshumidificateur.`;
+                detail = `Humidité critique (${rh}%). Ouvrez la porte intérieure vers une pièce aérée pour chasser la vapeur d'eau.`;
             }
-        } else {
+        } else if (ahExt >= ahInt) {
             status = 'blocked_humid';
             canVentilate = false;
-            title = "🛡️ Bloquer l'aération (Air ext. saturé)";
-            detail = `L'air extérieur est trop humide (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Ne pas ouvrir : risque d'imprégner vos parois massives.`;
+            title = "🛡️ Air extérieur saturé";
+            detail = `L'air extérieur est plus humide (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Ne pas ouvrir : risque d'imprégner vos parois massives.`;
+        } else {
+            status = 'comfort';
+            canVentilate = false;
+            title = "Potentiel d'assèchement insuffisant";
+            detail = `Humidité ${rh}%, mais l'air extérieur n'est pas assez sec (écart < 0.4 g/m³) pour évacuer efficacement la vapeur d'eau.`;
         }
-    } else if (rh >= 58 || (isWetRoom && rh >= 54)) {
+    } 
+    // 2. Humidité au-delà de la zone de confort (> 60 %)
+    else if (rh > 60) {
         if (deltaAh >= 0.4 && ahExt < ahInt) {
             status = 'recommended_dry';
+            canVentilate = true;
             if (canOpenWin) {
                 title = `Aération flash conseillée (${verresTxt})`;
                 detail = `Ouvrez en grand ${optimalDurationMin} min pour renouveler l'air et chasser ${verresTxt} sans impacter la masse des murs.`;
@@ -944,16 +954,23 @@ function calculateDifferentialVentilation(zoneConfig, roomData, envData) {
                 title = `Boost VMC conseillé`;
                 detail = `Humidité élevée (${rh}%). Activez la vitesse rapide de la VMC pour assainir l'air (pièce sans fenêtre ouvrable).`;
             } else {
-                title = `Ventiler via les pièces voisines`;
-                detail = `Humidité élevée (${rh}%). Ouvrez la porte vers le couloir ventilé pour évacuer l'humidité.`;
+                title = `Aération indirecte / Ouvrir porte`;
+                detail = `Humidité élevée (${rh}%). Ouvrez la porte vers les pièces voisines aérées pour assainir l'ambiance.`;
             }
-        } else {
+        } else if (ahExt >= ahInt) {
             status = 'blocked_humid';
             canVentilate = false;
-            title = "🛡️ Aération déconseillée (Extérieur humide)";
-            detail = `L'air extérieur contient ${ahExt.toFixed(1)} g/m³ d'eau (contre ${ahInt.toFixed(1)} g/m³ dedans). Garder les fenêtres closes.`;
+            title = "🛡️ Air extérieur saturé";
+            detail = `L'air extérieur est plus humide (${ahExt.toFixed(1)} g/m³ ≥ ${ahInt.toFixed(1)} g/m³). Maintenez les ouvertures fermées.`;
+        } else {
+            status = 'comfort';
+            canVentilate = false;
+            title = "Potentiel d'assèchement trop faible";
+            detail = `Humidité ${rh}%, mais l'air extérieur n'est que très légèrement plus sec (écart < 0.4 g/m³). Inutile d'ouvrir en grand.`;
         }
-    } else if (rh < 38) {
+    } 
+    // 3. Air sec (< 38 %)
+    else if (rh < 38) {
         status = 'dry_air';
         title = "Air intérieur sec";
         detail = `Humidité basse (${rh}%). Aérer brièvement pour l'oxygène uniquement.`;
@@ -1012,9 +1029,9 @@ function getRoomActionNudge(nomPiece, zoneConfig, roomData, envData) {
     const hasVmcSys = zoneConfig?.equipment?.vmcSystem && zoneConfig.equipment.vmcSystem !== 'aucun' && zoneConfig.equipment.vmcSystem !== 'none';
 
     let badgeIcon = "✨";
-    let badgeLabel = "Équilibré";
+    let badgeLabel = "Rien à faire";
     let badgeStyle = "background: #F1F5F9; border: 1px solid #CBD5E1; color: #334155;";
-    let tooltip = "Conditions thermiques et hygrométriques idéales.";
+    let tooltip = vent.detail || "Conditions thermiques et hygrométriques satisfaisantes. Aucun geste requis.";
     let actionKey = 'comfort';
 
     // Règle 1 : Humidité & Aération flash prioritaire (avec test ouvrant expert)
@@ -1048,11 +1065,11 @@ function getRoomActionNudge(nomPiece, zoneConfig, roomData, envData) {
             tooltip = `⚠️ Air extérieur trop humide (${vent.ahExt} g/m³ ≥ ${vent.ahInt} g/m³). La VMC extrait l'humidité sans ouvrir vers l'extérieur.`;
             actionKey = 'vmc_boost';
         } else {
-            // Fenêtres fermées de base : ambiance protégée, aucun geste d'urgence requis
-            badgeIcon = "🛡️";
-            badgeLabel = "Air saturé";
+            // Fenêtres fermées de base : ambiance protégée, aucun geste requis
+            badgeIcon = "✨";
+            badgeLabel = "Rien à faire";
             badgeStyle = "background: #F8FAFC; border: 1px solid #E2E8F0; color: #64748B; font-weight: 600;";
-            tooltip = `Air extérieur saturé (${vent.ahExt} g/m³ ≥ ${vent.ahInt} g/m³). Fenêtres fermées : l'inertie intérieure est protégée.`;
+            tooltip = `Air extérieur saturé (${vent.ahExt} g/m³ ≥ ${vent.ahInt} g/m³). Fenêtres fermées : aucun geste requis.`;
             actionKey = 'comfort';
         }
     }
