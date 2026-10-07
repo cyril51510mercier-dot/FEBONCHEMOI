@@ -12,6 +12,7 @@ let SELECTION_PIECES = [];
 
 let capteursMaison = {};
 window.hourlyExtForecast = []; // Tableau des 24h de la journée (00h à 23h)
+window.futureHourlyForecast = []; // Chronique prospective des 48h à venir (heure par heure)
 
 // Préchargement synchrone immédiat depuis le cache local (évite tout état transitoire vide)
 try {
@@ -62,6 +63,7 @@ function applySharedEnvironment(data) {
         outdoorWind = env.outdoorWind ?? outdoorWind;
         sunshineStatus = env.sunshineStatus ?? sunshineStatus;
         if (env.hourlyExtForecast) window.hourlyExtForecast = env.hourlyExtForecast;
+        if (env.futureHourlyForecast) window.futureHourlyForecast = env.futureHourlyForecast;
         
         if (typeof updateWeatherUI === 'function') updateWeatherUI();
     }
@@ -350,6 +352,10 @@ window.addEventListener('load', async () => {
     const cachedForecast = localStorage.getItem('SOLSTICE_HOURLY_FORECAST');
     if (cachedForecast) {
         try { window.hourlyExtForecast = JSON.parse(cachedForecast); } catch(e) {}
+    }
+    const cachedFuture = localStorage.getItem('SOLSTICE_FUTURE_FORECAST');
+    if (cachedFuture) {
+        try { window.futureHourlyForecast = JSON.parse(cachedFuture); } catch(e) {}
     }
 
     genererSelecteurPieces();
@@ -1585,76 +1591,115 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
         fluxColor = "#4ADE80";
     }
 
-    // --- CALCUL THERMODYNAMIQUE DE L'AUTONOMIE T_STRUCT -> 19°C ---
-    const tCible = 19.0;
-    const tExtMoy = (options.tExt !== undefined) ? options.tExt : getDailyOutdoorTemp(); 
 
-    // Détermination de H_total (W/K)
+    // --- SIMULATION DYNAMIQUE PROSPECTIVE DE L'AUTONOMIE (T_STRUCT -> 19°C) ---
+    // Projection heure par heure sur la météo réelle des 48 prochaines heures (Météo-France / One Call)
+    const tCible = 19.0;
+    const tExtMoy = (options.tExt !== undefined) ? options.tExt : getDailyOutdoorTemp();
     const hTotalWPerK = (options.hTotalWPerK && options.hTotalWPerK > 0)
         ? options.hTotalWPerK
         : (totalVolumeM3 * 0.7);
 
-    // Calcul physique de la température d'équilibre libre T_eq :
-    let tEquilibre;
-    let deltaTeq = 0;
-    if (options.bilanNetKwh !== undefined) {
-        // Méthode rigoureuse liée au bilan thermique réel sur 24h (déperditions et apports réels) :
-        // P_net_moy = (Bilan Net 24h en Wh) / 24h
-        // Si bilanNetKwh < 0 => la maison perd plus d'énergie qu'elle n'en gagne => T_eq < 20°C
-        const pNetMoyenneW = (options.bilanNetKwh * 1000) / 24;
-        tEquilibre = 20.0 + (pNetMoyenneW / Math.max(10, hTotalWPerK));
-        deltaTeq = tEquilibre - tExtMoy;
-    } else {
-        // Fallback par sommation des apports gratuits
-        const internalGainsW = (options.internalGainsKw !== undefined)
-            ? (options.internalGainsKw * 1000)
-            : (totalVolumeM3 * 1.0);
-        const solarGainsW = (options.gainsSolairesKw !== undefined)
-            ? (options.gainsSolairesKw * 1000)
-            : 0;
-        const totalFreeGainsW = internalGainsW + solarGainsW;
-        deltaTeq = totalFreeGainsW / Math.max(10, hTotalWPerK);
-        tEquilibre = tExtMoy + deltaTeq;
+    // 1. Récupération de la chronique météo prévisionnelle (48h futures)
+    let futureForecast = (Array.isArray(window.futureHourlyForecast) && window.futureHourlyForecast.length >= 12)
+        ? window.futureHourlyForecast
+        : null;
+
+    if (!futureForecast) {
+        const curT = (options.tExt !== undefined) ? options.tExt : (typeof outdoorTemp !== 'undefined' ? outdoorTemp : 15);
+        const curRh = (typeof outdoorHumidity !== 'undefined') ? outdoorHumidity : 60;
+        const isSunny = (typeof sunshineStatus !== 'undefined') ? (sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun')) : false;
+        futureForecast = generateSyntheticFutureForecast(curT, curRh, isSunny);
     }
 
-    let autonomyText = "";
-    let hoursTo19 = 0;
+    // 2. Puissance solaire crête globale estimée pour le logement (kW)
+    const peakSolarKw = (options.gainsSolairesKw !== undefined && options.gainsSolairesKw > 0)
+        ? options.gainsSolairesKw
+        : (totalVolumeM3 * 0.004);
+
+    // Apports internes moyens constants (occupants + équipements) ~ 2 W/m²
+    const surfaceHab = totalVolumeM3 / 2.5;
+    const pInterneW = surfaceHab * 2.0;
+
+    // 3. Boucle de simulation dynamique pas-à-pas (Heure par heure sur les prochaines 48h)
+    let simT = tStruct;
+    let hoursTo19 = null;
+    let targetMoment = null;
+    let minTReached = simT;
+    let minNightTemp = 99;
+
+    const tauSim = Math.max(8.0, tauReel);
 
     if (tStruct <= tCible) {
-        autonomyText = "Parois ≤ 19°C (0 h)";
         hoursTo19 = 0;
-    } else if (tEquilibre >= tCible) {
-        // L'habitat reste naturellement au-dessus de 19°C sans chauffage grâce aux apports solaires/internes !
-        autonomyText = "Illimitée";
-        hoursTo19 = 120;
     } else {
-        // Décroissance exponentielle vers T_eq :
-        // T(t) = T_eq + (T_struct - T_eq) * exp(-t / tau)
-        // t_19 = tau * ln( (T_struct - T_eq) / (19 - T_eq) )
-        const denom = tCible - tEquilibre;
-        const num = tStruct - tEquilibre;
+        for (let k = 0; k < futureForecast.length; k++) {
+            const slot = futureForecast[k];
+            const tExtSlot = (slot && slot.temp !== undefined) ? slot.temp : 10;
+            minNightTemp = Math.min(minNightTemp, tExtSlot);
 
-        if (denom <= 0.05) {
-            autonomyText = "> 5 jours";
-            hoursTo19 = 120;
-        } else {
-            const ratio = num / denom;
-            if (ratio <= 1.0) {
-                autonomyText = "Parois ≤ 19°C (0 h)";
-                hoursTo19 = 0;
-            } else {
-                hoursTo19 = tauReel * Math.log(ratio);
-
-                if (hoursTo19 >= 120) {
-                    autonomyText = "> 5 jours";
-                } else if (hoursTo19 >= 48) {
-                    const days = (hoursTo19 / 24).toFixed(1);
-                    autonomyText = `~${days} j`;
-                } else {
-                    autonomyText = `~${hoursTo19.toFixed(1)} h`;
-                }
+            // Gains solaires dynamiques de l'heure k
+            let solarW = 0;
+            if (slot.isSunny) {
+                const h = slot.hour;
+                const sunFactor = Math.max(0, Math.sin(((h - 7) / 12) * Math.PI));
+                solarW = peakSolarKw * 1000 * sunFactor;
             }
+
+            const totalGainsW = solarW + pInterneW;
+            const tEquilibreSlot = tExtSlot + (totalGainsW / Math.max(10, hTotalWPerK));
+
+            // DÃ©charge exponentielle sur le pas de temps d'1 heure
+            const tNext = tEquilibreSlot + (simT - tEquilibreSlot) * Math.exp(-1.0 / tauSim);
+
+            // DÃ©tection du franchissement du seuil cible de 19Â°C
+            if (simT > tCible && tNext <= tCible && hoursTo19 === null) {
+                const frac = (simT - tCible) / Math.max(0.01, simT - tNext);
+                hoursTo19 = k + frac;
+                const targetTimestamp = slot.dt ? ((slot.dt + frac * 3600) * 1000) : (Date.now() + hoursTo19 * 3600 * 1000);
+                targetMoment = new Date(targetTimestamp);
+            }
+
+            simT = tNext;
+            minTReached = Math.min(minTReached, simT);
         }
+    }
+
+    // 4. Formatage et verbalisation pédagogique de l'indicateur
+    let autonomyText = '';
+    let autonomyDetail = '';
+
+    if (tStruct <= tCible) {
+        autonomyText = 'Parois ≤ 19°C (0 h)';
+        autonomyDetail = 'Batterie déchargée : la température moyenne des parois est déjà inférieure ou égale à 19°C.';
+        hoursTo19 = 0;
+    } else if (hoursTo19 === null) {
+        // Aucune chute sous 19°C constatée sur les 48h de prévision !
+        autonomyText = '> 48 h (préservée)';
+        autonomyDetail = `Simulation météo 48h : grâce aux apports solaires et à la douceur extérieure, vos parois restent au-dessus de 19°C (minimum simulé : ${minTReached.toFixed(1)}°C).`;
+        hoursTo19 = 48;
+    } else {
+        const hVal = parseFloat(hoursTo19.toFixed(1));
+        const now = new Date();
+        const sameDay = targetMoment && (targetMoment.getDate() === now.getDate());
+        const isTomorrow = targetMoment && (targetMoment.getDate() === (now.getDate() + 1));
+
+        let momentStr = '';
+        if (targetMoment) {
+            const hStr = `${String(targetMoment.getHours()).padStart(2, '0')}h${String(targetMoment.getMinutes()).padStart(2, '0')}`;
+            if (sameDay) momentStr = `ce soir vers ${hStr}`;
+            else if (isTomorrow) momentStr = `demain vers ${hStr}`;
+            else momentStr = `dans ${Math.round(hVal)}h (${targetMoment.toLocaleDateString('fr-FR', { weekday: 'short' })} à ${hStr})`;
+        }
+
+        if (hVal < 24) {
+            autonomyText = `~${hVal} h`;
+        } else {
+            const days = (hVal / 24).toFixed(1);
+            autonomyText = `~${days} j (~${Math.round(hVal)} h)`;
+        }
+
+        autonomyDetail = `Simulation météo prospective : avec le refroidissement nocturne (${minNightTemp.toFixed(1)}°C dehors), vos parois franchiront 19°C ${momentStr || `dans ~${hVal}h`}.`;
     }
 
     // --- ANALYSE FIABILISÉE DES CONSEILS D'INERTIE ---
@@ -1703,17 +1748,23 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
     if (actionText.includes("Décharger")) actionColor = "#38BDF8";
     if (actionText.includes("équilibre")) actionColor = "#94A3B8";
 
+    const finalTEq = (minTReached !== undefined && !isNaN(minTReached)) ? minTReached : tCible;
+    const finalDeltaTeq = (tStruct - finalTEq);
+
     return {
         tStruct: parseFloat(tStruct.toFixed(1)),
-        tEquilibre: parseFloat(tEquilibre.toFixed(1)),
-        deltaTeq: parseFloat(deltaTeq.toFixed(1)),
+        tEquilibre: parseFloat(finalTEq.toFixed(1)),
+        deltaTeq: parseFloat(finalDeltaTeq.toFixed(1)),
         fluxPowerKw: parseFloat(fluxPowerKw.toFixed(2)),
         fluxStatusText,
         fluxColor,
         actionColor,
         autonomyText,
+        autonomyDetail,
         hoursTo19: parseFloat(hoursTo19.toFixed(1)),
-        actionText
+        targetMoment,
+        actionText,
+        isFreeHeating: (hoursTo19 >= 48)
     };
 }
 
@@ -2072,19 +2123,23 @@ function actualiserCockpitGlobal() {
     const txtWallTemp = document.getElementById('txt-wall-temp');
     if (txtWallTemp) txtWallTemp.textContent = `${metrics.avgTStruct.toFixed(1)} °C`;
     const txtAutonomyVal = document.getElementById('txt-autonomy-val');
-    if (txtAutonomyVal) txtAutonomyVal.textContent = globalReserve.autonomyText;
+    if (txtAutonomyVal) {
+        txtAutonomyVal.textContent = globalReserve.autonomyText;
+        txtAutonomyVal.title = globalReserve.autonomyDetail || globalReserve.autonomyText;
+    }
     
     const txtAutonomyBar = document.getElementById('txt-autonomy-bar');
     if (txtAutonomyBar) {
         let barPct = 50;
-        if (globalReserve.hoursTo19 !== undefined && !isNaN(globalReserve.hoursTo19) && !globalReserve.autonomyText.includes('Illimitée')) {
+        if (globalReserve.hoursTo19 !== undefined && !isNaN(globalReserve.hoursTo19) && !globalReserve.autonomyText.includes('Illimitée') && !globalReserve.autonomyText.includes('> 48 h')) {
             barPct = Math.min(100, Math.max(5, Math.round((globalReserve.hoursTo19 / 36) * 100)));
-        } else if (globalReserve.autonomyText.includes('Illimitée')) {
+        } else if (globalReserve.autonomyText.includes('Illimitée') || globalReserve.autonomyText.includes('> 48 h')) {
             barPct = 100;
-        } else if (globalReserve.autonomyText.includes('≤ 19°C')) {
+        } else if (globalReserve.autonomyText.includes('19°C') || globalReserve.autonomyText.includes('<= 19') || globalReserve.hoursTo19 === 0) {
             barPct = 0;
         }
         txtAutonomyBar.style.width = `${barPct}%`;
+        txtAutonomyBar.parentElement.title = globalReserve.autonomyDetail || globalReserve.autonomyText;
     }
 
     // ============================================================
@@ -2270,7 +2325,7 @@ function actualiserCockpitGlobal() {
         const tExt = outdoorTemp.toFixed(1);
 
         if (fluxWallKw > 0.15) {
-            synthese = `Dehors il fait ${tExt}°C, et votre intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}). Vos murs restituent leur chaleur (+${Math.abs(fluxWallKw).toFixed(2)} kW) : vous avez ${globalReserve.autonomyText} d'autonomie sans chauffage.`;
+            synthese = `Dehors il fait ${tExt}°C, et votre intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}). Vos murs restituent leur chaleur (+${Math.abs(fluxWallKw).toFixed(2)} kW) : ${globalReserve.autonomyDetail || `vous avez ${globalReserve.autonomyText} d'autonomie sans chauffage.`}`;
         } else if (fluxWallKw < -0.15) {
             synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives absorbent activement la chaleur (${fluxWallKw.toFixed(2)} kW) pour préserver votre fraîcheur.`;
         } else {
@@ -2415,6 +2470,64 @@ function processOneCallHourlyForecast(hourlyList) {
     return hourly;
 }
 
+function processOneCallFutureForecast(hourlyList) {
+    if (!Array.isArray(hourlyList) || hourlyList.length === 0) return [];
+    const nowTs = Math.floor(Date.now() / 1000);
+    // Filtrer les créneaux futurs (jusqu'à 48 heures consécutives)
+    const futureSlots = hourlyList.filter(item => item && item.dt && item.dt >= (nowTs - 1800)).slice(0, 48);
+    
+    const sunriseH = window.solsticeEphemeris?.sunriseHour || 7;
+    const sunsetH = window.solsticeEphemeris?.sunsetHour || 19;
+
+    return futureSlots.map(item => {
+        const d = new Date(item.dt * 1000);
+        const h = d.getHours();
+        const isDaytime = (h >= sunriseH && h < sunsetH);
+        const weatherMain = item.weather?.[0]?.main || 'Clouds';
+        const isSunny = isDaytime && (weatherMain.toLowerCase().includes('clear') || weatherMain.toLowerCase().includes('sun'));
+
+        return {
+            dt: item.dt,
+            date: d,
+            hour: h,
+            temp: item.temp,
+            humidity: item.humidity,
+            weatherMain: weatherMain,
+            isSunny: isSunny
+        };
+    });
+}
+
+function generateSyntheticFutureForecast(currentTemp = 15, currentHumidity = 60, isSunnyNow = false) {
+    const forecast = [];
+    const now = new Date();
+    const currentH = now.getHours();
+    const sunriseH = window.solsticeEphemeris?.sunriseHour || 7;
+    const sunsetH = window.solsticeEphemeris?.sunsetHour || 19;
+
+    // Amplitude thermique journalière typique (creux à l'aube vers 06h, pic vers 15h)
+    const amp = 4.0;
+    const tMoy = currentTemp - (amp * Math.cos(((currentH - 15) * 2 * Math.PI) / 24));
+
+    for (let step = 0; step < 48; step++) {
+        const stepDate = new Date(now.getTime() + step * 3600 * 1000);
+        const h = stepDate.getHours();
+        const tempSynth = tMoy + amp * Math.cos(((h - 15) * 2 * Math.PI) / 24);
+        const isDay = (h >= sunriseH && h < sunsetH);
+
+        forecast.push({
+            dt: Math.floor(stepDate.getTime() / 1000),
+            date: stepDate,
+            hour: h,
+            temp: parseFloat(tempSynth.toFixed(1)),
+            humidity: Math.round(currentHumidity),
+            weatherMain: isSunnyNow ? 'Clear' : 'Clouds',
+            isSunny: isDay && isSunnyNow
+        });
+    }
+    return forecast;
+}
+
 function fetchOneCallWeather(lat, lon, cityName = 'Reims') {
     const summaryEl = document.getElementById('weatherSummary');
     if (summaryEl) summaryEl.innerHTML = '<span class="muted-text">⏳ Chargement de la météo (One Call)...</span>';
@@ -2447,7 +2560,9 @@ function fetchOneCallWeather(lat, lon, cityName = 'Reims') {
 
             if (Array.isArray(data.hourly)) {
                 window.hourlyExtForecast = processOneCallHourlyForecast(data.hourly);
+                window.futureHourlyForecast = processOneCallFutureForecast(data.hourly);
                 localStorage.setItem('SOLSTICE_HOURLY_FORECAST', JSON.stringify(window.hourlyExtForecast));
+                localStorage.setItem('SOLSTICE_FUTURE_FORECAST', JSON.stringify(window.futureHourlyForecast));
             }
 
             const locInput = document.getElementById('location');
@@ -2477,7 +2592,8 @@ function fetchOneCallWeather(lat, lon, cityName = 'Reims') {
                     outdoorHumidity,
                     outdoorWind,
                     sunshineStatus,
-                    hourlyExtForecast: window.hourlyExtForecast
+                    hourlyExtForecast: window.hourlyExtForecast,
+                    futureHourlyForecast: window.futureHourlyForecast
                 };
                 if (window.SolsticeStore && window.SolsticeStore.saveScanData) {
                     window.SolsticeStore.saveScanData(DONNEES_HABITAT);
