@@ -33,9 +33,15 @@
   }
 </script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solstice - Tableau de Bord Thermal</title>
-    <link rel="stylesheet" href="style.css">
+    <!-- Tailwind CSS (sans preflight pour préserver le design system Solstice) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: {
+                preflight: false,
+            }
+        };
+    </script>
 </head>
 <body style="background-color: #F1F5F9; font-family: system-ui, -apple-system, sans-serif; color: #0F172A; margin: 0; padding: 0;">
 
@@ -108,133 +114,311 @@
 
         <!-- Section 2 : Radiographie et Cockpit Global -->
         <section style="display: flex; flex-direction: column; gap: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                <h2 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #0F172A;">🎛️ Radiographie de l'Habitat</h2>
-                <button id="btn-sync-all" style="background: #D96B43; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 700; font-size: 0.88rem; cursor: pointer; box-shadow: 0 2px 4px rgba(217, 107, 67, 0.2);" onclick="synchroniserTouteLaMaison()">
-                    ⚡ Interroger les capteurs (Super-Scan)
-                </button>
-            </div>
+            <!-- ============================================================== -->
+            <!-- SYNTHÈSE GLOBALE DE L'HABITAT : ÉCORCHÉ VIVANT & COCKPIT V7    -->
+            <!-- ============================================================== -->
+            <div class="w-full bg-[#0B101D] border border-slate-800/90 rounded-3xl p-3.5 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.7)] text-slate-100">
+                
+                <!-- EN-TÊTE DU COCKPIT -->
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800/80">
+                    <div>
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-2xl drop-shadow">☀️</span>
+                            <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white m-0">SOLSTICE <span class="text-[#D96B43] font-light">| Votre Maison en Direct</span></h2>
+                        </div>
+                        <p class="text-xs sm:text-sm text-slate-400 m-0 mt-0.5">Suivez en temps réel le confort de l'air, la chaleur des murs et la météo de votre foyer</p>
+                    </div>
 
-<!-- SYNTHÈSE GLOBALE DE L'HABITAT -->
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #1E293B; padding-bottom: 10px;">
-    <div style="display: flex; align-items: baseline; gap: 10px;">
-        <h2 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #F8FAFC;">🏠 Synthèse Globale de l'Habitat</h2>
-        <span id="global-calc-timestamp" style="font-size: 0.75rem; color: #64748B; font-weight: 500;">--:--</span>
-    </div>
-    <label style="font-size: 0.82rem; color: #94A3B8; cursor: pointer;">
-        <input type="checkbox" id="include-buffer-checkbox" onchange="toggleIncludeBuffer(this.checked)"> Inclure pièces tampons
-    </label>
-</div>
-
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 15px;">
-        
-        <!-- CARTE 1 : CONFORT & RESSENTI -->
-        <div style="background: #1E293B; padding: 14px 16px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; min-height: 175px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94A3B8; font-weight: 700;">CONFORT & RESSENTI</span>
-                <span style="font-size: 0.82rem; color: #F8FAFC; font-weight: 600;"><span id="global-avg-temp">--</span> °C • <span id="global-avg-rh">--</span>%</span>
-            </div>
-            
-            <div style="text-align: center; margin: 10px 0;">
-                <div style="font-size: 1.4rem; font-weight: 800; color: #F8FAFC; line-height: 1.1;">
-                    <span style="font-size: 0.9rem; color: #94A3B8; font-weight: 600;">PMV :</span> <span id="global-pmv-val">--</span>
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <button id="btn-sync-all" style="background: #D96B43; color: white; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer; box-shadow: 0 2px 8px rgba(217, 107, 67, 0.35);" onclick="synchroniserTouteLaMaison()">
+                            ⚡ Interroger les capteurs
+                        </button>
+                        <span id="global-calc-timestamp" class="text-xs text-slate-400 font-medium">--:--</span>
+                        <label class="text-xs text-slate-300 flex items-center gap-1.5 cursor-pointer bg-slate-900/90 border border-slate-700/60 px-3 py-1.5 rounded-xl hover:text-white transition">
+                            <input type="checkbox" id="include-buffer-checkbox" onchange="toggleIncludeBuffer(this.checked)" class="rounded text-[#D96B43]"> Pièces tampons
+                        </label>
+                    </div>
                 </div>
-                <div style="margin-top: 6px;">
-                    <span id="global-pmv-status" style="display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; background: #334155;">--</span>
-                </div>
-            </div>
 
-            <div id="global-pmv-subtext" style="font-size: 0.75rem; color: #94A3B8; text-align: center; border-top: 1px dashed #334155; padding-top: 6px;">
-                --
-            </div>
-        </div>
+                <!-- GRAND CANEVAS ARCHITECTURAL (ZÉRO SUPERPOSITION, FLÈCHES COURTES, INTÉRIEUR STRICTEMENT DANS LA MAISON) -->
+                <div class="relative bg-gradient-to-b from-[#070B16] via-[#091022] to-[#050813] border border-slate-800 rounded-3xl p-2 sm:p-4 overflow-hidden select-none">
+                    
+                    <!-- DESSIN ARCHITECTURAL VECTORIEL SVG (1000 x 510) -->
+                    <div class="w-full">
+                        <svg viewBox="0 0 1000 510" class="w-full h-auto select-none" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <!-- Lueur atmosphérique du soleil -->
+                                <radialGradient id="sunAtmosphere" cx="50%" cy="50%" r="50%">
+                                    <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.95"/>
+                                    <stop offset="30%" stop-color="#F59E0B" stop-opacity="0.50"/>
+                                    <stop offset="70%" stop-color="#D96B43" stop-opacity="0.15"/>
+                                    <stop offset="100%" stop-color="#0F172A" stop-opacity="0"/>
+                                </radialGradient>
 
-        <!-- CARTE 2 : AIR & SÉCHAGE -->
-        <div style="background: #1E293B; padding: 14px 16px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; min-height: 175px;">
-            <div>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <div class="solstice-tooltip-container" style="position: relative; display: inline-block; cursor: help;">
-                        <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94A3B8; font-weight: 700;">
-                            AIR & SÉCHAGE <span style="color: #D96B43;">ℹ️</span>
-                        </span>
-                        <div class="solstice-tooltip-popup" style="visibility: hidden; width: 170px; background-color: #334155; color: #fff; text-align: center; border-radius: 6px; padding: 6px; position: absolute; z-index: 10; bottom: 125%; left: 0; opacity: 0; transition: opacity 0.2s; font-size: 0.75rem; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                            Volume analysé : <strong id="global-volume-tooltip">-- m³</strong>
+                                <!-- Pénétration solaire volumétrique -->
+                                <linearGradient id="solarLightCone" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.22"/>
+                                    <stop offset="45%" stop-color="#FBBF24" stop-opacity="0.08"/>
+                                    <stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/>
+                                </linearGradient>
+
+                                <!-- Reflets verriers double vitrage -->
+                                <linearGradient id="glassReflection" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.25"/>
+                                    <stop offset="30%" stop-color="#FFFFFF" stop-opacity="0.08"/>
+                                    <stop offset="70%" stop-color="#0284C7" stop-opacity="0.04"/>
+                                    <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.20"/>
+                                </linearGradient>
+
+                                <!-- Marqueurs Flèches Laser Néon -->
+                                <marker id="mk-laser-orange" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                    <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#F59E0B"/>
+                                </marker>
+                                <marker id="mk-laser-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                    <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38BDF8"/>
+                                </marker>
+                                <marker id="mk-laser-rose" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                    <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#F43F5E"/>
+                                </marker>
+                            </defs>
+
+                            <!-- 1. PAYSAGE EXTÉRIEUR SCANDINAVE ÉPURÉ -->
+                            <rect x="0" y="0" width="370" height="510" fill="#070B16"/>
+
+                            <!-- Collines -->
+                            <path d="M -20 380 Q 80 260 220 330 T 370 290 L 370 510 L -20 510 Z" fill="#0C1427" opacity="0.6"/>
+                            <path d="M -20 420 Q 120 340 260 390 T 370 360 L 370 510 L -20 510 Z" fill="#111B33" opacity="0.8"/>
+
+                            <!-- Cône volumétrique d'ensoleillement direct -->
+                            <polygon id="volumetric-cone" points="105,85 440,165 440,455 350,455" fill="url(#solarLightCone)"/>
+
+                            <!-- Astre Céleste (Soleil / Lune) -->
+                            <g class="sun-glow-anim">
+                                <circle cx="105" cy="85" r="70" fill="url(#sunAtmosphere)" id="svg-sky-corona"/>
+                                <circle cx="105" cy="85" r="24" fill="#F59E0B" id="svg-sky-core" stroke="#FEF08A" stroke-width="2"/>
+                            </g>
+
+                            <!-- Terrain naturel -->
+                            <rect x="0" y="455" width="370" height="55" fill="#0B132B"/>
+                            <line x1="0" y1="455" x2="370" y2="455" stroke="#334155" stroke-width="2"/>
+
+                            <!-- Végétation discrète -->
+                            <path d="M 40 455 L 48 430 L 56 455 Z" fill="#1E293B"/>
+                            <path d="M 60 455 L 70 420 L 80 455 Z" fill="#1E293B"/>
+                            <path d="M 320 455 L 332 415 L 344 455 Z" fill="#1E293B"/>
+
+                            <!-- 2. VILLA CONTEMPORAINE -->
+                            <rect x="370" y="80" width="606" height="375" fill="#080E1C"/>
+
+                            <!-- TOITURE ZINC & PANNEAUX SOLAIRES -->
+                            <polygon points="360,80 985,80 970,55 385,55" fill="#1E293B" stroke="#F59E0B" stroke-width="1.5" id="roof-structure"/>
+                            <!-- Panneaux solaires -->
+                            <polygon points="430,75 580,75 570,60 440,60" fill="#0F172A" stroke="#38BDF8" stroke-width="1.2"/>
+                            <line x1="480" y1="75" x2="483" y2="60" stroke="#38BDF8" stroke-width="0.8"/>
+                            <line x1="530" y1="75" x2="533" y2="60" stroke="#38BDF8" stroke-width="0.8"/>
+                            <polygon points="620,75 770,75 760,60 630,60" fill="#0F172A" stroke="#38BDF8" stroke-width="1.2"/>
+                            <line x1="670" y1="75" x2="673" y2="60" stroke="#38BDF8" stroke-width="0.8"/>
+                            <line x1="720" y1="75" x2="723" y2="60" stroke="#38BDF8" stroke-width="0.8"/>
+
+                            <!-- RIVE DE TOITURE -->
+                            <rect x="350" y="78" width="636" height="6" fill="#334155" rx="2"/>
+
+                            <!-- MURS GAUCHE -->
+                            <rect x="360" y="84" width="16" height="80" fill="#1E293B" stroke="#F59E0B" stroke-width="1.5" id="wall-tl"/>
+                            <rect x="360" y="430" width="16" height="25" fill="#1E293B" stroke="#F59E0B" stroke-width="1.5" id="wall-bl"/>
+
+                            <!-- GRANDE BAIE VITRÉE MINIMALISTE -->
+                            <rect x="368" y="164" width="8" height="266" fill="#38BDF8" fill-opacity="0.1" stroke="#38BDF8" stroke-width="2"/>
+                            <!-- Reflets modernes -->
+                            <polygon points="368,170 376,164 376,210 368,225" fill="url(#glassReflection)"/>
+                            <polygon points="368,290 376,275 376,340 368,360" fill="url(#glassReflection)"/>
+                            <polygon points="368,390 376,375 376,430 368,430" fill="url(#glassReflection)"/>
+
+                            <!-- MUR MASSIF DROIT (BÉTON LOURD / INERTIE) -->
+                            <rect x="948" y="84" width="28" height="371" fill="#1E293B" stroke="#F59E0B" stroke-width="2" id="wall-heavy-r"/>
+                            <line x1="952" y1="140" x2="976" y2="140" stroke="#475569" stroke-width="1.2"/>
+                            <line x1="952" y1="210" x2="976" y2="210" stroke="#475569" stroke-width="1.2"/>
+                            <line x1="952" y1="290" x2="976" y2="290" stroke="#475569" stroke-width="1.2"/>
+                            <line x1="952" y1="370" x2="976" y2="370" stroke="#475569" stroke-width="1.2"/>
+
+                            <!-- DALLE BÉTON ISOLÉE -->
+                            <rect x="370" y="455" width="606" height="16" rx="2" id="floor-heavy" fill="#1E293B" stroke="#F59E0B" stroke-width="2"/>
+
+                            <!-- VIE INTÉRIEURE DISCRÈTE -->
+                            <line x1="680" y1="75" x2="680" y2="145" stroke="#64748B" stroke-width="1.5"/>
+                            <path d="M 664 152 Q 680 144 696 152 Z" fill="#F59E0B" fill-opacity="0.6"/>
+
+                            <!-- 3. FLÈCHES DE FLUX RACCOURCIES (Longueur optimale ~120px) -->
+                            
+                            <!-- FAISCEAU 1 : TRAVERSÉE BAIE VITRÉE (x: 310 à 440) -->
+                            <g id="flux-laser-ext-group">
+                                <path id="flux-laser-ext-halo" d="M 310 220 L 440 220" stroke="#F59E0B" stroke-width="14" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
+                                <path id="flux-laser-ext-line" d="M 310 220 L 440 220" stroke="#F59E0B" stroke-width="5" fill="none" class="flow-laser laser-orange" marker-end="url(#mk-laser-orange)"/>
+                            </g>
+                            <line x1="375" y1="220" x2="375" y2="190" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="2 2" stroke-opacity="0.8"/>
+                            <circle cx="375" cy="220" r="3.5" fill="#F59E0B"/>
+
+                            <!-- FAISCEAU 2 : FLUX MUR DROIT (x: 948 à 830) -->
+                            <g id="flux-laser-wall-group">
+                                <path id="flux-laser-wall-halo" d="M 948 220 L 830 220" stroke="#F59E0B" stroke-width="14" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
+                                <path id="flux-laser-wall-line" d="M 948 220 L 830 220" stroke="#F59E0B" stroke-width="5" fill="none" class="flow-laser laser-orange" marker-end="url(#mk-laser-orange)"/>
+                            </g>
+                            <line x1="885" y1="220" x2="885" y2="190" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="2 2" stroke-opacity="0.8"/>
+                            <circle cx="885" cy="220" r="3.5" fill="#F59E0B"/>
+
+                        </svg>
+                    </div>
+
+                    <!-- COUCHE HUD DES CARTES DE DONNÉES (ZÉRO SUPERPOSITION) -->
+
+                    <!-- A. CARTOUCHE EXTÉRIEUR (Ultra-translucide cristallin ~94%) -->
+                    <div class="absolute top-[38%] left-4 sm:left-6 w-60 sm:w-68 crystalline-sheer rounded-2xl p-3 shadow-2xl">
+                        <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-white/10">
+                            <span class="text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1.5 text-crisp">
+                                <span>🌍</span> Extérieur
+                            </span>
+                            <div class="flex items-center gap-1.5 bg-black/30 px-2.5 py-0.5 rounded-full border border-sky-400/40">
+                                <span id="txt-ext-emoji" class="text-sm">☀️</span>
+                                <span id="txt-ext-label" class="text-[11px] font-bold text-sky-200">--</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1.5 mb-2">
+                            <div class="bg-black/20 p-2 rounded-xl border border-white/10 flex items-center justify-between">
+                                <span class="text-xs text-slate-200 text-crisp">🌡️ Température</span>
+                                <strong class="text-base sm:text-lg font-black text-white text-crisp" id="txt-ext-temp">-- °C</strong>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-1.5">
+                                <div class="bg-black/20 p-1.5 rounded-xl border border-white/10 text-center">
+                                    <span class="text-[9px] text-slate-300 block font-semibold text-crisp">💧 Humid. Rel.</span>
+                                    <strong class="text-xs sm:text-sm font-bold text-sky-200 text-crisp" id="txt-ext-rh">-- %</strong>
+                                </div>
+                                <div class="bg-black/20 p-1.5 rounded-xl border border-white/10 text-center">
+                                    <span class="text-[9px] text-slate-300 block font-semibold text-crisp">🌫️ Humid. Abs.</span>
+                                    <strong class="text-xs sm:text-sm font-bold text-sky-200 text-crisp" id="txt-ext-ah">-- g/m³</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between text-xs bg-sky-950/20 px-2.5 py-1.5 rounded-xl border border-sky-500/20">
+                            <span class="text-slate-200 text-[10px] text-crisp">🧺 Séchage extérieur :</span>
+                            <strong class="text-amber-300 font-extrabold text-xs text-crisp" id="txt-ext-drying">--/10</strong>
                         </div>
                     </div>
-                    <strong id="global-avg-ah" style="font-size: 0.85rem; font-weight: 700; color: #38BDF8;">-- g/m³</strong>
+
+                    <!-- B. BATTERIE DES MURS & COMBLES (Au-dessus des flux) -->
+                    <div class="absolute top-5 left-[66%] -translate-x-1/2 w-[68%] max-w-sm hud-glass-amber rounded-2xl px-3.5 py-2 shadow-2xl flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl drop-shadow">🛡️</span>
+                            <div>
+                                <span class="text-[9px] text-amber-200/90 block font-bold uppercase tracking-wider text-crisp">Batterie des Murs</span>
+                                <strong class="text-base sm:text-lg font-black text-amber-300 text-crisp" id="txt-wall-temp">-- °C</strong>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2.5">
+                            <div class="text-right">
+                                <span class="text-[9px] text-slate-200 block font-medium text-crisp">Autonomie (~19°C)</span>
+                                <strong class="text-xs sm:text-sm font-black text-sky-300 text-crisp" id="txt-autonomy-val">-- h</strong>
+                            </div>
+                            <div class="w-16 sm:w-20 bg-black/50 h-2.5 rounded-full overflow-hidden border border-amber-500/30">
+                                <div id="txt-autonomy-bar" class="h-full bg-gradient-to-r from-[#D96B43] to-sky-400 rounded-full transition-all duration-500" style="width: 50%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- C. ÉTIQUETTE DU FLUX DE BAIE -->
+                    <div class="absolute top-[29%] left-[33%] sm:left-[34%] -translate-y-1/2 hud-glass-amber border-amber-400/50 px-2.5 py-1 rounded-xl text-center shadow-lg">
+                        <span class="text-[9px] text-slate-300 block font-semibold text-crisp" id="txt-flux-ext-tag">☀️ Gain Solaire</span>
+                        <strong class="text-xs font-black text-amber-300 text-crisp" id="txt-flux-ext-val">+0.00 kW</strong>
+                    </div>
+
+                    <!-- D. ÉTIQUETTE DU FLUX DES MURS -->
+                    <div class="absolute top-[29%] right-7 sm:right-9 -translate-y-1/2 hud-glass-amber border-amber-400/50 px-2.5 py-1 rounded-xl text-center shadow-lg">
+                        <span class="text-[9px] text-slate-300 block font-semibold text-crisp" id="txt-flux-wall-tag">🔥 Restitution</span>
+                        <strong class="text-xs font-black text-amber-300 text-crisp" id="txt-flux-wall-val">+0.00 kW</strong>
+                    </div>
+
+                    <!-- E. AMBIANCE INTÉRIEURE (AIR) : STRICTEMENT DANS LA MAISON -->
+                    <div class="absolute bottom-6 left-[65%] -translate-x-1/2 w-64 sm:w-76 max-w-[85%] hud-glass-emerald rounded-2xl p-3 shadow-2xl text-center">
+                        <div class="flex items-center justify-between mb-1.5 pb-1 border-b border-emerald-500/20">
+                            <span class="text-[11px] font-black text-emerald-300 flex items-center gap-1 text-crisp">
+                                <span>🌬️</span> Air Intérieur (Moyenne)
+                            </span>
+                            <span id="txt-pmv-badge" class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-400/50 text-emerald-200 text-crisp">
+                                Confort Idéal
+                            </span>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-1.5 mb-2">
+                            <div class="bg-black/35 p-1.5 rounded-xl border border-white/10">
+                                <span class="text-[9px] text-slate-300 block font-semibold text-crisp">T° Air</span>
+                                <strong class="text-sm sm:text-base font-black text-white text-crisp" id="txt-in-temp">-- °C</strong>
+                            </div>
+                            <div class="bg-black/35 p-1.5 rounded-xl border border-white/10">
+                                <span class="text-[9px] text-slate-300 block font-semibold text-crisp">Humid. Rel.</span>
+                                <strong class="text-sm font-bold text-slate-100 text-crisp" id="txt-in-rh">-- %</strong>
+                            </div>
+                            <div class="bg-black/35 p-1.5 rounded-xl border border-white/10">
+                                <span class="text-[9px] text-slate-300 block font-semibold text-crisp">Humid. Abs.</span>
+                                <strong class="text-sm font-bold text-sky-200 text-crisp" id="txt-in-ah">-- g/m³</strong>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between text-xs bg-black/30 px-2 py-1 rounded-lg border border-white/10">
+                            <span class="text-slate-300 text-[10px] text-crisp">🧺 Séchage intérieur :</span>
+                            <strong class="text-slate-100 font-bold text-xs text-crisp" id="txt-in-drying">--/10</strong>
+                        </div>
+                    </div>
+
                 </div>
 
-                <div id="global-microclimate-desc" style="font-size: 0.82rem; font-weight: 600; color: #38BDF8; line-height: 1.2;">
-                    --
+                <!-- 4. PROGRESSION DU BILAN THERMIQUE DU JOUR -->
+                <div class="mt-3.5 bg-slate-950/70 border border-slate-800/80 rounded-2xl p-3 shadow-inner">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                            <span>⚡</span> Progression du Bilan Thermique du Jour
+                        </span>
+                        <span class="text-[10px] text-slate-400">Énergie nette (Gains - Déperditions)</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <!-- 1. Passé -->
+                        <div class="bg-black/40 border border-slate-800 p-2 rounded-xl">
+                            <span class="text-[10px] text-slate-400 block font-semibold">1. Cumulé depuis 00h</span>
+                            <strong class="text-sm sm:text-base font-black text-emerald-400" id="txt-kwh-passed">-- kWh</strong>
+                            <span class="text-[9px] text-slate-500 block">Énergie accumulée</span>
+                        </div>
+
+                        <!-- 2. Direct -->
+                        <div class="bg-amber-950/30 border border-amber-500/50 p-2 rounded-xl shadow-sm">
+                            <span class="text-[10px] text-amber-300 block font-bold">2. En direct (Puissance)</span>
+                            <strong class="text-sm sm:text-base font-black text-amber-400" id="txt-kw-flux">-- kW</strong>
+                            <span class="text-[9px] text-amber-300/80 block">Flux instantané</span>
+                        </div>
+
+                        <!-- 3. Projection -->
+                        <div class="bg-black/40 border border-slate-800 p-2 rounded-xl">
+                            <span class="text-[10px] text-slate-400 block font-semibold">3. Estimé ce soir (24h)</span>
+                            <strong class="text-sm sm:text-base font-black text-white" id="txt-kwh-final">-- kWh</strong>
+                            <span class="text-[9px] text-slate-500 block">Projection fin de jour</span>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- 5. SYNTHÈSE EN MOTS SIMPLES -->
+                <div class="mt-3 bg-gradient-to-r from-slate-900/90 to-slate-800/70 border border-slate-700/60 rounded-2xl p-3 sm:p-3.5 flex items-start gap-2.5">
+                    <span class="text-xl mt-0.5">💬</span>
+                    <div class="text-xs sm:text-sm">
+                        <strong class="text-white font-bold block mb-0.5">Ce qui se passe en ce moment :</strong>
+                        <p class="text-slate-300 leading-relaxed text-xs sm:text-[13px] m-0" id="txt-summary">
+                            Chargement des données de l'habitat en cours...
+                        </p>
+                    </div>
+                </div>
+
             </div>
-
-            <div style="border-top: 1px dashed #334155; padding-top: 6px;">
-                <div style="font-size: 0.70rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748B; font-weight: 700; margin-bottom: 4px;">POTENTIEL DE SÉCHAGE</div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 2px;">
-                    <span style="color: #94A3B8;">🏠 Intérieur :</span>
-                    <strong id="global-drying-indoor" style="color: #F8FAFC;">--/10</strong>
-                </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
-                    <span style="color: #94A3B8;">🌳 Extérieur :</span>
-                    <strong id="global-drying-outdoor" style="color: #F8FAFC;">--/10</strong>
-                </div>
-            </div>
-        </div>
-
-        <!-- CARTE 3 : BILAN THERMIQUE -->
-        <div style="background: #1E293B; padding: 14px 16px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; min-height: 175px;">
-            <div>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94A3B8; font-weight: 700;">BILAN THERMIQUE</span>
-                    <span id="global-ephemeris" style="font-size: 0.75rem; color: #F59E0B; font-weight: 600;">☀️ --:-- ── 🌙 --:--</span>
-                </div>
-
-                <div style="text-align: center; margin: 4px 0;">
-                    <div id="global-net-main" style="font-size: 1.35rem; font-weight: 800; color: #4ADE80; line-height: 1.1;">-- kWh aujourd'hui</div>
-                    <div id="global-net-status" style="font-size: 0.75rem; color: #94A3B8; margin-top: 2px;">(Maison en gain)</div>
-                </div>
-            </div>
-
-            <div style="border-top: 1px dashed #334155; padding-top: 6px;">
-                <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 2px;">
-                    <span style="color: #94A3B8;">☀️ Jour :</span>
-                    <strong id="global-net-day" style="color: #F8FAFC;">-- kWh</strong>
-                </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
-                    <span style="color: #94A3B8;">🌙 Nuit :</span>
-                    <strong id="global-net-night" style="color: #F8FAFC;">-- kWh</strong>
-                </div>
-            </div>
-        </div>
-
-        <!-- CARTE 4 : MASSE & INERTIE -->
-        <div style="background: #1E293B; padding: 14px 16px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; min-height: 175px;">
-            <div>
-                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94A3B8; font-weight: 700; display: block; margin-bottom: 6px;">MASSE & INERTIE</span>
-                
-                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
-                    <span style="font-size: 0.85rem; color: #F8FAFC; font-weight: 700;">Murs : <span id="global-tstruct" style="color: #F59E0B;">-- °C</span></span>
-                    <span style="font-size: 0.70rem; color: #64748B;">(Temp. moyenne)</span>
-                </div>
-
-                <div style="margin-bottom: 4px;">
-                    <span id="global-wall-state-title" style="font-size: 0.82rem; font-weight: 700; color: #38BDF8;">🧱 Parois en recharge</span>
-                    <span id="global-flux-power-detail" style="font-size: 0.75rem; color: #94A3B8;">(-0.00 kW)</span>
-                </div>
-
-                <div style="font-size: 0.78rem; color: #CBD5E1;">
-                    ⏱️ Autonomie (~19°C) : <strong id="global-autonomy" style="color: #38BDF8;">-- h</strong>
-                </div>
-            </div>
-
-            <div style="border-top: 1px dashed #334155; padding-top: 6px; text-align: center;">
-                <span id="global-reserve-action" style="font-size: 0.82rem; font-weight: 700; color: #4ADE80;">--</span>
-            </div>
-        </div>
-
-    </div>
-</div>
 
             <!-- Sélecteur de Pièces -->
             <div id="room-selector-container" style="background: white; padding: 14px 18px; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">

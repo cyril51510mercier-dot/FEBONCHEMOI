@@ -620,3 +620,70 @@ tr:last-child td {
     color: #cbd5e1;
     font-size: 1rem;
 }
+
+/* ================================================================== */
+/* 8. ÉCORCHÉ ARCHITECTURAL & COCKPIT GLOBAL V7                       */
+/* ================================================================== */
+
+@keyframes laser-stream {
+    from { stroke-dashoffset: 32; }
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes celestial-pulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.7)); }
+    50% { transform: scale(1.06); filter: drop-shadow(0 0 28px rgba(245, 158, 11, 0.95)); }
+}
+
+.flow-laser {
+    stroke-dasharray: 10 5;
+    animation: laser-stream 0.8s linear infinite;
+}
+
+.sun-glow-anim {
+    transform-origin: 105px 85px;
+    animation: celestial-pulse 4s ease-in-out infinite;
+}
+
+/* Néons laser à haute intensité */
+.laser-orange {
+    filter: drop-shadow(0 0 6px #F59E0B) drop-shadow(0 0 14px rgba(217, 107, 67, 0.85));
+}
+
+.laser-blue {
+    filter: drop-shadow(0 0 6px #38BDF8) drop-shadow(0 0 14px rgba(2, 132, 199, 0.85));
+}
+
+.laser-rose {
+    filter: drop-shadow(0 0 6px #F43F5E) drop-shadow(0 0 14px rgba(225, 29, 72, 0.85));
+}
+
+/* Verre Cristallin Ultra-Translucide (~94% transparent pour voir tout le paysage) */
+.crystalline-sheer {
+    background: rgba(11, 19, 38, 0.10);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+}
+
+.hud-glass-amber {
+    background: rgba(24, 18, 12, 0.68);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(245, 158, 11, 0.40);
+    box-shadow: 0 10px 30px 0 rgba(245, 158, 11, 0.15);
+}
+
+.hud-glass-emerald {
+    background: rgba(8, 22, 18, 0.68);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    box-shadow: 0 10px 30px 0 rgba(16, 185, 129, 0.15);
+}
+
+.text-crisp {
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95), 0 0 2px rgba(0, 0, 0, 0.8);
+}
+

@@ -1581,123 +1581,66 @@ function updateHeatingSeasonDisplay() {
 
 function actualiserCockpitGlobal() {
     const metrics = calculateGlobalHabitatMetrics();
-
     if (!metrics) return;
 
-    if (document.getElementById('global-volume-tooltip')) {
-        document.getElementById('global-volume-tooltip').textContent = `${metrics.totalVolumeM3} m³`;
-    }
+    const now = new Date();
+    const currentH = now.getHours();
 
-    if (document.getElementById('global-avg-temp')) document.getElementById('global-avg-temp').textContent = `${metrics.avgTemp}`;
-    if (document.getElementById('global-avg-rh')) document.getElementById('global-avg-rh').textContent = `${metrics.avgRH}`;
-    if (document.getElementById('global-avg-ah')) document.getElementById('global-avg-ah').textContent = `${metrics.avgAH} g/m³`;
+    // ============================================================
+    // 1. EXTÉRIEUR (Données réelles et Ciel SVG)
+    // ============================================================
+    const extTemp = outdoorTemp;
+    const extRh = outdoorHumidity;
+    const extAh = calculateAbsoluteHumidity(extTemp, extRh);
+    const extDrying = metrics.outdoorDryingScore10;
 
-    // 1. CARTE CONFORT
-    const pmvValEl = document.getElementById('global-pmv-val');
-    const pmvStatusEl = document.getElementById('global-pmv-status');
-    const pmvSubtextEl = document.getElementById('global-pmv-subtext');
+    const sunriseH = window.solsticeEphemeris?.sunriseHour || 7;
+    const sunsetH = window.solsticeEphemeris?.sunsetHour || 19;
+    const isNight = currentH < sunriseH || currentH >= sunsetH;
+    const isSunny = (sunshineStatus || '').toLowerCase().includes('clear') || (sunshineStatus || '').toLowerCase().includes('sun');
 
-    if (pmvValEl) pmvValEl.textContent = (metrics.avgPMV > 0 ? "+" : "") + metrics.avgPMV.toFixed(2);
-    
-    if (pmvStatusEl && pmvSubtextEl) {
-        if (metrics.avgPMV >= -0.2 && metrics.avgPMV <= 0.2) {
-            pmvStatusEl.textContent = "Confort Parfait";
-            pmvStatusEl.style.background = "#059669";
-            pmvStatusEl.style.color = "#FFFFFF";
-            pmvSubtextEl.textContent = "Équilibre thermique idéal pour le corps";
-        } else if (metrics.avgPMV > 0.2 && metrics.avgPMV <= 0.75) {
-            pmvStatusEl.textContent = "Légère Chaleur";
-            pmvStatusEl.style.background = "#D97706";
-            pmvStatusEl.style.color = "#FFFFFF";
-            pmvSubtextEl.textContent = "Sensation de douceur chaude";
-        } else if (metrics.avgPMV > 0.75) {
-            pmvStatusEl.textContent = "Inconfort Chaud";
-            pmvStatusEl.style.background = "#DC2626";
-            pmvStatusEl.style.color = "#FFFFFF";
-            pmvSubtextEl.textContent = "Ambiance trop chaude";
-        } else if (metrics.avgPMV < -0.2 && metrics.avgPMV >= -0.75) {
-            pmvStatusEl.textContent = "Confort Optimal";
-            pmvStatusEl.style.background = "#059669";
-            pmvStatusEl.style.color = "#FFFFFF";
-            pmvSubtextEl.textContent = "Légère fraîcheur imperceptible";
+    let extEmoji = isNight ? '🌙' : (isSunny ? '☀️' : '⛅');
+    let extLabel = isNight ? 'Nuit' : (isSunny ? 'Ensoleillé' : (sunshineStatus || 'Variable'));
+    if ((sunshineStatus || '').toLowerCase().includes('rain')) { extEmoji = '🌧️'; extLabel = 'Pluie'; }
+    if ((sunshineStatus || '').toLowerCase().includes('snow')) { extEmoji = '❄️'; extLabel = 'Neige'; }
+
+    // Rendu Carte Extérieur
+    const txtExtTemp = document.getElementById('txt-ext-temp');
+    if (txtExtTemp) txtExtTemp.textContent = `${extTemp.toFixed(1)} °C`;
+    const txtExtRh = document.getElementById('txt-ext-rh');
+    if (txtExtRh) txtExtRh.textContent = `${extRh}%`;
+    const txtExtAh = document.getElementById('txt-ext-ah');
+    if (txtExtAh) txtExtAh.textContent = `${extAh.toFixed(1)} g/m³`;
+    const txtExtDrying = document.getElementById('txt-ext-drying');
+    if (txtExtDrying) txtExtDrying.textContent = `${extDrying}/10`;
+    const txtExtEmoji = document.getElementById('txt-ext-emoji');
+    if (txtExtEmoji) txtExtEmoji.textContent = extEmoji;
+    const txtExtLabel = document.getElementById('txt-ext-label');
+    if (txtExtLabel) txtExtLabel.textContent = extLabel;
+
+    // Rendu SVG Astre Céleste (Soleil / Lune / Nuages)
+    const svgSkyCore = document.getElementById('svg-sky-core');
+    const svgSkyCorona = document.getElementById('svg-sky-corona');
+    const svgCone = document.getElementById('volumetric-cone');
+    if (svgSkyCore) {
+        if (isNight) {
+            svgSkyCore.setAttribute('fill', '#38BDF8');
+            if (svgSkyCorona) svgSkyCorona.setAttribute('stop-opacity', '0.20');
+            if (svgCone) svgCone.setAttribute('fill-opacity', '0');
+        } else if (isSunny) {
+            svgSkyCore.setAttribute('fill', '#F59E0B');
+            if (svgSkyCorona) svgSkyCorona.setAttribute('stop-opacity', '0.95');
+            if (svgCone) svgCone.setAttribute('fill-opacity', '0.22');
         } else {
-            pmvStatusEl.textContent = "Inconfort Frais";
-            pmvStatusEl.style.background = "#0284C7";
-            pmvStatusEl.style.color = "#FFFFFF";
-            pmvSubtextEl.textContent = "Sensation de fraîcheur marquée";
+            svgSkyCore.setAttribute('fill', '#94A3B8');
+            if (svgSkyCorona) svgSkyCorona.setAttribute('stop-opacity', '0.35');
+            if (svgCone) svgCone.setAttribute('fill-opacity', '0.06');
         }
     }
 
-    // 2. CARTE AIR & SÉCHAGE
-    const descEl = document.getElementById('global-microclimate-desc');
-    if (descEl) {
-        if (metrics.avgRH > 62 || metrics.avgAH >= 12.0) {
-            descEl.textContent = "💧 Atmosphère lourde & chargée en humidité";
-            descEl.style.color = "#38BDF8";
-        } else if (metrics.avgTemp < 19.0 && metrics.avgRH > 60) {
-            descEl.textContent = "❄️ Ambiance fraîche & moite";
-            descEl.style.color = "#93C5FD";
-        } else if (metrics.avgTemp < 19.0 && metrics.avgRH < 40) {
-            descEl.textContent = "🌵 Air sec & frais";
-            descEl.style.color = "#FDBA74";
-        } else if (metrics.avgTemp > 23.0 && metrics.avgRH < 40) {
-            descEl.textContent = "☀️ Chaleur sèche";
-            descEl.style.color = "#F59E0B";
-        } else if (metrics.avgTemp >= 19.0 && metrics.avgTemp <= 23.0 && metrics.avgRH >= 40 && metrics.avgRH <= 60) {
-            descEl.textContent = "🍃 Atmosphère douce & équilibrée";
-            descEl.style.color = "#4ADE80";
-        } else {
-            descEl.textContent = "📊 Microclimat stable";
-            descEl.style.color = "#94A3B8";
-        }
-    }
-
-    if (document.getElementById('global-drying-indoor')) {
-        document.getElementById('global-drying-indoor').textContent = `${metrics.indoorDryingScore10}/10`;
-    }
-    if (document.getElementById('global-drying-outdoor')) {
-        document.getElementById('global-drying-outdoor').textContent = `${metrics.outdoorDryingScore10}/10`;
-    }
-
-    // 3. CARTE BILAN THERMIQUE
-    const ephEl = document.getElementById('global-ephemeris');
-    if (ephEl && window.solsticeEphemeris) {
-        ephEl.textContent = `☀️ ${window.solsticeEphemeris.sunriseStr} ── 🌙 ${window.solsticeEphemeris.sunsetStr}`;
-    }
-
-    const netMainEl = document.getElementById('global-net-main');
-    const netStatusEl = document.getElementById('global-net-status');
-    if (netMainEl && netStatusEl) {
-        const valNet = metrics.totalBilanNetKwh;
-        const valPasse = metrics.totalBilanPasseKwh;
-        const fluxNet = metrics.totalPuissanceNetteKw;
-        const currentH = new Date().getHours();
-
-        const signPasse = valPasse > 0 ? '+' : '';
-        netMainEl.textContent = `${signPasse}${valPasse} kWh (${currentH}h)`;
-        netMainEl.style.color = valPasse >= 0 ? "#4ADE80" : "#F87171";
-
-        const signFlux = fluxNet > 0 ? '+' : '';
-        const statutFlux = fluxNet > 0.1 
-            ? `☀️ Recharge (${signFlux}${fluxNet} kW)`
-            : (fluxNet < -0.1 ? `❄️ Décharge (${signFlux}${fluxNet} kW)` : `⚖️ Équilibre (0 kW)`);
-        const signNet = valNet > 0 ? '+' : '';
-        netStatusEl.textContent = `${statutFlux} • Prév. 24h : ${signNet}${valNet} kWh`;
-    }
-    
-    if (document.getElementById('global-net-day')) {
-        const valDay = metrics.totalBilanDiurnekWh;
-        document.getElementById('global-net-day').textContent = `${valDay > 0 ? '+' : ''}${valDay} kWh`;
-        document.getElementById('global-net-day').style.color = valDay >= 0 ? "#4ADE80" : "#F87171";
-    }
-
-    if (document.getElementById('global-net-night')) {
-        const valNight = metrics.totalBilanNocturnekWh;
-        document.getElementById('global-net-night').textContent = `${valNight > 0 ? '+' : ''}${valNight} kWh`;
-        document.getElementById('global-net-night').style.color = valNight >= 0 ? "#4ADE80" : "#F87171";
-    }
-
-    // 4. CARTE INERTIE & MASSE
+    // ============================================================
+    // 2. BATTERIE DES MURS & AUTONOMIE
+    // ============================================================
     const globalReserve = calculateStructureReserve(
         metrics.avgTStruct, 
         metrics.avgTemp, 
@@ -1710,47 +1653,201 @@ function actualiserCockpitGlobal() {
         }
     );
 
-    if (document.getElementById('global-tstruct')) {
-        document.getElementById('global-tstruct').textContent = `${metrics.avgTStruct} °C`;
-    }
+    const txtWallTemp = document.getElementById('txt-wall-temp');
+    if (txtWallTemp) txtWallTemp.textContent = `${metrics.avgTStruct.toFixed(1)} °C`;
+    const txtAutonomyVal = document.getElementById('txt-autonomy-val');
+    if (txtAutonomyVal) txtAutonomyVal.textContent = globalReserve.autonomyText;
     
-    const deltaFlux = metrics.avgTStruct - metrics.avgTemp;
-    const absPowerKw = Math.abs(globalReserve.fluxPowerKw).toFixed(2);
-    const wallTitleEl = document.getElementById('global-wall-state-title');
-    const wallDetailEl = document.getElementById('global-flux-power-detail');
+    const txtAutonomyBar = document.getElementById('txt-autonomy-bar');
+    if (txtAutonomyBar) {
+        let barPct = 50;
+        if (globalReserve.hoursTo19 !== undefined && !isNaN(globalReserve.hoursTo19)) {
+            barPct = Math.min(100, Math.max(5, Math.round((globalReserve.hoursTo19 / 36) * 100)));
+        } else if (globalReserve.autonomyText.includes('Illimitée')) {
+            barPct = 100;
+        } else if (globalReserve.autonomyText.includes('≤ 19°C')) {
+            barPct = 0;
+        }
+        txtAutonomyBar.style.width = `${barPct}%`;
+    }
 
-    if (wallTitleEl && wallDetailEl) {
-        if (deltaFlux > 0.3) {
-            wallTitleEl.textContent = "🔥 Parois en restitution";
-            wallTitleEl.style.color = "#FDBA74";
-            wallDetailEl.textContent = `(+${absPowerKw} kW de restitution)`;
-        } else if (deltaFlux < -0.3) {
-            wallTitleEl.textContent = "🧱 Parois en recharge";
-            wallTitleEl.style.color = "#38BDF8";
-            wallDetailEl.textContent = `(-${absPowerKw} kW d'absorption)`;
+    // ============================================================
+    // 3. AIR INTÉRIEUR
+    // ============================================================
+    const txtInTemp = document.getElementById('txt-in-temp');
+    if (txtInTemp) txtInTemp.textContent = `${metrics.avgTemp.toFixed(1)} °C`;
+    const txtInRh = document.getElementById('txt-in-rh');
+    if (txtInRh) txtInRh.textContent = `${metrics.avgRH} %`;
+    const txtInAh = document.getElementById('txt-in-ah');
+    if (txtInAh) txtInAh.textContent = `${metrics.avgAH.toFixed(1)} g/m³`;
+    const txtInDrying = document.getElementById('txt-in-drying');
+    if (txtInDrying) txtInDrying.textContent = `${metrics.indoorDryingScore10}/10`;
+
+    const txtPmvBadge = document.getElementById('txt-pmv-badge');
+    let pmvLabel = "Confort Idéal";
+    let pmvClass = "bg-emerald-950/80 border-emerald-400/50 text-emerald-200";
+    if (metrics.avgPMV > 0.75) {
+        pmvLabel = "Inconfort Chaud";
+        pmvClass = "bg-red-950/80 border-red-400/50 text-red-200";
+    } else if (metrics.avgPMV > 0.2) {
+        pmvLabel = "Légère Chaleur";
+        pmvClass = "bg-amber-950/80 border-amber-400/50 text-amber-200";
+    } else if (metrics.avgPMV < -0.75) {
+        pmvLabel = "Inconfort Frais";
+        pmvClass = "bg-blue-950/80 border-blue-400/50 text-blue-200";
+    } else if (metrics.avgPMV < -0.2) {
+        pmvLabel = "Légère Fraîcheur";
+        pmvClass = "bg-sky-950/80 border-sky-400/50 text-sky-200";
+    }
+    const signPmv = metrics.avgPMV > 0 ? "+" : "";
+    if (txtPmvBadge) {
+        txtPmvBadge.textContent = `${pmvLabel} (${signPmv}${metrics.avgPMV.toFixed(2)})`;
+        txtPmvBadge.className = `text-[10px] font-extrabold px-2 py-0.5 rounded-full border text-crisp ${pmvClass}`;
+    }
+
+    // ============================================================
+    // 4. FLUX THERMIQUES LASER COURT (Fenêtre & Mur)
+    // ============================================================
+    // Flux Extérieur (fenêtre/enveloppe)
+    const netExtKw = (metrics.totalGainsSolairesKw + metrics.totalGainsConductionKw) - metrics.totalDeperditionsKw;
+    const txtFluxExtTag = document.getElementById('txt-flux-ext-tag');
+    const txtFluxExtVal = document.getElementById('txt-flux-ext-val');
+    const lineExt = document.getElementById('flux-laser-ext-line');
+    const haloExt = document.getElementById('flux-laser-ext-halo');
+
+    if (txtFluxExtTag && txtFluxExtVal && lineExt && haloExt) {
+        if (netExtKw > 0.15) {
+            txtFluxExtTag.textContent = isSunny ? "☀️ Gain Solaire" : "🌡️ Apport Extérieur";
+            txtFluxExtVal.textContent = `+${netExtKw.toFixed(2)} kW`;
+            txtFluxExtVal.style.color = "#F59E0B";
+            lineExt.setAttribute('d', "M 310 220 L 440 220");
+            lineExt.setAttribute('stroke', "#F59E0B");
+            lineExt.setAttribute('class', "flow-laser laser-orange");
+            lineExt.setAttribute('marker-end', "url(#mk-laser-orange)");
+            haloExt.setAttribute('d', "M 310 220 L 440 220");
+            haloExt.setAttribute('stroke', "#F59E0B");
+        } else if (netExtKw < -0.15) {
+            txtFluxExtTag.textContent = "❄️ Pertes Extérieur";
+            txtFluxExtVal.textContent = `${netExtKw.toFixed(2)} kW`;
+            txtFluxExtVal.style.color = "#38BDF8";
+            lineExt.setAttribute('d', "M 440 220 L 310 220");
+            lineExt.setAttribute('stroke', "#38BDF8");
+            lineExt.setAttribute('class', "flow-laser laser-blue");
+            lineExt.setAttribute('marker-end', "url(#mk-laser-blue)");
+            haloExt.setAttribute('d', "M 440 220 L 310 220");
+            haloExt.setAttribute('stroke', "#38BDF8");
         } else {
-            wallTitleEl.textContent = "⚖️ Parois à l'équilibre";
-            wallTitleEl.style.color = "#4ADE80";
-            wallDetailEl.textContent = `(0 kW d'échange)`;
+            txtFluxExtTag.textContent = "⚖️ Équilibre Ext.";
+            txtFluxExtVal.textContent = "0.00 kW";
+            txtFluxExtVal.style.color = "#10B981";
+            lineExt.setAttribute('d', "M 310 220 L 440 220");
+            lineExt.setAttribute('stroke', "#10B981");
+            lineExt.setAttribute('class', "flow-laser");
+            lineExt.setAttribute('marker-end', "");
+            haloExt.setAttribute('d', "M 310 220 L 440 220");
+            haloExt.setAttribute('stroke', "#10B981");
         }
     }
 
-    const autonomyEl = document.getElementById('global-autonomy');
-    if (autonomyEl) {
-        autonomyEl.textContent = globalReserve.autonomyText;
+    // Flux Murs (Batterie thermique)
+    const fluxWallKw = globalReserve.fluxPowerKw;
+    const txtFluxWallTag = document.getElementById('txt-flux-wall-tag');
+    const txtFluxWallVal = document.getElementById('txt-flux-wall-val');
+    const lineWall = document.getElementById('flux-laser-wall-line');
+    const haloWall = document.getElementById('flux-laser-wall-halo');
+
+    if (txtFluxWallTag && txtFluxWallVal && lineWall && haloWall) {
+        if (fluxWallKw > 0.15) {
+            txtFluxWallTag.textContent = "🔥 Restitution";
+            txtFluxWallVal.textContent = `+${fluxWallKw.toFixed(2)} kW`;
+            txtFluxWallVal.style.color = "#F59E0B";
+            lineWall.setAttribute('d', "M 948 220 L 830 220");
+            lineWall.setAttribute('stroke', "#F59E0B");
+            lineWall.setAttribute('class', "flow-laser laser-orange");
+            lineWall.setAttribute('marker-end', "url(#mk-laser-orange)");
+            haloWall.setAttribute('d', "M 948 220 L 830 220");
+            haloWall.setAttribute('stroke', "#F59E0B");
+        } else if (fluxWallKw < -0.15) {
+            txtFluxWallTag.textContent = "🧱 Absorption Murs";
+            txtFluxWallVal.textContent = `${fluxWallKw.toFixed(2)} kW`;
+            txtFluxWallVal.style.color = "#38BDF8";
+            lineWall.setAttribute('d', "M 830 220 L 948 220");
+            lineWall.setAttribute('stroke', "#38BDF8");
+            lineWall.setAttribute('class', "flow-laser laser-blue");
+            lineWall.setAttribute('marker-end', "url(#mk-laser-blue)");
+            haloWall.setAttribute('d', "M 830 220 L 948 220");
+            haloWall.setAttribute('stroke', "#38BDF8");
+        } else {
+            txtFluxWallTag.textContent = "⚖️ Équilibre Murs";
+            txtFluxWallVal.textContent = "0.00 kW";
+            txtFluxWallVal.style.color = "#10B981";
+            lineWall.setAttribute('d', "M 948 220 L 830 220");
+            lineWall.setAttribute('stroke', "#10B981");
+            lineWall.setAttribute('class', "flow-laser");
+            lineWall.setAttribute('marker-end', "");
+            haloWall.setAttribute('d', "M 948 220 L 830 220");
+            haloWall.setAttribute('stroke', "#10B981");
+        }
     }
 
+    // Couleur d'accent de la structure de la maison
+    const archColor = metrics.avgTemp > 24 ? "#F43F5E" : (isNight || extTemp < 8 ? "#38BDF8" : "#F59E0B");
+    ['roof-structure', 'wall-tl', 'wall-bl', 'wall-heavy-r', 'floor-heavy'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute('stroke', archColor);
+    });
+
+    // ============================================================
+    // 5. BILAN PROGRESSIF EN 3 TEMPS
+    // ============================================================
+    const txtKwhPassed = document.getElementById('txt-kwh-passed');
+    if (txtKwhPassed) {
+        const valPasse = metrics.totalBilanPasseKwh;
+        const sign = valPasse > 0 ? '+' : '';
+        txtKwhPassed.textContent = `${sign}${valPasse.toFixed(2)} kWh`;
+        txtKwhPassed.className = `text-sm sm:text-base font-black ${valPasse >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+    }
+
+    const txtKwFlux = document.getElementById('txt-kw-flux');
+    if (txtKwFlux) {
+        const valFlux = metrics.totalPuissanceNetteKw;
+        const sign = valFlux > 0 ? '+' : '';
+        txtKwFlux.textContent = `${sign}${valFlux.toFixed(2)} kW`;
+        txtKwFlux.className = `text-sm sm:text-base font-black ${valFlux >= 0 ? 'text-amber-400' : 'text-sky-400'}`;
+    }
+
+    const txtKwhFinal = document.getElementById('txt-kwh-final');
+    if (txtKwhFinal) {
+        const valFinal = metrics.totalBilanNetKwh;
+        const sign = valFinal > 0 ? '+' : '';
+        txtKwhFinal.textContent = `${sign}${valFinal.toFixed(2)} kWh`;
+        txtKwhFinal.className = `text-sm sm:text-base font-black ${valFinal >= 0 ? 'text-white' : 'text-slate-300'}`;
+    }
+
+    // ============================================================
+    // 6. SYNTHÈSE EN MOTS SIMPLES (Dynamique et humaine)
+    // ============================================================
+    const txtSummary = document.getElementById('txt-summary');
+    if (txtSummary) {
+        let synthese = "";
+        const tAir = metrics.avgTemp.toFixed(1);
+        const tExt = outdoorTemp.toFixed(1);
+
+        if (fluxWallKw > 0.15) {
+            synthese = `Dehors il fait ${tExt}°C, et votre intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}). Vos murs restituent leur chaleur (+${Math.abs(fluxWallKw).toFixed(2)} kW) : vous avez ${globalReserve.autonomyText} d'autonomie sans chauffage.`;
+        } else if (fluxWallKw < -0.15) {
+            synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives absorbent activement la chaleur (${fluxWallKw.toFixed(2)} kW) pour préserver votre fraîcheur.`;
+        } else {
+            synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C au confort stable. Les échanges thermiques entre l'air et les murs sont équilibrés.`;
+        }
+        txtSummary.textContent = synthese;
+    }
+
+    // Horodatage du calcul
     const timeEl = document.getElementById('global-calc-timestamp');
     if (timeEl) {
-        const now = new Date();
         const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         timeEl.textContent = `(Calculé à ${timeStr})`;
-    }
-
-    const actionEl = document.getElementById('global-reserve-action');
-    if (actionEl) {
-        actionEl.textContent = globalReserve.actionText;
-        actionEl.style.color = globalReserve.actionColor; 
     }
 }
 
