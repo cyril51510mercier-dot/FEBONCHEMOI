@@ -2340,12 +2340,10 @@ function actualiserCockpitGlobal() {
         needle.style.left = `${gainPct}%`;
     }
 
-    // Mise à jour de la Trajectoire Énergétique Graphique (SVG 100% kWh avec Vitesse en Direct kW)
+    // Mise à jour de la Trajectoire Énergétique Graphique (SVG 100% kWh, courbe orange)
     const elBarPassed = document.getElementById('chart-bar-passed');
     const elTxtPassed = document.getElementById('chart-txt-passed');
     const elDotPassed = document.getElementById('chart-dot-passed');
-    const elFluxIndicator = document.getElementById('chart-flux-indicator');
-    const elTxtFlux = document.getElementById('chart-txt-flux');
     const elBarFinal = document.getElementById('chart-bar-final');
     const elTxtFinal = document.getElementById('chart-txt-final');
     const elDotFinal = document.getElementById('chart-dot-final');
@@ -2383,22 +2381,10 @@ function actualiserCockpitGlobal() {
         }
         if (elDotFinal) elDotFinal.setAttribute('cy', dotYFin);
 
-        // 3. Indicateur de Pente Dynamique / Puissance en direct (kW)
-        if (elFluxIndicator) {
-            const fluxY = Math.min(85, Math.max(22, dotYP - 10));
-            elFluxIndicator.setAttribute('transform', `translate(260, ${fluxY})`);
-        }
-        if (elTxtFlux) {
-            const trendArrow = valFlux > 0.1 ? '↗' : (valFlux < -0.1 ? '↘' : '→');
-            elTxtFlux.textContent = `⚡ ${fluxFormatted} ${trendArrow}`;
-            elTxtFlux.setAttribute('fill', valFlux > 0 ? '#FBBF24' : (valFlux < 0 ? '#38BDF8' : '#34D399'));
-        }
-
-        // 4. Courbe Spline Continue d'Énergie (00h -> Maintenant -> Projection 24h)
+        // 3. Courbe Orange de Trajectoire (00h -> Maintenant -> Projection 24h)
         if (elTrendCurve) {
-            const slopeOffset = Math.max(-16, Math.min(16, valFlux * 5));
-            const ctrlY1 = Math.min(95, Math.max(18, dotYP - slopeOffset));
-            elTrendCurve.setAttribute('d', `M 55 ${zeroY} C 110 ${zeroY}, 130 ${ctrlY1}, 178 ${dotYP} C 226 ${dotYP + slopeOffset}, 290 ${dotYFin}, 368 ${dotYFin}`);
+            elTrendCurve.setAttribute('d', `M 55 ${zeroY} C 115 ${zeroY}, 135 ${dotYP}, 190 ${dotYP} C 255 ${dotYP}, 305 ${dotYFin}, 370 ${dotYFin}`);
+            elTrendCurve.setAttribute('stroke', '#F59E0B');
         }
     }
 
