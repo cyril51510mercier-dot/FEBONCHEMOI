@@ -721,6 +721,39 @@ tr:last-child td {
     animation: radiator-glow 2.5s ease-in-out infinite;
 }
 
+/* Positionnement adaptatif des encarts HUD : En superposition sur PC, en cartes dégroupées sur mobile */
+@media (max-width: 767px) {
+    .hud-mobile-grid {
+        position: static !important;
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+        margin-top: 12px !important;
+        pointer-events: auto !important;
+    }
+
+    .hud-card-responsive {
+        position: static !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        transform: none !important;
+        margin-bottom: 0 !important;
+    }
+}
+
+@media (min-width: 768px) {
+    .hud-mobile-grid {
+        position: absolute !important;
+        inset: 0 !important;
+        pointer-events: none !important;
+    }
+
+    .hud-card-responsive {
+        position: absolute !important;
+        pointer-events: auto !important;
+    }
+}
+
 /* Barre de personnalisation (Ville, CLO, Pièces tampons) */
 .custom-pill-btn {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);

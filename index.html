@@ -35,7 +35,7 @@
         }
     </script>
 
-    <!-- Tailwind CSS (sans preflight pour respecter le design system Solstice) -->
+    <!-- Tailwind CSS (sans preflight) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -47,90 +47,82 @@
 </head>
 <body style="background-color: #F1F5F9; font-family: system-ui, -apple-system, sans-serif; color: #0F172A; margin: 0; padding: 0;">
 
-    <main class="dashboard-container" style="max-width: 1240px; margin: 14px auto; padding: 0 12px; display: flex; flex-direction: column; gap: 18px;">
+    <main class="dashboard-container" style="max-width: 1240px; margin: 14px auto; padding: 0 12px; display: flex; flex-direction: column; gap: 16px;">
         
         <!-- ============================================================== -->
-        <!-- MASTER CARD : COCKPIT HABITAT & ÉCORCHÉ ARCHITECTURAL V8      -->
+        <!-- MASTER CARD : COCKPIT HABITAT & SCÈNE ARCHITECTURALE V8.1     -->
         <!-- ============================================================== -->
-        <div class="w-full bg-[#0B101D] border border-slate-800 rounded-3xl p-3 sm:p-5 shadow-[0_20px_50px_rgba(0,0,0,0.6)] text-slate-100 flex flex-col gap-4">
+        <div class="w-full bg-[#0B101D] border border-slate-800 rounded-3xl p-3.5 sm:p-5 shadow-[0_20px_50px_rgba(0,0,0,0.6)] text-slate-100 flex flex-col gap-4">
             
-            <!-- 1. EN-TÊTE SUPÉRIEUR INTÉGRÉ (NAVIGATION & STATUTS) -->
+            <!-- 1. EN-TÊTE SUPÉRIEUR (TITRE AGRANDI & PHRASE SIMPLIFIÉE) -->
             <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
-                <!-- Identité Solstice -->
-                <div class="flex items-center gap-2.5">
-                    <span class="text-2xl drop-shadow">☀️</span>
+                <!-- Identité Solstice (Police Agrandie) -->
+                <div class="flex items-center gap-3">
+                    <span class="text-3xl sm:text-4xl drop-shadow">☀️</span>
                     <div>
-                        <h1 class="text-lg sm:text-xl font-black tracking-tight text-white m-0 leading-tight">
-                            SOLSTICE <span class="text-[#D96B43] font-light text-sm sm:text-base">| Tableau de Bord</span>
+                        <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white m-0 leading-tight">
+                            SOLSTICE <span class="text-[#D96B43] font-light text-xl sm:text-2xl">| Tableau de Bord</span>
                         </h1>
-                        <p class="text-[11px] text-slate-400 m-0">Diagnostic & Suivi Thera-Aéraulique en Direct</p>
+                        <p class="text-sm sm:text-base text-slate-300 m-0 mt-0.5 font-medium">
+                            Suivez en temps réel le confort et l'énergie de votre maison
+                        </p>
                     </div>
                 </div>
 
                 <!-- Actions Principales & Badge Saison de Chauffe -->
                 <div class="flex flex-wrap items-center gap-2">
-                    <!-- Badge Saison de Chauffe dynamique -->
                     <span id="heating-season-badge" class="px-3 py-1.5 rounded-full text-xs font-bold inline-flex items-center gap-1.5 bg-slate-900 border border-slate-700 text-slate-200 cursor-default">
                         ⏳ Analyse saison...
                     </span>
 
-                    <!-- Super Scan -->
                     <button id="btn-sync-all" onclick="synchroniserTouteLaMaison(event)" class="custom-pill-btn bg-[#D96B43] hover:bg-[#C25832] text-white border-0 px-3.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer shadow-md">
                         ⚡ Super Scan
                     </button>
 
-                    <!-- Plan d'Action -->
                     <button onclick="voirToutesLesRecommandations()" class="custom-pill-btn bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer">
                         📋 Plan d'Action
                     </button>
 
-                    <!-- Config BEM -->
                     <a href="setup.html" class="custom-pill-btn bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center gap-1.5 no-underline">
                         ⚙️ Config BEM
                     </a>
 
-                    <!-- Horodatage -->
                     <span id="global-calc-timestamp" class="text-[11px] text-slate-400 font-medium px-2 py-1 bg-slate-900/60 rounded-lg border border-slate-800">
                         --:--
                     </span>
                 </div>
             </div>
 
-            <!-- 2. BANDEAU DE PERSONNALISATION UNIFIÉ (VILLE, CLO & PIÈCES TAMPONS) -->
+            <!-- 2. BANDEAU DE PERSONNALISATION ÉPURÉ (VILLE CLIQUABLE & PIÈCES TAMPONS) -->
             <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
                 
-                <!-- Bloc A : Localisation Habitat (sans redondance météo) -->
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="font-bold text-slate-300 flex items-center gap-1">
-                        <span>📍</span> <span id="summary-city-name" class="text-amber-400 font-extrabold text-sm">Reims</span>
-                    </span>
-                    <div class="flex items-center gap-1 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2 py-1">
-                        <input type="text" id="location" placeholder="Autre ville..." aria-label="Ville" class="bg-transparent border-0 text-white text-xs outline-none w-24 sm:w-28 placeholder:text-slate-500">
-                        <button id="getWeatherButton" onclick="rechercherMeteo()" class="bg-transparent border-0 text-slate-300 hover:text-white cursor-pointer px-1" title="Rechercher">🔍</button>
+                <!-- Bloc A : Localisation avec clic sur ville pour éditer -->
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <!-- Nom de ville cliquable -->
+                    <div onclick="toggleCityInput()" class="font-bold text-slate-300 flex items-center gap-1.5 cursor-pointer hover:text-white transition group" title="Cliquer pour changer de ville">
+                        <span class="text-sm">📍</span>
+                        <span id="summary-city-name" class="text-amber-400 font-black text-sm sm:text-base border-b border-dashed border-amber-400/60 group-hover:border-amber-300 pb-0.5">Reims</span>
+                        <span class="text-[11px] text-slate-400 group-hover:text-amber-300 transition">✏️</span>
                     </div>
+
+                    <!-- Champ de saisie dynamique (masqué par défaut) -->
+                    <div id="city-input-group" class="hidden items-center gap-1 bg-slate-950 border border-amber-500/70 rounded-xl px-2 py-1 shadow-lg">
+                        <input type="text" id="location" placeholder="Nom de ville..." aria-label="Ville" class="bg-transparent border-0 text-white text-xs outline-none w-28 placeholder:text-slate-500" onkeydown="if(event.key==='Enter') validerNouvelleVille()">
+                        <button id="getWeatherButton" onclick="validerNouvelleVille()" class="bg-amber-500 text-slate-950 font-bold rounded-lg px-2 py-0.5 text-xs cursor-pointer hover:bg-amber-400">OK</button>
+                        <button onclick="toggleCityInput(false)" class="text-slate-400 hover:text-white text-xs px-1 cursor-pointer">✕</button>
+                    </div>
+
+                    <!-- Bouton Géolocaliser -->
                     <button id="geoLocateButton" onclick="geolocaliserMeteo()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl px-2.5 py-1 text-[11px] font-semibold cursor-pointer">
                         📍 Géolocaliser
                     </button>
-                    <!-- Conteneur météo OneCall pour retour d'état de chargement -->
-                    <span id="weatherSummary" class="text-[11px] text-slate-400 font-medium ml-1"></span>
+
+                    <!-- Éléments techniques conservés pour compatibilité engine.js (masqués pour éviter toute redondance) -->
+                    <span id="weatherSummary" style="display: none;"></span>
                     <span id="summary-weather-inline" style="display: none;"></span>
                 </div>
 
-                <!-- Bloc B : Isolation Corporelle (CLO) -->
-                <div class="flex flex-wrap items-center gap-2">
-                    <div class="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2.5 py-1">
-                        <span class="text-slate-300">👕</span>
-                        <span class="font-bold text-white"><strong id="currentCloValue">1.00</strong> Clo</span>
-                        <span id="currentCloDesc" class="text-slate-400 text-[11px] hidden sm:inline ml-1 font-normal">(Chemise & pull)</span>
-                    </div>
-                    <div class="flex items-center gap-1">
-                        <button onclick="adjustClothing(-0.2)" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold cursor-pointer" title="Alléger la tenue (-0.2 Clo)">➖ Plus léger</button>
-                        <button onclick="adjustClothing(0.2)" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold cursor-pointer" title="Couvrir davantage (+0.2 Clo)">➕ Plus chaud</button>
-                        <button onclick="resetClothing()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg px-2 py-1 text-[11px] cursor-pointer" title="Réinitialiser à la valeur de saison">🔄</button>
-                    </div>
-                </div>
-
-                <!-- Bloc C : Interrupteur Pièces Tampons -->
+                <!-- Bloc B : Interrupteur Pièces Tampons -->
                 <div class="flex items-center">
                     <label class="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white transition font-medium select-none bg-slate-950/60 border border-slate-800 rounded-xl px-2.5 py-1">
                         <input type="checkbox" id="include-buffer-checkbox" onchange="toggleIncludeBuffer(this.checked)" class="accent-[#D96B43] rounded cursor-pointer">
@@ -140,12 +132,12 @@
 
             </div>
 
-            <!-- 3. SCÈNE VECTORIELLE DE LA MAISON COUPÉE (ÉCORCHÉ ARCHITECTURAL & EXTÉRIEUR) -->
-            <div class="relative bg-gradient-to-b from-[#0A1124] via-[#0E172F] to-[#070B18] border border-slate-800 rounded-3xl p-2 sm:p-4 overflow-hidden select-none">
+            <!-- 3. SCÈNE ARCHITECTURALE HD & ENCARTS ADAPTATIFS (MOBILE SANS CHEVAUCHEMENT) -->
+            <div class="relative w-full max-w-[940px] mx-auto bg-gradient-to-b from-[#0A1124] via-[#0E172F] to-[#070B18] border border-slate-800 rounded-3xl p-2 sm:p-4 overflow-hidden select-none">
                 
-                <!-- DESSIN ARCHITECTURAL SVG (1000 x 660) -->
+                <!-- DESSIN ARCHITECTURAL VECTORIEL SVG (1000 x 600) -->
                 <div class="w-full">
-                    <svg viewBox="0 0 1000 660" class="w-full h-auto select-none" xmlns="http://www.w3.org/2000/svg">
+                    <svg viewBox="0 0 1000 600" class="w-full h-auto select-none" xmlns="http://www.w3.org/2000/svg">
                         <defs>
                             <!-- Dégradé Ciel Réaliste & Doux -->
                             <linearGradient id="skyAtmosphereGrad" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -183,12 +175,6 @@
                                 <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.25"/>
                             </linearGradient>
 
-                            <!-- Dégradé Flèches d'Aération Naturelle -->
-                            <linearGradient id="airflowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" stop-color="#EA580C" stop-opacity="0.85"/>
-                                <stop offset="100%" stop-color="#F97316" stop-opacity="0.95"/>
-                            </linearGradient>
-
                             <!-- Marqueurs Rayons & Flux Laser -->
                             <marker id="mk-ray-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                                 <path d="M 0 2 L 8 5 L 0 8 z" fill="#D97706"/>
@@ -202,45 +188,38 @@
                         </defs>
 
                         <!-- FOND GLOBAL EXTÉRIEUR (JARDIN & CIEL PÂLE MODERNE) -->
-                        <rect x="0" y="0" width="1000" height="660" fill="url(#skyAtmosphereGrad)"/>
+                        <rect x="0" y="0" width="1000" height="600" fill="url(#skyAtmosphereGrad)"/>
 
                         <!-- LIGNE DE SOL & TERRAIN -->
-                        <rect x="0" y="580" width="1000" height="80" fill="#E2E8F0"/>
-                        <line x1="0" y1="580" x2="1000" y2="580" stroke="#1E293B" stroke-width="2.5"/>
-                        <!-- Gazon à gauche -->
-                        <rect x="0" y="580" width="310" height="10" fill="#84CC16"/>
+                        <rect x="0" y="530" width="1000" height="70" fill="#E2E8F0"/>
+                        <line x1="0" y1="530" x2="1000" y2="530" stroke="#1E293B" stroke-width="2.5"/>
+                        <rect x="0" y="530" width="310" height="8" fill="#84CC16"/>
 
                         <!-- CÔNE SOLAIRE VOLUMÉTRIQUE -->
-                        <polygon id="volumetric-cone" points="135,115 450,150 450,580 300,580" fill="url(#solarLightCone)"/>
+                        <polygon id="volumetric-cone" points="135,105 450,140 450,530 300,530" fill="url(#solarLightCone)"/>
 
-                        <!-- ASTRE CÉLESTE (SOLEIL VECTORIEL CHAUD) -->
+                        <!-- ASTRE CÉLESTE (SOLEIL VECTORIEL CHAUD PARFAITEMENT DÉGAGÉ) -->
                         <g class="sun-glow-anim">
-                            <circle cx="135" cy="115" r="75" fill="url(#sunHaloGrad)" id="svg-sky-corona"/>
-                            <circle cx="135" cy="115" r="28" fill="#F59E0B" stroke="#FEF08A" stroke-width="2.5" id="svg-sky-core"/>
+                            <circle cx="135" cy="105" r="70" fill="url(#sunHaloGrad)" id="svg-sky-corona"/>
+                            <circle cx="135" cy="105" r="26" fill="#F59E0B" stroke="#FEF08A" stroke-width="2.5" id="svg-sky-core"/>
                         </g>
 
                         <!-- RAYONS SOLAIRES FLÉCHÉS DIRECTIONNELS -->
                         <g id="solar-rays-group">
-                            <!-- Rayon 1 vers panneaux solaires sur le toit -->
-                            <line x1="165" y1="125" x2="435" y2="160" stroke="#D97706" stroke-width="2" class="anim-solar-ray" marker-end="url(#mk-ray-arrow)"/>
-                            <!-- Rayon 2 vers baie vitrée supérieure -->
-                            <line x1="160" y1="140" x2="340" y2="300" stroke="#D97706" stroke-width="2" class="anim-solar-ray" marker-end="url(#mk-ray-arrow)"/>
-                            <!-- Rayon 3 vers sol & baie inférieure -->
-                            <line x1="150" y1="155" x2="270" y2="460" stroke="#D97706" stroke-width="2" class="anim-solar-ray" marker-end="url(#mk-ray-arrow)"/>
+                            <line x1="165" y1="115" x2="435" y2="150" stroke="#D97706" stroke-width="2" class="anim-solar-ray" marker-end="url(#mk-ray-arrow)"/>
+                            <line x1="160" y1="130" x2="340" y2="280" stroke="#D97706" stroke-width="2" class="anim-solar-ray" marker-end="url(#mk-ray-arrow)"/>
+                            <line x1="150" y1="145" x2="270" y2="420" stroke="#D97706" stroke-width="2" class="anim-solar-ray" marker-end="url(#mk-ray-arrow)"/>
                         </g>
 
-                        <!-- ARBRE ET VÉGÉTATION STYLISÉE (STYLE DE L'ILLUSTRATION) -->
+                        <!-- ARBRE ET VÉGÉTATION STYLISÉE -->
                         <g id="garden-vegetation">
-                            <!-- Tronc -->
-                            <line x1="115" y1="460" x2="115" y2="580" stroke="#1E293B" stroke-width="4.5" stroke-linecap="round"/>
-                            <line x1="115" y1="510" x2="135" y2="485" stroke="#1E293B" stroke-width="3" stroke-linecap="round"/>
-                            <!-- Houppier ovale épuré -->
-                            <ellipse cx="115" cy="420" rx="52" ry="72" fill="#65A30D" stroke="#1E293B" stroke-width="2.5"/>
-                            <ellipse cx="105" cy="405" rx="36" ry="52" fill="#84CC16" fill-opacity="0.35"/>
-                            <!-- Buissons au sol -->
-                            <circle cx="80" cy="580" r="24" fill="#4D7C0F" stroke="#1E293B" stroke-width="2"/>
-                            <circle cx="150" cy="580" r="28" fill="#65A30D" stroke="#1E293B" stroke-width="2"/>
-                            <circle cx="115" cy="580" r="22" fill="#4D7C0F" stroke="#1E293B" stroke-width="2"/>
+                            <line x1="115" y1="410" x2="115" y2="530" stroke="#1E293B" stroke-width="4.5" stroke-linecap="round"/>
+                            <line x1="115" y1="460" x2="135" y2="435" stroke="#1E293B" stroke-width="3" stroke-linecap="round"/>
+                            <ellipse cx="115" cy="370" rx="48" ry="66" fill="#65A30D" stroke="#1E293B" stroke-width="2.5"/>
+                            <ellipse cx="105" cy="355" rx="32" ry="46" fill="#84CC16" fill-opacity="0.35"/>
+                            <circle cx="80" cy="530" r="22" fill="#4D7C0F" stroke="#1E293B" stroke-width="2"/>
+                            <circle cx="150" cy="530" r="26" fill="#65A30D" stroke="#1E293B" stroke-width="2"/>
+                            <circle cx="115" cy="530" r="20" fill="#4D7C0F" stroke="#1E293B" stroke-width="2"/>
                         </g>
 
                         <!-- ============================================================== -->
@@ -248,309 +227,373 @@
                         <!-- ============================================================== -->
                         
                         <!-- 1. ENVELOPPE ISOLÉE CONTINUE BEM (COUCHE CYAN HACHURÉE) -->
-                        <!-- Murs extérieurs et toiture avec motif zig-zag -->
                         <g id="bem-insulation-envelope">
                             <!-- Dalle de fondation isolée -->
-                            <rect x="310" y="580" width="620" height="24" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="floor-heavy"/>
+                            <rect x="310" y="530" width="620" height="22" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="floor-heavy"/>
                             
                             <!-- Mur droit isolé continu -->
-                            <rect x="906" y="230" width="24" height="350" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="wall-heavy-r"/>
+                            <rect x="906" y="210" width="24" height="320" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="wall-heavy-r"/>
                             
                             <!-- Toiture pente droite isolée -->
-                            <polygon points="635,70 930,230 906,242 635,94" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2"/>
+                            <polygon points="635,60 930,210 906,222 635,84" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2"/>
                             
                             <!-- Toiture pente gauche isolée -->
-                            <polygon points="635,70 310,230 334,242 635,94" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="roof-structure"/>
+                            <polygon points="635,60 310,210 334,222 635,84" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="roof-structure"/>
                             
                             <!-- Allège gauche supérieure isolée -->
-                            <rect x="310" y="230" width="24" height="30" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="wall-tl"/>
+                            <rect x="310" y="210" width="24" height="28" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="wall-tl"/>
                             
                             <!-- Allège gauche inférieure isolée -->
-                            <rect x="310" y="555" width="24" height="25" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="wall-bl"/>
+                            <rect x="310" y="505" width="24" height="25" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="wall-bl"/>
                         </g>
 
                         <!-- 2. PANNEAUX SOLAIRES PHOTOVOLTAÏQUES (SUR PENTE GAUCHE) -->
                         <g id="solar-panels-roof">
-                            <polygon points="410,185 580,100 575,88 405,173" fill="#0F172A" stroke="#0284C7" stroke-width="2"/>
-                            <line x1="450" y1="165" x2="445" y2="153" stroke="#38BDF8" stroke-width="1.2"/>
-                            <line x1="490" y1="145" x2="485" y2="133" stroke="#38BDF8" stroke-width="1.2"/>
-                            <line x1="530" y1="125" x2="525" y2="113" stroke="#38BDF8" stroke-width="1.2"/>
+                            <polygon points="410,165 580,85 575,73 405,153" fill="#0F172A" stroke="#0284C7" stroke-width="2"/>
+                            <line x1="450" y1="145" x2="445" y2="133" stroke="#38BDF8" stroke-width="1.2"/>
+                            <line x1="490" y1="125" x2="485" y2="113" stroke="#38BDF8" stroke-width="1.2"/>
+                            <line x1="530" y1="105" x2="525" y2="93" stroke="#38BDF8" stroke-width="1.2"/>
                             <!-- Rive de toit zinc anthracite -->
-                            <polygon points="635,62 935,225 930,230 635,68 305,225 300,220" fill="#1E293B"/>
+                            <polygon points="635,52 935,205 930,210 635,58 305,205 300,200" fill="#1E293B"/>
                         </g>
 
-                        <!-- 3. VOLUMES INTÉRIEURS DES 4 PIÈCES (COULEURS CHAUDES CONVIVIALES) -->
+                        <!-- 3. VOLUMES INTÉRIEURS DES 4 PIÈCES -->
                         
                         <!-- R+1 Gauche : Mezzanine / Bureau Haut -->
-                        <polygon points="334,260 635,110 635,360 334,360" fill="#FFFBEB" stroke="#1E293B" stroke-width="1.5"/>
+                        <polygon points="334,238 635,95 635,330 334,330" fill="#FFFBEB" stroke="#1E293B" stroke-width="1.5"/>
                         <!-- R+1 Droite : Chambre Parentale -->
-                        <polygon points="635,110 906,255 906,360 635,360" fill="#F8FAFC" stroke="#1E293B" stroke-width="1.5"/>
+                        <polygon points="635,95 906,230 906,330 635,330" fill="#F8FAFC" stroke="#1E293B" stroke-width="1.5"/>
                         
                         <!-- RDC Gauche : Salon / Séjour Lumineux -->
-                        <rect x="334" y="380" width="301" height="200" fill="#FEF3C7" stroke="#1E293B" stroke-width="1.5"/>
+                        <rect x="334" y="350" width="301" height="180" fill="#FEF3C7" stroke="#1E293B" stroke-width="1.5"/>
                         <!-- RDC Droite : Espace Bureau & Chauffage -->
-                        <rect x="635" y="380" width="271" height="200" fill="#F8FAFC" stroke="#1E293B" stroke-width="1.5"/>
+                        <rect x="635" y="350" width="271" height="180" fill="#F8FAFC" stroke="#1E293B" stroke-width="1.5"/>
 
                         <!-- Plancher intermédiaire (RDC / R+1) -->
-                        <rect x="334" y="360" width="572" height="20" fill="#E2E8F0" stroke="#1E293B" stroke-width="2"/>
+                        <rect x="334" y="330" width="572" height="20" fill="#E2E8F0" stroke="#1E293B" stroke-width="2"/>
                         <!-- Mur de refend central -->
-                        <line x1="635" y1="110" x2="635" y2="580" stroke="#1E293B" stroke-width="2.5"/>
+                        <line x1="635" y1="95" x2="635" y2="530" stroke="#1E293B" stroke-width="2.5"/>
 
-                        <!-- 4. MENUISERIES VITRÉES ET OUVERTURE NATURELLE -->
-                        
+                        <!-- 4. MENUISERIES VITRÉES -->
                         <!-- Baie supérieure R+1 (Double Vitrage Fixe) -->
-                        <rect x="326" y="260" width="8" height="100" fill="#38BDF8" fill-opacity="0.2" stroke="#1E293B" stroke-width="2"/>
-                        <polygon points="326,270 334,264 334,310 326,325" fill="url(#glassReflection)"/>
+                        <rect x="326" y="238" width="8" height="92" fill="#38BDF8" fill-opacity="0.2" stroke="#1E293B" stroke-width="2"/>
+                        <polygon points="326,245 334,239 334,285 326,300" fill="url(#glassReflection)"/>
 
-                        <!-- Baie inférieure RDC : Vantail Entrouvert vers l'extérieur -->
-                        <rect x="326" y="380" width="8" height="175" fill="#38BDF8" fill-opacity="0.1" stroke="#1E293B" stroke-width="2"/>
-                        <!-- Vantail ouvert à 25° -->
-                        <polygon points="326,430 300,420 300,530 326,540" fill="#38BDF8" fill-opacity="0.3" stroke="#1E293B" stroke-width="2"/>
-                        <line x1="300" y1="420" x2="300" y2="530" stroke="#0284C7" stroke-width="2"/>
+                        <!-- Baie inférieure RDC -->
+                        <rect x="326" y="350" width="8" height="155" fill="#38BDF8" fill-opacity="0.15" stroke="#1E293B" stroke-width="2"/>
+                        <polygon points="326,360 334,354 334,420 326,440" fill="url(#glassReflection)"/>
 
-                        <!-- 5. GRANDES FLÈCHES D'AÉRATION NATURELLE TRAVERSANT LA BAIE OUVERTE -->
-                        <g id="natural-ventilation-arrows" class="anim-natural-airflow">
-                            <!-- Flèche supérieure -->
-                            <path d="M 210 460 L 400 460 L 400 445 L 450 470 L 400 495 L 400 480 L 210 480 Z" fill="url(#airflowGrad)" stroke="#C2410C" stroke-width="1.5"/>
-                            <!-- Flèche principale -->
-                            <path d="M 170 520 L 460 520 L 460 505 L 520 535 L 460 565 L 460 550 L 170 550 Z" fill="url(#airflowGrad)" stroke="#C2410C" stroke-width="1.5"/>
-                        </g>
-
-                        <!-- 6. MOBILIER ÉPURÉ & RADIATEUR D'ÉMISSION THERMIQUE -->
-                        
+                        <!-- 5. MOBILIER ÉPURÉ & RADIATEUR D'ÉMISSION THERMIQUE -->
                         <!-- R+1 Mezzanine : Bureau & Ordinateur -->
                         <g id="mezzanine-furniture">
-                            <rect x="420" y="325" width="70" height="6" fill="#1E293B" rx="1"/>
-                            <line x1="430" y1="331" x2="430" y2="360" stroke="#1E293B" stroke-width="2"/>
-                            <line x1="480" y1="331" x2="480" y2="360" stroke="#1E293B" stroke-width="2"/>
-                            <!-- Laptop -->
-                            <rect x="445" y="312" width="20" height="13" fill="#64748B" rx="1"/>
-                            <!-- Chaise -->
-                            <path d="M 505 320 L 515 320 L 515 340 L 500 340 L 500 360 M 515 340 L 515 360" stroke="#1E293B" stroke-width="2" fill="none"/>
+                            <rect x="420" y="295" width="70" height="6" fill="#1E293B" rx="1"/>
+                            <line x1="430" y1="301" x2="430" y2="330" stroke="#1E293B" stroke-width="2"/>
+                            <line x1="480" y1="301" x2="480" y2="330" stroke="#1E293B" stroke-width="2"/>
+                            <rect x="445" y="282" width="20" height="13" fill="#64748B" rx="1"/>
+                            <path d="M 505 290 L 515 290 L 515 310 L 500 310 L 500 330 M 515 310 L 515 330" stroke="#1E293B" stroke-width="2" fill="none"/>
                         </g>
 
                         <!-- R+1 Chambre : Lit & Lampe de Chevet -->
                         <g id="bedroom-furniture">
-                            <!-- Lit -->
-                            <rect x="710" y="335" width="85" height="25" fill="#38BDF8" fill-opacity="0.5" stroke="#1E293B" stroke-width="2" rx="3"/>
-                            <!-- Tête de lit -->
-                            <rect x="795" y="315" width="8" height="45" fill="#1E293B" rx="1"/>
-                            <!-- Coussins -->
-                            <rect x="765" y="330" width="25" height="12" fill="#FFFFFF" stroke="#1E293B" stroke-width="1.5" rx="2"/>
-                            <!-- Chevet -->
-                            <rect x="815" y="340" width="22" height="20" fill="#CBD5E1" stroke="#1E293B" stroke-width="1.5"/>
-                            <circle cx="826" cy="333" r="5" fill="#F59E0B"/>
+                            <rect x="710" y="305" width="85" height="25" fill="#38BDF8" fill-opacity="0.5" stroke="#1E293B" stroke-width="2" rx="3"/>
+                            <rect x="795" y="285" width="8" height="45" fill="#1E293B" rx="1"/>
+                            <rect x="765" y="300" width="25" height="12" fill="#FFFFFF" stroke="#1E293B" stroke-width="1.5" rx="2"/>
+                            <rect x="815" y="310" width="22" height="20" fill="#CBD5E1" stroke="#1E293B" stroke-width="1.5"/>
+                            <circle cx="826" cy="303" r="5" fill="#F59E0B"/>
                         </g>
 
-                        <!-- RDC Salon : Canapé Convivial, Plante & Lampadaire -->
+                        <!-- RDC Salon : Canapé Convivial, Plante, Lampadaire et OCCUPANT -->
                         <g id="living-furniture">
-                            <!-- Canapé -->
-                            <rect x="460" y="525" width="115" height="45" fill="#FDBA74" stroke="#1E293B" stroke-width="2" rx="4"/>
-                            <rect x="470" y="505" width="95" height="20" fill="#FB923C" stroke="#1E293B" stroke-width="2" rx="3"/>
-                            <rect x="450" y="520" width="15" height="40" fill="#EA580C" stroke="#1E293B" stroke-width="2" rx="2"/>
-                            <rect x="570" y="520" width="15" height="40" fill="#EA580C" stroke="#1E293B" stroke-width="2" rx="2"/>
-                            <!-- Plante verte d'intérieur -->
-                            <path d="M 430 555 L 440 555 L 438 575 L 432 575 Z" fill="#D97706" stroke="#1E293B" stroke-width="1.5"/>
-                            <ellipse cx="435" cy="540" rx="8" ry="14" fill="#65A30D"/>
-                            <ellipse cx="426" cy="545" rx="7" ry="10" fill="#84CC16"/>
-                            <ellipse cx="444" cy="545" rx="7" ry="10" fill="#84CC16"/>
+                            <rect x="470" y="475" width="115" height="45" fill="#FDBA74" stroke="#1E293B" stroke-width="2" rx="4"/>
+                            <rect x="480" y="455" width="95" height="20" fill="#FB923C" stroke="#1E293B" stroke-width="2" rx="3"/>
+                            <rect x="460" y="470" width="15" height="40" fill="#EA580C" stroke="#1E293B" stroke-width="2" rx="2"/>
+                            <rect x="580" y="470" width="15" height="40" fill="#EA580C" stroke="#1E293B" stroke-width="2" rx="2"/>
+                            <!-- Plante verte -->
+                            <path d="M 360 505 L 370 505 L 368 525 L 362 525 Z" fill="#D97706" stroke="#1E293B" stroke-width="1.5"/>
+                            <ellipse cx="365" cy="490" rx="8" ry="14" fill="#65A30D"/>
+                            <ellipse cx="356" cy="495" rx="7" ry="10" fill="#84CC16"/>
+                            <ellipse cx="374" cy="495" rx="7" ry="10" fill="#84CC16"/>
                             <!-- Lampadaire -->
-                            <line x1="595" y1="475" x2="595" y2="575" stroke="#1E293B" stroke-width="2"/>
-                            <polygon points="585,475 605,475 610,495 580,495" fill="#FBBF24" stroke="#1E293B" stroke-width="1.5"/>
+                            <line x1="605" y1="425" x2="605" y2="525" stroke="#1E293B" stroke-width="2"/>
+                            <polygon points="595,425 615,425 620,445 590,445" fill="#FBBF24" stroke="#1E293B" stroke-width="1.5"/>
+                            
+                            <!-- SILHOUETTE VECTORIELLE DE L'OCCUPANT DANS LA MAISON (CLO) -->
+                            <g id="human-occupant" transform="translate(415, 440)">
+                                <circle cx="10" cy="8" r="7.5" fill="#FDBA74" stroke="#1E293B" stroke-width="1.8"/>
+                                <rect x="3" y="17" width="14" height="28" rx="3" fill="#D96B43" stroke="#1E293B" stroke-width="1.8"/>
+                                <path d="M 3 22 L -2 34 M 17 22 L 21 32" stroke="#1E293B" stroke-width="1.8" stroke-linecap="round"/>
+                                <path d="M 6 45 L 6 85 M 14 45 L 14 85" stroke="#1E293B" stroke-width="2.2" stroke-linecap="round"/>
+                            </g>
                         </g>
 
                         <!-- RDC Bureau & Radiateur à Ailettes -->
                         <g id="radiator-heating-group" class="anim-radiator-heating">
-                            <!-- Radiateur émetteur sur mur droit -->
-                            <rect x="860" y="520" width="36" height="50" fill="#FFFFFF" stroke="#1E293B" stroke-width="2" rx="2"/>
-                            <line x1="867" y1="520" x2="867" y2="570" stroke="#94A3B8" stroke-width="2"/>
-                            <line x1="874" y1="520" x2="874" y2="570" stroke="#94A3B8" stroke-width="2"/>
-                            <line x1="881" y1="520" x2="881" y2="570" stroke="#94A3B8" stroke-width="2"/>
-                            <line x1="888" y1="520" x2="888" y2="570" stroke="#94A3B8" stroke-width="2"/>
-                            <!-- Bureau -->
-                            <rect x="670" y="535" width="70" height="6" fill="#1E293B"/>
-                            <line x1="680" y1="541" x2="680" y2="580" stroke="#1E293B" stroke-width="2"/>
-                            <line x1="730" y1="541" x2="730" y2="580" stroke="#1E293B" stroke-width="2"/>
-                            <!-- Chaise de bureau -->
-                            <path d="M 755 530 L 765 530 L 765 550 L 750 550 L 750 580" stroke="#1E293B" stroke-width="2" fill="none"/>
-                            <!-- Lampe suspendue -->
-                            <line x1="705" y1="380" x2="705" y2="440" stroke="#1E293B" stroke-width="1.5"/>
-                            <path d="M 695 440 Q 705 430 715 440 Z" fill="#F59E0B" stroke="#1E293B" stroke-width="1.5"/>
+                            <rect x="860" y="470" width="36" height="50" fill="#FFFFFF" stroke="#1E293B" stroke-width="2" rx="2"/>
+                            <line x1="867" y1="470" x2="867" y2="520" stroke="#94A3B8" stroke-width="2"/>
+                            <line x1="874" y1="470" x2="874" y2="520" stroke="#94A3B8" stroke-width="2"/>
+                            <line x1="881" y1="470" x2="881" y2="520" stroke="#94A3B8" stroke-width="2"/>
+                            <line x1="888" y1="470" x2="888" y2="520" stroke="#94A3B8" stroke-width="2"/>
+                            <rect x="670" y="485" width="70" height="6" fill="#1E293B"/>
+                            <line x1="680" y1="491" x2="680" y2="530" stroke="#1E293B" stroke-width="2"/>
+                            <line x1="730" y1="491" x2="730" y2="530" stroke="#1E293B" stroke-width="2"/>
+                            <path d="M 755 480 L 765 480 L 765 500 L 750 500 L 750 530" stroke="#1E293B" stroke-width="2" fill="none"/>
+                            <line x1="705" y1="350" x2="705" y2="400" stroke="#1E293B" stroke-width="1.5"/>
+                            <path d="M 695 400 Q 705 390 715 400 Z" fill="#F59E0B" stroke="#1E293B" stroke-width="1.5"/>
                         </g>
 
-                        <!-- 7. FLÛX THERMIQUES LASER (COMPATIBILITÉ ENGINE.JS) -->
+                        <!-- 6. FLUX THERMIQUES LASER (ORIGINE SUR LES MURS DU 1ER ÉTAGE R+1) -->
+                        <!-- Flux Fenêtre R+1 (y = 285) -->
                         <g id="flux-laser-ext-group">
-                            <path id="flux-laser-ext-halo" d="M 280 280 L 380 280" stroke="#F59E0B" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
-                            <path id="flux-laser-ext-line" d="M 280 280 L 380 280" stroke="#F59E0B" stroke-width="4" fill="none" class="flow-laser laser-orange" marker-end="url(#mk-laser-orange)"/>
+                            <path id="flux-laser-ext-halo" d="M 270 285 L 375 285" stroke="#F59E0B" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
+                            <path id="flux-laser-ext-line" d="M 270 285 L 375 285" stroke="#F59E0B" stroke-width="4" fill="none" class="flow-laser laser-orange" marker-end="url(#mk-laser-orange)"/>
                         </g>
+                        <!-- Flux Mur Massif R+1 (y = 285) -->
                         <g id="flux-laser-wall-group">
-                            <path id="flux-laser-wall-halo" d="M 906 310 L 820 310" stroke="#F59E0B" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
-                            <path id="flux-laser-wall-line" d="M 906 310 L 820 310" stroke="#F59E0B" stroke-width="4" fill="none" class="flow-laser laser-orange" marker-end="url(#mk-laser-orange)"/>
+                            <path id="flux-laser-wall-halo" d="M 906 285 L 815 285" stroke="#F59E0B" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
+                            <path id="flux-laser-wall-line" d="M 906 285 L 815 285" stroke="#F59E0B" stroke-width="4" fill="none" class="flow-laser laser-orange" marker-end="url(#mk-laser-orange)"/>
                         </g>
 
                     </svg>
                 </div>
 
-                <!-- COUCHE HUD DES CARTES DE DONNÉES EN DIRECT -->
-                
-                <!-- A. CARTOUCHE EXTÉRIEUR (HAUT GAUCHE) -->
-                <div class="absolute top-3 left-3 sm:top-5 sm:left-5 w-44 sm:w-56 crystalline-sheer rounded-2xl p-2.5 sm:p-3 shadow-xl">
-                    <div class="flex items-center justify-between mb-1.5 pb-1 border-b border-white/20">
-                        <span class="text-[10px] sm:text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1 text-crisp">
-                            <span>🌍</span> Extérieur
-                        </span>
-                        <div class="flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-full border border-sky-400/30">
-                            <span id="txt-ext-emoji" class="text-xs">☀️</span>
-                            <span id="txt-ext-label" class="text-[10px] font-bold text-sky-200">--</span>
+                <!-- ============================================================== -->
+                <!-- COUCHE DES ENCARTS HUD : SUPERPOSÉS SUR PC, SOUS LE DESSIN SUR MOBILE -->
+                <!-- ============================================================== -->
+                <div class="hud-mobile-grid">
+                    
+                    <!-- A. CARTOUCHE EXTÉRIEUR (PLACÉ PLUS BAS POUR DÉGAGER LE SOLEIL) -->
+                    <div class="hud-card-responsive md:top-[42%] md:left-[2%] w-full md:w-52 crystalline-sheer rounded-2xl p-2.5 sm:p-3 shadow-xl">
+                        <div class="flex items-center justify-between mb-1.5 pb-1 border-b border-white/20">
+                            <span class="text-[10px] sm:text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1 text-crisp">
+                                <span>🌍</span> Extérieur
+                            </span>
+                            <div class="flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-full border border-sky-400/30">
+                                <span id="txt-ext-emoji" class="text-xs">☀️</span>
+                                <span id="txt-ext-label" class="text-[10px] font-bold text-sky-200">--</span>
+                            </div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="bg-black/30 px-2 py-1 rounded-xl flex items-center justify-between border border-white/10">
+                                <span class="text-[10px] text-slate-200 text-crisp">Température</span>
+                                <strong class="text-sm sm:text-base font-black text-white text-crisp" id="txt-ext-temp">-- °C</strong>
+                            </div>
+                            <div class="grid grid-cols-2 gap-1 text-center">
+                                <div class="bg-black/30 p-1 rounded-lg border border-white/10">
+                                    <span class="text-[8px] text-slate-300 block text-crisp">Humid. Rel.</span>
+                                    <strong class="text-xs font-bold text-sky-200 text-crisp" id="txt-ext-rh">-- %</strong>
+                                </div>
+                                <div class="bg-black/30 p-1 rounded-lg border border-white/10">
+                                    <span class="text-[8px] text-slate-300 block text-crisp">Humid. Abs.</span>
+                                    <strong class="text-xs font-bold text-sky-200 text-crisp" id="txt-ext-ah">-- g/m³</strong>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between text-[10px] bg-sky-950/40 px-2 py-0.5 rounded-lg border border-sky-500/20">
+                                <span class="text-slate-200 text-[9px] text-crisp">🧺 Séchage ext. :</span>
+                                <strong class="text-amber-300 font-extrabold text-[11px] text-crisp" id="txt-ext-drying">--/10</strong>
+                            </div>
                         </div>
                     </div>
-                    <div class="space-y-1">
-                        <div class="bg-black/30 px-2 py-1 rounded-xl flex items-center justify-between border border-white/10">
-                            <span class="text-[10px] text-slate-200 text-crisp">Température</span>
-                            <strong class="text-sm sm:text-base font-black text-white text-crisp" id="txt-ext-temp">-- °C</strong>
+
+                    <!-- B. BATTERIE DES MURS & AUTONOMIE (TOUCHANT LA TOITURE & POINTE 1ER ÉTAGE) -->
+                    <div class="hud-card-responsive md:top-[6%] md:left-[64%] md:-translate-x-1/2 w-full md:max-w-xs hud-glass-amber rounded-2xl p-2.5 sm:p-3 shadow-xl">
+                        <div class="flex items-center justify-between mb-1 pb-1 border-b border-amber-500/30">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-base drop-shadow">🛡️</span>
+                                <span class="text-[10px] font-bold text-amber-200 uppercase tracking-wider text-crisp">Batterie des Murs</span>
+                            </div>
+                            <strong class="text-sm sm:text-base font-black text-amber-300 text-crisp" id="txt-wall-temp">-- °C</strong>
                         </div>
-                        <div class="grid grid-cols-2 gap-1 text-center">
-                            <div class="bg-black/30 p-1 rounded-lg border border-white/10">
+                        <div class="flex items-center justify-between gap-2 mt-1">
+                            <div class="text-left">
+                                <span class="text-[9px] text-slate-200 block text-crisp">Autonomie (~19°C)</span>
+                                <strong class="text-xs sm:text-sm font-black text-sky-300 text-crisp whitespace-nowrap" id="txt-autonomy-val">-- h</strong>
+                            </div>
+                            <div class="w-16 sm:w-20 bg-black/60 h-2 rounded-full overflow-hidden border border-amber-500/30 shrink-0">
+                                <div id="txt-autonomy-bar" class="h-full bg-gradient-to-r from-[#D96B43] to-sky-400 rounded-full transition-all duration-500" style="width: 50%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- C. AIR INTÉRIEUR (CENTRÉ DANS L'HABITAT) -->
+                    <div class="hud-card-responsive md:top-[48%] md:left-[58%] md:-translate-x-1/2 w-full md:w-68 hud-glass-emerald rounded-2xl p-2.5 shadow-2xl text-center">
+                        <div class="flex items-center justify-between mb-1 pb-1 border-b border-emerald-500/20">
+                            <span class="text-[10px] sm:text-[11px] font-black text-emerald-300 flex items-center gap-1 text-crisp">
+                                <span>🌬️</span> Air Intérieur Moyen
+                            </span>
+                            <span id="txt-pmv-badge" class="text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-400/50 text-emerald-200 text-crisp">
+                                Confort Idéal
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1 mb-1.5">
+                            <div class="bg-black/35 p-1 rounded-lg border border-white/10">
+                                <span class="text-[8px] text-slate-300 block text-crisp">T° Air</span>
+                                <strong class="text-xs sm:text-sm font-black text-white text-crisp" id="txt-in-temp">-- °C</strong>
+                            </div>
+                            <div class="bg-black/35 p-1 rounded-lg border border-white/10">
                                 <span class="text-[8px] text-slate-300 block text-crisp">Humid. Rel.</span>
-                                <strong class="text-xs font-bold text-sky-200 text-crisp" id="txt-ext-rh">-- %</strong>
+                                <strong class="text-xs sm:text-sm font-bold text-slate-100 text-crisp" id="txt-in-rh">-- %</strong>
                             </div>
-                            <div class="bg-black/30 p-1 rounded-lg border border-white/10">
+                            <div class="bg-black/35 p-1 rounded-lg border border-white/10">
                                 <span class="text-[8px] text-slate-300 block text-crisp">Humid. Abs.</span>
-                                <strong class="text-xs font-bold text-sky-200 text-crisp" id="txt-ext-ah">-- g/m³</strong>
+                                <strong class="text-xs sm:text-sm font-bold text-sky-200 text-crisp" id="txt-in-ah">-- g/m³</strong>
                             </div>
                         </div>
-                        <div class="flex items-center justify-between text-[10px] bg-sky-950/40 px-2 py-0.5 rounded-lg border border-sky-500/20">
-                            <span class="text-slate-200 text-[9px] text-crisp">🧺 Séchage ext. :</span>
-                            <strong class="text-amber-300 font-extrabold text-[11px] text-crisp" id="txt-ext-drying">--/10</strong>
+                        <div class="flex items-center justify-between text-[10px] bg-black/30 px-2 py-0.5 rounded border border-white/10" id="box-hud-ventilation" title="Conseil d'aération différentielle par humidité absolue">
+                            <span class="text-slate-300 text-[9px] text-crisp">🪟 Aération flash :</span>
+                            <strong class="text-[11px] font-bold text-emerald-300 text-crisp" id="txt-hud-ventilation">--</strong>
                         </div>
+                        <span id="txt-in-drying" style="display: none;">--</span>
                     </div>
-                </div>
 
-                <!-- B. CARTOUCHE BATTERIE DES MURS & AUTONOMIE (HAUT TOITURE) -->
-                <div class="absolute top-3 right-3 sm:top-5 sm:right-6 max-w-[240px] sm:max-w-xs hud-glass-amber rounded-2xl p-2.5 sm:p-3 shadow-xl">
-                    <div class="flex items-center justify-between mb-1 pb-1 border-b border-amber-500/30">
-                        <div class="flex items-center gap-1.5">
-                            <span class="text-base drop-shadow">🛡️</span>
-                            <span class="text-[10px] font-bold text-amber-200 uppercase tracking-wider text-crisp">Batterie des Murs</span>
+                    <!-- D. ENCART CLO & OCCUPANT (DESIGN STYLE BATTERIE DES MURS DANS LE SÉJOUR) -->
+                    <div class="hud-card-responsive md:bottom-[4%] md:left-[43%] md:-translate-x-1/2 w-full md:w-60 hud-glass-amber rounded-2xl p-2.5 sm:p-3 shadow-xl">
+                        <div class="flex items-center justify-between mb-1 pb-1 border-b border-amber-500/30">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-base drop-shadow">🧍</span>
+                                <span class="text-[10px] font-bold text-amber-200 uppercase tracking-wider text-crisp">Tenue de l'Occupant</span>
+                            </div>
+                            <strong class="text-sm font-black text-amber-300 text-crisp"><span id="currentCloValue">1.00</span> Clo</strong>
                         </div>
-                        <strong class="text-sm sm:text-base font-black text-amber-300 text-crisp" id="txt-wall-temp">-- °C</strong>
+                        <div class="text-[10px] text-slate-300 text-crisp mb-1.5 text-center font-medium truncate" id="currentCloDesc">
+                            Chemise & pull
+                        </div>
+                        <div class="flex items-center justify-center gap-1.5 pt-0.5">
+                            <button onclick="adjustClothing(-0.2)" class="bg-black/40 hover:bg-black/60 text-slate-200 border border-white/15 rounded-lg px-2 py-0.5 text-[10px] font-bold cursor-pointer" title="Alléger tenue (-0.2 Clo)">➖ Alléger</button>
+                            <button onclick="adjustClothing(0.2)" class="bg-black/40 hover:bg-black/60 text-slate-200 border border-white/15 rounded-lg px-2 py-0.5 text-[10px] font-bold cursor-pointer" title="Couvrir tenue (+0.2 Clo)">➕ Couvrir</button>
+                            <button onclick="resetClothing()" class="bg-black/40 hover:bg-black/60 text-slate-300 border border-white/15 rounded-lg px-2 py-0.5 text-[10px] cursor-pointer" title="Réinitialiser saison">🔄</button>
+                        </div>
                     </div>
-                    <div class="flex items-center justify-between gap-2 mt-1">
-                        <div class="text-left">
-                            <span class="text-[9px] text-slate-200 block text-crisp">Autonomie (~19°C)</span>
-                            <strong class="text-xs sm:text-sm font-black text-sky-300 text-crisp whitespace-nowrap" id="txt-autonomy-val">-- h</strong>
-                        </div>
-                        <div class="w-16 sm:w-20 bg-black/60 h-2 rounded-full overflow-hidden border border-amber-500/30 shrink-0">
-                            <div id="txt-autonomy-bar" class="h-full bg-gradient-to-r from-[#D96B43] to-sky-400 rounded-full transition-all duration-500" style="width: 50%;"></div>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- C. ÉTIQUETTE DU FLUX DE BAIE VITRÉE -->
-                <div class="absolute top-[38%] left-[28%] sm:left-[30%] -translate-y-1/2 hud-glass-amber border-amber-400/50 px-2 py-0.5 rounded-lg text-center shadow-md">
-                    <span class="text-[8px] sm:text-[9px] text-slate-300 block font-semibold text-crisp" id="txt-flux-ext-tag">☀️ Gain Solaire</span>
-                    <strong class="text-[10px] sm:text-xs font-black text-amber-300 text-crisp" id="txt-flux-ext-val">+0.00 kW</strong>
-                </div>
+                    <!-- ÉTIQUETTES DE FLUX R+1 (SUPERPOSÉES AU 1ER ÉTAGE) -->
+                    <div class="hidden md:block absolute top-[43%] left-[27%] -translate-y-1/2 hud-glass-amber border-amber-400/50 px-2 py-0.5 rounded-lg text-center shadow-md">
+                        <span class="text-[8px] text-slate-300 block font-semibold text-crisp" id="txt-flux-ext-tag">☀️ Gain Solaire</span>
+                        <strong class="text-[10px] font-black text-amber-300 text-crisp" id="txt-flux-ext-val">+0.00 kW</strong>
+                    </div>
 
-                <!-- D. ÉTIQUETTE DU FLUX DES MURS MASSIFS -->
-                <div class="absolute top-[42%] right-[10%] sm:right-[12%] -translate-y-1/2 hud-glass-amber border-amber-400/50 px-2 py-0.5 rounded-lg text-center shadow-md">
-                    <span class="text-[8px] sm:text-[9px] text-slate-300 block font-semibold text-crisp" id="txt-flux-wall-tag">🔥 Restitution</span>
-                    <strong class="text-[10px] sm:text-xs font-black text-amber-300 text-crisp" id="txt-flux-wall-val">+0.00 kW</strong>
-                </div>
+                    <div class="hidden md:block absolute top-[43%] right-[8%] -translate-y-1/2 hud-glass-amber border-amber-400/50 px-2 py-0.5 rounded-lg text-center shadow-md">
+                        <span class="text-[8px] text-slate-300 block font-semibold text-crisp" id="txt-flux-wall-tag">🔥 Restitution</span>
+                        <strong class="text-[10px] font-black text-amber-300 text-crisp" id="txt-flux-wall-val">+0.00 kW</strong>
+                    </div>
 
-                <!-- E. AMBIANCE INTÉRIEURE (AIR & CONFORT PMV) -->
-                <div class="absolute bottom-3 left-[50%] -translate-x-1/2 w-64 sm:w-76 max-w-[92%] hud-glass-emerald rounded-2xl p-2.5 shadow-2xl text-center">
-                    <div class="flex items-center justify-between mb-1 pb-1 border-b border-emerald-500/20">
-                        <span class="text-[10px] sm:text-[11px] font-black text-emerald-300 flex items-center gap-1 text-crisp">
-                            <span>🌬️</span> Air Intérieur Moyen
-                        </span>
-                        <span id="txt-pmv-badge" class="text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-400/50 text-emerald-200 text-crisp">
-                            Confort Idéal
-                        </span>
-                    </div>
-                    <div class="grid grid-cols-3 gap-1 mb-1.5">
-                        <div class="bg-black/35 p-1 rounded-lg border border-white/10">
-                            <span class="text-[8px] text-slate-300 block text-crisp">T° Air</span>
-                            <strong class="text-xs sm:text-sm font-black text-white text-crisp" id="txt-in-temp">-- °C</strong>
-                        </div>
-                        <div class="bg-black/35 p-1 rounded-lg border border-white/10">
-                            <span class="text-[8px] text-slate-300 block text-crisp">Humid. Rel.</span>
-                            <strong class="text-xs sm:text-sm font-bold text-slate-100 text-crisp" id="txt-in-rh">-- %</strong>
-                        </div>
-                        <div class="bg-black/35 p-1 rounded-lg border border-white/10">
-                            <span class="text-[8px] text-slate-300 block text-crisp">Humid. Abs.</span>
-                            <strong class="text-xs sm:text-sm font-bold text-sky-200 text-crisp" id="txt-in-ah">-- g/m³</strong>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between text-[10px] bg-black/30 px-2 py-0.5 rounded border border-white/10" id="box-hud-ventilation" title="Conseil d'aération différentielle par humidité absolue">
-                        <span class="text-slate-300 text-[9px] text-crisp">🪟 Aération flash :</span>
-                        <strong class="text-[11px] font-bold text-emerald-300 text-crisp" id="txt-hud-ventilation">--</strong>
-                    </div>
-                    <!-- Séchage linge intérieur conservé pour la rétrocompatibilité ID -->
-                    <span id="txt-in-drying" style="display: none;">--</span>
                 </div>
 
             </div>
 
-            <!-- 4. BILAN THERMIQUE DU JOUR EN VERSION GRAPHIQUE (BALANCE & HISTOGRAMME EN 3 TEMPS) -->
-            <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-inner flex flex-col gap-3">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
-                    <div class="flex items-center gap-2">
-                        <span class="text-lg">⚡</span>
-                        <h2 class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-slate-200 m-0">
-                            Dynamique du Bilan Thermique du Jour
-                        </h2>
+            <!-- 4. BILAN THERMIQUE DU JOUR : BALANCE DES FLUX & HISTOGRAMME 3 TEMPS CÔTE-À-CÔTE -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+                
+                <!-- COLONNE GAUCHE : BALANCE DES FLUX EN DIRECT (LG:COL-SPAN-5, PLUS COMPACTE) -->
+                <div class="lg:col-span-5 bg-slate-950/90 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-inner flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-1 pb-1 border-b border-slate-800">
+                            <span class="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-1.5">
+                                <span>⚖️</span> Balance des Flux en Direct
+                            </span>
+                            <span class="text-[10px] text-amber-300 font-semibold bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-500/30">
+                                En Direct
+                            </span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 m-0 mb-3">
+                            Rapport instantané entre apports de chaleur et déperditions de l'enveloppe
+                        </p>
                     </div>
-                    <span class="text-[11px] text-slate-400">Énergie nette de l'habitat (Apports − Déperditions)</span>
+
+                    <div class="my-2 bg-slate-900/90 border border-slate-800/80 rounded-xl p-3">
+                        <div class="flex justify-between items-center text-[10px] font-bold mb-1.5">
+                            <span class="text-amber-400">☀️ Apports (+ kW)</span>
+                            <span class="text-sky-400">❄️ Pertes (− kW)</span>
+                        </div>
+                        <div class="thermal-balance-track">
+                            <div id="balance-bar-gain" class="h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-500" style="width: 50%;"></div>
+                            <div id="balance-bar-loss" class="h-full bg-gradient-to-r from-sky-500 to-blue-600 transition-all duration-500" style="width: 50%;"></div>
+                            <div id="balance-needle" class="balance-needle-marker" style="left: 50%;" title="Équilibre du solde instantané"></div>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px] text-slate-400 mt-2">
+                            <span>Stockage</span>
+                            <span class="text-slate-200 font-bold">Solde net : <strong id="txt-kw-flux" class="text-amber-400 font-black">-- kW</strong></span>
+                            <span>Décharge</span>
+                        </div>
+                    </div>
+
+                    <div class="text-[10px] text-slate-400 bg-black/25 p-2 rounded-xl border border-white/5 flex items-center justify-between">
+                        <span>Aiguille blanche :</span>
+                        <span class="font-medium text-slate-300">Solde instantané en direct</span>
+                    </div>
                 </div>
 
-                <!-- Balance Graphique des Flux (Jauge Bicolore avec Pointeur Net) -->
-                <div class="bg-slate-900/90 border border-slate-800/80 rounded-xl p-3">
-                    <div class="flex justify-between items-center text-[11px] font-bold mb-1.5">
-                        <span class="text-amber-400 flex items-center gap-1">☀️ Apports Thermiques (Solaire + Internes)</span>
-                        <span class="text-sky-400 flex items-center gap-1">❄️ Déperditions (Murs + Ventilation)</span>
+                <!-- COLONNE DROITE : HISTOGRAMME & COURBE GRAPHIQUE DES 3 TEMPS DU JOUR (LG:COL-SPAN-7) -->
+                <div class="lg:col-span-7 bg-slate-950/90 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-inner flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-1 pb-1 border-b border-slate-800">
+                            <span class="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-1.5">
+                                <span>📈</span> Trajectoire Thermique du Jour
+                            </span>
+                            <span class="text-[10px] text-slate-400 font-medium">3 étapes : 00h ➔ En direct ➔ 24h</span>
+                        </div>
                     </div>
-                    <div class="thermal-balance-track">
-                        <div id="balance-bar-gain" class="h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-500" style="width: 50%;"></div>
-                        <div id="balance-bar-loss" class="h-full bg-gradient-to-r from-sky-500 to-blue-600 transition-all duration-500" style="width: 50%;"></div>
-                        <div id="balance-needle" class="balance-needle-marker" style="left: 50%;"></div>
+
+                    <!-- Mini Graphique Vectoriel avec Histogramme & Courbe de Tendance -->
+                    <div class="w-full my-2 bg-slate-900/90 border border-slate-800/80 rounded-xl p-2.5">
+                        <svg viewBox="0 0 460 145" class="w-full h-auto select-none" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="gradBarPassed" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#10B981" stop-opacity="0.85"/>
+                                    <stop offset="100%" stop-color="#047857" stop-opacity="0.40"/>
+                                </linearGradient>
+                                <linearGradient id="gradBarFlux" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.85"/>
+                                    <stop offset="100%" stop-color="#D97706" stop-opacity="0.40"/>
+                                </linearGradient>
+                                <linearGradient id="gradBarFinal" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.85"/>
+                                    <stop offset="100%" stop-color="#0284C7" stop-opacity="0.40"/>
+                                </linearGradient>
+                            </defs>
+
+                            <!-- Ligne d'équilibre zéro -->
+                            <line x1="45" y1="72" x2="435" y2="72" stroke="#475569" stroke-width="1.2"/>
+                            <text x="36" y="75" fill="#64748B" font-size="9" text-anchor="end">0</text>
+
+                            <!-- 1. Barre Passé (Cumulé depuis 00h) -->
+                            <g id="chart-bar-passed-group">
+                                <rect id="chart-bar-passed" x="75" y="38" width="48" height="34" rx="4" fill="url(#gradBarPassed)" stroke="#10B981" stroke-width="1.5"/>
+                                <text id="chart-txt-passed" x="99" y="32" fill="#34D399" font-size="11" font-weight="bold" text-anchor="middle">-- kWh</text>
+                                <text x="99" y="92" fill="#94A3B8" font-size="9" font-weight="bold" text-anchor="middle">1. Cumulé</text>
+                                <text x="99" y="103" fill="#64748B" font-size="8" text-anchor="middle">(depuis 00h)</text>
+                            </g>
+
+                            <!-- 2. Barre Direct (Flux instantané) -->
+                            <g id="chart-bar-flux-group">
+                                <rect id="chart-bar-flux" x="206" y="44" width="48" height="28" rx="4" fill="url(#gradBarFlux)" stroke="#F59E0B" stroke-width="1.5"/>
+                                <text id="chart-txt-flux" x="230" y="38" fill="#FBBF24" font-size="11" font-weight="bold" text-anchor="middle">-- kW</text>
+                                <text x="230" y="92" fill="#FCD34D" font-size="9" font-weight="bold" text-anchor="middle">2. En direct</text>
+                                <text x="230" y="103" fill="#B45309" font-size="8" text-anchor="middle">(puissance)</text>
+                            </g>
+
+                            <!-- 3. Barre Atterrissage (Projection 24h) -->
+                            <g id="chart-bar-final-group">
+                                <rect id="chart-bar-final" x="337" y="28" width="48" height="44" rx="4" fill="url(#gradBarFinal)" stroke="#38BDF8" stroke-width="1.5"/>
+                                <text id="chart-txt-final" x="361" y="22" fill="#BAE6FD" font-size="11" font-weight="bold" text-anchor="middle">-- kWh</text>
+                                <text x="361" y="92" fill="#94A3B8" font-size="9" font-weight="bold" text-anchor="middle">3. Ce soir</text>
+                                <text x="361" y="103" fill="#64748B" font-size="8" text-anchor="middle">(projection)</text>
+                            </g>
+
+                            <!-- Courbe Spline de Liaison Visuelle -->
+                            <path id="chart-trend-curve" d="M 99 38 C 160 25, 175 44, 230 44 C 285 44, 300 28, 361 28" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
+                            <circle id="chart-dot-passed" cx="99" cy="38" r="4.5" fill="#10B981" stroke="#FFFFFF" stroke-width="1.5"/>
+                            <circle id="chart-dot-flux" cx="230" cy="44" r="5.5" fill="#F59E0B" stroke="#FFFFFF" stroke-width="2"/>
+                            <circle id="chart-dot-final" cx="361" cy="28" r="4.5" fill="#38BDF8" stroke="#FFFFFF" stroke-width="1.5"/>
+                        </svg>
                     </div>
-                    <div class="flex justify-between items-center text-[10px] text-slate-400 mt-1">
-                        <span>Énergie absorbée / stockée</span>
-                        <span class="font-bold text-slate-300">Solde instantané : <span id="txt-kw-flux" class="text-amber-400 font-extrabold">-- kW</span></span>
-                        <span>Énergie cédée à l'extérieur</span>
+
+                    <!-- Résumé Textuel Chiffré -->
+                    <div class="flex flex-wrap justify-between items-center text-[10px] text-slate-400 border-t border-slate-800/80 pt-1.5 gap-2">
+                        <span>Énergie stockée : <strong id="txt-kwh-passed" class="text-emerald-400 font-bold">-- kWh</strong></span>
+                        <span>Flux direct : <strong id="txt-kw-flux-display" class="text-amber-400 font-bold">-- kW</strong></span>
+                        <span>Projection minuit : <strong id="txt-kwh-final" class="text-white font-bold">-- kWh</strong></span>
                     </div>
                 </div>
 
-                <!-- Histogramme / Progression en 3 Temps (Passé ➔ Direct ➔ 24h) -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    <!-- 1. Passé (Cumulé depuis 00h) -->
-                    <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 text-center flex flex-col justify-between">
-                        <div class="flex items-center justify-center gap-1 text-[11px] text-slate-400 font-semibold mb-1">
-                            <span>⏳</span> 1. Cumulé depuis 00h
-                        </div>
-                        <strong class="text-base sm:text-lg font-black text-emerald-400 block my-0.5" id="txt-kwh-passed">-- kWh</strong>
-                        <span class="text-[10px] text-slate-500 block">Énergie nette emmagasinée</span>
-                    </div>
-
-                    <!-- 2. Direct (Puissance instantanée) -->
-                    <div class="bg-amber-950/20 border border-amber-500/40 rounded-xl p-2.5 text-center flex flex-col justify-between shadow-sm">
-                        <div class="flex items-center justify-center gap-1 text-[11px] text-amber-300 font-bold mb-1">
-                            <span>⚡</span> 2. En direct (Puissance)
-                        </div>
-                        <strong class="text-base sm:text-lg font-black text-amber-400 block my-0.5" id="txt-kw-flux-display">-- kW</strong>
-                        <span class="text-[10px] text-amber-300/80 block">Flux thermique actuel</span>
-                    </div>
-
-                    <!-- 3. Projection (Atterrissage à 24h) -->
-                    <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 text-center flex flex-col justify-between">
-                        <div class="flex items-center justify-center gap-1 text-[11px] text-slate-400 font-semibold mb-1">
-                            <span>🎯</span> 3. Estimé ce soir (24h)
-                        </div>
-                        <strong class="text-base sm:text-lg font-black text-white block my-0.5" id="txt-kwh-final">-- kWh</strong>
-                        <span class="text-[10px] text-slate-500 block">Projection fin de journée</span>
-                    </div>
-                </div>
             </div>
 
             <!-- 5. SYNTHÈSE EN MOTS SIMPLES (ASSISTANT SOLSTICE) -->
@@ -580,13 +623,11 @@
                     </div>
 
                     <div class="flex items-center gap-2">
-                        <!-- Sélecteurs Tout cocher / Tout décocher -->
                         <div class="flex gap-1.5">
                             <button onclick="toggleAllRooms(true)" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs px-2.5 py-1 rounded-lg font-semibold cursor-pointer">Tout cocher</button>
                             <button onclick="toggleAllRooms(false)" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs px-2.5 py-1 rounded-lg font-semibold cursor-pointer">Tout décocher</button>
                         </div>
 
-                        <!-- Commutateur de Vue Cartes / Tableau -->
                         <div class="view-mode-toggle ml-1">
                             <button id="btn-view-cards" onclick="setDashboardViewMode('cards')" class="view-mode-btn active" title="Vue Cartes (optimisée téléphone)">📱 Cartes</button>
                             <button id="btn-view-table" onclick="setDashboardViewMode('table')" class="view-mode-btn" title="Vue Tableau (synthétique)">📊 Tableau</button>
@@ -594,7 +635,7 @@
                     </div>
                 </div>
 
-                <!-- Conteneur des Chips de Pièces (généré par engine.js) -->
+                <!-- Chips des Pièces -->
                 <div id="room-checkboxes" class="flex flex-wrap gap-2 pt-1"></div>
             </div>
 
@@ -621,14 +662,13 @@
                 </table>
             </div>
 
-            <!-- Grille alternative pour fallback éventuel -->
             <div id="dashboard-grid" style="display: none;"></div>
 
         </section>
 
     </main>
 
-    <!-- Pied de Page Minimaliste -->
+    <!-- Pied de Page -->
     <footer style="text-align: center; padding: 18px; font-size: 0.8rem; color: #94A3B8; border-top: 1px solid #E2E8F0; margin-top: 24px;">
         <p style="margin: 0;">Solstice Engine v3.5 • Modélisation ISO 7730 / ASHRAE 55 • Suivi Thera-Aéraulique</p>
     </footer>
@@ -639,6 +679,31 @@
         function voirToutesLesRecommandations() {
             sessionStorage.setItem('currentZoneId', 'all');
             window.location.href = 'reco.html';
+        }
+
+        // Bascule de la saisie de ville
+        function toggleCityInput(forceOpen) {
+            const group = document.getElementById('city-input-group');
+            if (!group) return;
+            if (forceOpen === undefined) {
+                group.classList.toggle('hidden');
+                group.classList.toggle('flex');
+            } else if (forceOpen) {
+                group.classList.remove('hidden');
+                group.classList.add('flex');
+            } else {
+                group.classList.add('hidden');
+                group.classList.remove('flex');
+            }
+            if (!group.classList.contains('hidden')) {
+                const input = document.getElementById('location');
+                if (input) input.focus();
+            }
+        }
+
+        function validerNouvelleVille() {
+            rechercherMeteo();
+            toggleCityInput(false);
         }
 
         // Bascule de Mode d'Affichage Pièces (Cartes vs Tableau)
@@ -660,13 +725,11 @@
             }
         }
 
-        // Détection et initialisation du mode d'affichage préféré
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof updateHeatingSeasonDisplay === 'function') {
                 updateHeatingSeasonDisplay();
             }
 
-            // Sur smartphone, mode cartes par défaut ; sur grand écran (>768px), préférence utilisateur ou tableau
             const savedMode = localStorage.getItem('SOLSTICE_VIEW_MODE');
             if (savedMode) {
                 setDashboardViewMode(savedMode);

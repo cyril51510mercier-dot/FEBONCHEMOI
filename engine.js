@@ -2339,18 +2339,60 @@ function actualiserCockpitGlobal() {
         needle.style.left = `${gainPct}%`;
     }
 
-    // Mise à jour des flèches d'aération naturelle et du radiateur dans le SVG
-    const airflowArrows = document.getElementById('natural-ventilation-arrows');
-    if (airflowArrows) {
-        if (deltaAhGlobal >= 0.5 && metrics.avgRH > 58) {
-            airflowArrows.style.opacity = '1';
-            airflowArrows.style.filter = 'drop-shadow(0 0 8px rgba(249, 115, 22, 0.7))';
-        } else if (deltaAhGlobal < 0.2 && metrics.avgRH >= 58) {
-            airflowArrows.style.opacity = '0.2';
-            airflowArrows.style.filter = 'none';
-        } else {
-            airflowArrows.style.opacity = '0.7';
-            airflowArrows.style.filter = 'none';
+    // Mise à jour de l'Histogramme & Courbe Graphique des 3 Temps (SVG)
+    const elBarPassed = document.getElementById('chart-bar-passed');
+    const elTxtPassed = document.getElementById('chart-txt-passed');
+    const elDotPassed = document.getElementById('chart-dot-passed');
+    const elBarFlux = document.getElementById('chart-bar-flux');
+    const elTxtFlux = document.getElementById('chart-txt-flux');
+    const elDotFlux = document.getElementById('chart-dot-flux');
+    const elBarFinal = document.getElementById('chart-bar-final');
+    const elTxtFinal = document.getElementById('chart-txt-final');
+    const elDotFinal = document.getElementById('chart-dot-final');
+    const elTrendCurve = document.getElementById('chart-trend-curve');
+
+    if (elBarPassed && elBarFlux && elBarFinal) {
+        // Hauteurs et positions Y basées sur la ligne médiane à y=72
+        const hP = Math.min(48, Math.max(8, Math.round(Math.abs(valPasse) * 2.5)));
+        const yP = valPasse >= 0 ? (72 - hP) : 72;
+        const dotYP = valPasse >= 0 ? (72 - hP) : (72 + hP);
+
+        const hF = Math.min(48, Math.max(8, Math.round(Math.abs(valFlux) * 12)));
+        const yF = valFlux >= 0 ? (72 - hF) : 72;
+        const dotYF = valFlux >= 0 ? (72 - hF) : (72 + hF);
+
+        const hFin = Math.min(48, Math.max(8, Math.round(Math.abs(valFinal) * 2.5)));
+        const yFin = valFinal >= 0 ? (72 - hFin) : 72;
+        const dotYFin = valFinal >= 0 ? (72 - hFin) : (72 + hFin);
+
+        elBarPassed.setAttribute('y', yP);
+        elBarPassed.setAttribute('height', hP);
+        if (elTxtPassed) {
+            const signP = valPasse > 0 ? '+' : '';
+            elTxtPassed.textContent = `${signP}${valPasse.toFixed(1)} kWh`;
+            elTxtPassed.setAttribute('y', Math.max(16, yP - 5));
+        }
+        if (elDotPassed) elDotPassed.setAttribute('cy', dotYP);
+
+        elBarFlux.setAttribute('y', yF);
+        elBarFlux.setAttribute('height', hF);
+        if (elTxtFlux) {
+            elTxtFlux.textContent = fluxFormatted;
+            elTxtFlux.setAttribute('y', Math.max(16, yF - 5));
+        }
+        if (elDotFlux) elDotFlux.setAttribute('cy', dotYF);
+
+        elBarFinal.setAttribute('y', yFin);
+        elBarFinal.setAttribute('height', hFin);
+        if (elTxtFinal) {
+            const signFin = valFinal > 0 ? '+' : '';
+            elTxtFinal.textContent = `${signFin}${valFinal.toFixed(1)} kWh`;
+            elTxtFinal.setAttribute('y', Math.max(16, yFin - 5));
+        }
+        if (elDotFinal) elDotFinal.setAttribute('cy', dotYFin);
+
+        if (elTrendCurve) {
+            elTrendCurve.setAttribute('d', `M 99 ${dotYP} C 160 ${dotYP}, 175 ${dotYF}, 230 ${dotYF} C 285 ${dotYF}, 300 ${dotYFin}, 361 ${dotYFin}`);
         }
     }
 
