@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (locRh !== null && !isNaN(parseFloat(locRh))) rhExt = parseFloat(locRh);
             if (localStorage.getItem('sunshineStatus')) sunStatus = localStorage.getItem('sunshineStatus');
 
-            // 4. Scan Data __ENV__
+            // 4. Scan Data __ENV__ et détection directe in situ
             const scanData = (store.getScanData && store.getScanData()) || {};
             if (scanData['__ENV__']) {
                 const env = scanData['__ENV__'];
@@ -57,10 +57,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (env.sunshineStatus) sunStatus = env.sunshineStatus;
             }
 
+            let gardenT = null, gardenRh = null, streetT = null, streetRh = null;
+            for (const [nom, d] of Object.entries(scanData)) {
+                if (nom === '__ENV__' || nom === '__BUFFER_TOGGLE__') continue;
+                const low = nom.toLowerCase();
+                if ((low.includes('jardin') || low.includes('gouttiere') || low.includes('gouttière')) && d && typeof d.ta === 'number' && !isNaN(d.ta)) {
+                    gardenT = d.ta;
+                    gardenRh = d.rh;
+                }
+                if ((low.includes('rue') || low.includes('appui') || low.includes('fenetre rue') || low.includes('fenêtre rue')) && d && typeof d.ta === 'number' && !isNaN(d.ta)) {
+                    streetT = d.ta;
+                    streetRh = d.rh;
+                }
+            }
+
+            if (gardenT !== null) {
+                tExt = gardenT;
+                if (gardenRh !== null) rhExt = gardenRh;
+            }
+
+            let deltaTSun = 0;
+            if (gardenT !== null && streetT !== null) {
+                deltaTSun = parseFloat((streetT - gardenT).toFixed(1));
+                if (deltaTSun >= 1.5) sunStatus = 'clear';
+            }
+
             return {
                 t_ext: tExt,
                 rh_ext: rhExt,
                 sun_status: sunStatus,
+                delta_t_sun: deltaTSun,
+                t_ext_garden: gardenT,
+                t_ext_street: streetT,
                 t_ext_max: tExt + 3,
                 t_ext_min: tExt - 5
             };

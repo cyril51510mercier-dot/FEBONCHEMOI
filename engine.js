@@ -288,13 +288,95 @@ function getZoneConfigByName(roomName) {
 }
 
 function isOutdoorZone(nomPiece, zoneConfig) {
-    if (nomPiece && (nomPiece.toLowerCase().includes('extér') || nomPiece.toLowerCase().includes('exter'))) {
-        return true;
+    if (nomPiece) {
+        const low = nomPiece.toLowerCase();
+        if (low.includes('extér') || low.includes('exter') || low.includes('jardin') || low.includes('rue') || low.includes('goutti') || low.includes('appui')) {
+            return true;
+        }
     }
     if (zoneConfig && Array.isArray(zoneConfig.usages) && zoneConfig.usages.includes('outdoor')) {
         return true;
     }
     return false;
+}
+
+// ------------------------------------------------------------
+// CAPTEURS EXTÉRIEURS IN SITU : JARDIN (OMBREGÉ/AIR) & RUE (ENSOLEILLÉ)
+// ------------------------------------------------------------
+function getOutdoorGardenSensor() {
+    for (const [nom, data] of Object.entries(DONNEES_HABITAT || {})) {
+        if (nom === '__ENV__' || nom === '__BUFFER_TOGGLE__') continue;
+        const low = nom.toLowerCase();
+        if ((low.includes('jardin') || low.includes('gouttiere') || low.includes('gouttière')) && data && typeof data.ta === 'number' && !isNaN(data.ta)) {
+            return { name: nom, ta: data.ta, rh: data.rh, data };
+        }
+    }
+    const cfg = GLOBAL_HOUSE_CONFIG.zones || GLOBAL_HOUSE_CONFIG || {};
+    for (const [k, z] of Object.entries(cfg)) {
+        if (!z) continue;
+        const low = ((z.name || '') + ' ' + (z.id || '') + ' ' + (z.sensorName || '')).toLowerCase();
+        if (low.includes('jardin') || low.includes('gouttiere') || low.includes('gouttière')) {
+            const roomName = z.name || z.nom || k;
+            const data = DONNEES_HABITAT[roomName];
+            if (data && typeof data.ta === 'number' && !isNaN(data.ta)) {
+                return { name: roomName, ta: data.ta, rh: data.rh, data };
+            }
+        }
+    }
+    for (const [nom, data] of Object.entries(DONNEES_HABITAT || {})) {
+        if (nom === '__ENV__' || nom === '__BUFFER_TOGGLE__') continue;
+        const low = nom.toLowerCase();
+        if ((low.includes('extér') || low.includes('exter')) && !low.includes('rue') && !low.includes('appui') && data && typeof data.ta === 'number' && !isNaN(data.ta)) {
+            return { name: nom, ta: data.ta, rh: data.rh, data };
+        }
+    }
+    return null;
+}
+
+function getOutdoorStreetSensor() {
+    for (const [nom, data] of Object.entries(DONNEES_HABITAT || {})) {
+        if (nom === '__ENV__' || nom === '__BUFFER_TOGGLE__') continue;
+        const low = nom.toLowerCase();
+        if ((low.includes('rue') || low.includes('appui') || low.includes('fenetre rue') || low.includes('fenêtre rue')) && data && typeof data.ta === 'number' && !isNaN(data.ta)) {
+            return { name: nom, ta: data.ta, rh: data.rh, data };
+        }
+    }
+    const cfg = GLOBAL_HOUSE_CONFIG.zones || GLOBAL_HOUSE_CONFIG || {};
+    for (const [k, z] of Object.entries(cfg)) {
+        if (!z) continue;
+        const low = ((z.name || '') + ' ' + (z.id || '') + ' ' + (z.sensorName || '')).toLowerCase();
+        if (low.includes('rue') || low.includes('appui') || low.includes('fenetre rue') || low.includes('fenêtre rue')) {
+            const roomName = z.name || z.nom || k;
+            const data = DONNEES_HABITAT[roomName];
+            if (data && typeof data.ta === 'number' && !isNaN(data.ta)) {
+                return { name: roomName, ta: data.ta, rh: data.rh, data };
+            }
+        }
+    }
+    return null;
+}
+
+function getEffectiveOutdoorAir() {
+    const garden = getOutdoorGardenSensor();
+    const street = getOutdoorStreetSensor();
+
+    const tAir = (garden && typeof garden.ta === 'number') ? garden.ta : outdoorTemp;
+    const rhAir = (garden && typeof garden.rh === 'number') ? garden.rh : outdoorHumidity;
+    const ahAir = calculateAbsoluteHumidity(tAir, rhAir);
+
+    const deltaSun = (street && garden) ? parseFloat((street.ta - garden.ta).toFixed(1)) : 0;
+    const hasDirectSun = deltaSun >= 1.5;
+
+    return {
+        tAir,
+        rhAir,
+        ahAir,
+        gardenSensor: garden,
+        streetSensor: street,
+        deltaSun,
+        hasDirectSun,
+        source: garden ? 'in_situ' : 'api'
+    };
 }
 
 function isBufferZone(nomPiece, zoneConfig) {
@@ -527,7 +609,10 @@ function getRoomMetric(nomPiece, colIndex) {
     if (colIndex === 5) return isOutdoor ? -999 : calculatePMV(ta, tr, vel, rh, met, totalClo);
     if (colIndex === 6) return isOutdoor ? -999 : calculateDailyThermalBalance(zoneConfig, ta).bilanNetkWh;
     if (colIndex === 7) return isOutdoor ? -999 : ta;
-    if (colIndex === 8) return calculateDryingPotential(ta, rh, vel).dryingIndex;
+    if (colIndex === 8) {
+        const effectiveVel = isOutdoor ? ((outdoorWind || 0) / 3.6) : vel;
+        return parseFloat(calculateDryingPotential(ta, rh, effectiveVel).score10);
+    }
 
     return 0;
 }
@@ -893,8 +978,10 @@ function hasOpenableWindows(zoneConfig) {
 function calculateDifferentialVentilation(zoneConfig, roomData, envData) {
     const ta = (roomData && roomData.ta !== undefined) ? roomData.ta : 20;
     const rh = (roomData && roomData.rh !== undefined) ? roomData.rh : 50;
-    const tExt = (envData && envData.t_ext !== undefined) ? envData.t_ext : (outdoorTemp ?? 15);
-    const rhExt = (envData && envData.rh_ext !== undefined) ? envData.rh_ext : (outdoorHumidity ?? 60);
+
+    const effOutdoor = getEffectiveOutdoorAir();
+    const tExt = (envData && typeof envData.t_ext === 'number') ? envData.t_ext : effOutdoor.tAir;
+    const rhExt = (envData && typeof envData.rh_ext === 'number') ? envData.rh_ext : effOutdoor.rhAir;
 
     const ahInt = calculateAbsoluteHumidity(ta, rh);
     const ahExt = calculateAbsoluteHumidity(tExt, rhExt);
@@ -1301,14 +1388,17 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     let depKw = 0;
     let gainsConductionKw = 0;
 
-    if (ta > outdoorTemp) {
-        depKw = (hTotal * (ta - outdoorTemp)) / 1000;
+    const effOutdoor = getEffectiveOutdoorAir();
+    const tExtRef = effOutdoor.tAir;
+
+    if (ta > tExtRef) {
+        depKw = (hTotal * (ta - tExtRef)) / 1000;
     } else {
-        gainsConductionKw = (hTotal * (outdoorTemp - ta)) / 1000;
+        gainsConductionKw = (hTotal * (tExtRef - ta)) / 1000;
     }
 
     let gainsSolairesKw = 0;
-    const isSunnyInstant = sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun');
+    const isSunnyInstant = sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun') || effOutdoor.hasDirectSun;
 
     const glassMap = { 'single': 0.85, 'double_old': 0.75, 'double_standard': 0.68, 'double_recent': 0.60, 'triple': 0.45 };
     const maskMap = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 };
@@ -1842,8 +1932,9 @@ function calculateGlobalHabitatMetrics() {
     if (totalVolume === 0) return null;
     const avgTau = weightedTau / totalVolume;
 
+    const effOutdoor = getEffectiveOutdoorAir();
     const velExt = (outdoorWind || 0) / 3.6;
-    const dryingOutdoor = calculateDryingPotential(outdoorTemp, outdoorHumidity, velExt);
+    const dryingOutdoor = calculateDryingPotential(effOutdoor.tAir, effOutdoor.rhAir, velExt);
 
     const avgDryingIndoorIndex = weightedDryingIndex / totalVolume;
     const indoorDryingScore10 = (Math.min(100, Math.max(0, Math.round((avgDryingIndoorIndex / 1.8) * 100))) / 10).toFixed(1);
@@ -1922,14 +2013,24 @@ function mettreAJourTuile(nomPiece) {
             pmvBadge.style.color = "#64748B";
         }
 
+        const isStreet = nomPiece.toLowerCase().includes('rue') || nomPiece.toLowerCase().includes('appui');
+        const isGarden = nomPiece.toLowerCase().includes('jardin') || nomPiece.toLowerCase().includes('goutti');
+
         const actionElOutdoor = document.getElementById('action-' + idCapteur);
         if (actionElOutdoor) {
-            actionElOutdoor.innerHTML = `<span style="color: #94A3B8; font-size: 0.75rem; font-weight: 500;">Extérieur</span>`;
+            if (isGarden) {
+                actionElOutdoor.innerHTML = `<span style="background: #F0FDF4; border: 1px solid #BBF7D0; color: #166534; font-size: 0.72rem; padding: 2px 7px; border-radius: 6px; font-weight: 700; display: inline-flex; align-items: center; gap: 3px;" title="Sonde d'air de référence in situ (Jardin / ombre)"><span>🌿</span><span>Réf. Air</span></span>`;
+            } else if (isStreet) {
+                actionElOutdoor.innerHTML = `<span style="background: #FFFBEB; border: 1px solid #FDE68A; color: #B45309; font-size: 0.72rem; padding: 2px 7px; border-radius: 6px; font-weight: 700; display: inline-flex; align-items: center; gap: 3px;" title="Sonde de façade exposée au soleil direct (Rue / appui)"><span>☀️</span><span>Réf. Soleil</span></span>`;
+            } else {
+                actionElOutdoor.innerHTML = `<span style="color: #94A3B8; font-size: 0.75rem; font-weight: 500;">Extérieur</span>`;
+            }
         }
 
-        const velExt = outdoorWind / 3.6;
+        const velExt = (outdoorWind || 0) / 3.6;
         const dryingExt = calculateDryingPotential(currentTa, currentRh, velExt);
         if (dryingEl) {
+            const locName = isStreet ? "Côté Rue (au soleil)" : (isGarden ? "Au Jardin (ombragé)" : "Extérieur");
             dryingEl.innerHTML = `
                 <div style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
                     <span style="font-weight: 700; color: ${dryingExt.color};">${dryingExt.score10}/10</span>
@@ -1938,7 +2039,7 @@ function mettreAJourTuile(nomPiece) {
                     </div>
                 </div>
             `;
-            dryingEl.title = `${dryingExt.status} (${dryingExt.scorePercent}%) - VPD: ${dryingExt.vpdkPa} kPa`;
+            dryingEl.title = `Séchage ${locName} : ${dryingExt.status} (${dryingExt.scorePercent}%) - VPD: ${dryingExt.vpdkPa} kPa`;
         }
         return;
     }
@@ -2055,30 +2156,57 @@ function actualiserCockpitGlobal() {
     // ============================================================
     // 1. EXTÉRIEUR (Données réelles et Ciel SVG)
     // ============================================================
-    const extTemp = outdoorTemp;
-    const extRh = outdoorHumidity;
-    const extAh = calculateAbsoluteHumidity(extTemp, extRh);
+    const effOutdoor = getEffectiveOutdoorAir();
+    const extTemp = effOutdoor.tAir;
+    const extRh = effOutdoor.rhAir;
+    const extAh = effOutdoor.ahAir;
     const extDrying = metrics.outdoorDryingScore10;
 
     const sunriseH = window.solsticeEphemeris?.sunriseHour || 7;
     const sunsetH = window.solsticeEphemeris?.sunsetHour || 19;
     const isNight = currentH < sunriseH || currentH >= sunsetH;
-    const isSunny = (sunshineStatus || '').toLowerCase().includes('clear') || (sunshineStatus || '').toLowerCase().includes('sun');
+    let isSunny = (sunshineStatus || '').toLowerCase().includes('clear') || (sunshineStatus || '').toLowerCase().includes('sun');
+    if (effOutdoor.hasDirectSun && !isNight) {
+        isSunny = true;
+    }
 
     let extEmoji = isNight ? '🌙' : (isSunny ? '☀️' : '⛅');
     let extLabel = isNight ? 'Nuit' : (isSunny ? 'Ensoleillé' : (sunshineStatus || 'Variable'));
     if ((sunshineStatus || '').toLowerCase().includes('rain')) { extEmoji = '🌧️'; extLabel = 'Pluie'; }
     if ((sunshineStatus || '').toLowerCase().includes('snow')) { extEmoji = '❄️'; extLabel = 'Neige'; }
+    if (effOutdoor.hasDirectSun && !isNight) {
+        extLabel = `Soleil in situ (+${effOutdoor.deltaSun.toFixed(1)}°C)`;
+    } else if (effOutdoor.gardenSensor) {
+        extLabel = `${extLabel} (in situ)`;
+    }
 
     // Rendu Carte Extérieur
     const txtExtTemp = document.getElementById('txt-ext-temp');
-    if (txtExtTemp) txtExtTemp.textContent = `${extTemp.toFixed(1)} °C`;
+    if (txtExtTemp) {
+        txtExtTemp.textContent = `${extTemp.toFixed(1)} °C`;
+        if (effOutdoor.gardenSensor) {
+            let tooltip = `🌿 Air Jardin (référence in situ) : ${extTemp.toFixed(1)} °C | HR ${extRh.toFixed(0)}% (${extAh.toFixed(1)} g/m³) [Réf. Air & Séchage]`;
+            if (effOutdoor.streetSensor) {
+                tooltip += `\n☀️ Façade Rue (ensoleillée) : ${effOutdoor.streetSensor.ta.toFixed(1)} °C | HR ${effOutdoor.streetSensor.rh.toFixed(0)}% (ΔT soleil : +${effOutdoor.deltaSun.toFixed(1)} °C)`;
+            }
+            txtExtTemp.parentElement.title = tooltip;
+            txtExtTemp.title = tooltip;
+        }
+    }
     const txtExtRh = document.getElementById('txt-ext-rh');
-    if (txtExtRh) txtExtRh.textContent = `${extRh}%`;
+    if (txtExtRh) txtExtRh.textContent = `${extRh.toFixed(0)} %`;
     const txtExtAh = document.getElementById('txt-ext-ah');
     if (txtExtAh) txtExtAh.textContent = `${extAh.toFixed(1)} g/m³`;
     const txtExtDrying = document.getElementById('txt-ext-drying');
-    if (txtExtDrying) txtExtDrying.textContent = `${extDrying}/10`;
+    if (txtExtDrying) {
+        txtExtDrying.textContent = `${extDrying}/10`;
+        let dryingTooltip = `Séchage extérieur au Jardin : ${extDrying}/10`;
+        if (effOutdoor.streetSensor) {
+            const dryingStreet = calculateDryingPotential(effOutdoor.streetSensor.ta, effOutdoor.streetSensor.rh, (outdoorWind || 0) / 3.6);
+            dryingTooltip += `\nSéchage Côté Rue (au soleil) : ${dryingStreet.score10}/10 (${dryingStreet.status})`;
+        }
+        txtExtDrying.parentElement.title = dryingTooltip;
+    }
     const txtExtEmoji = document.getElementById('txt-ext-emoji');
     if (txtExtEmoji) txtExtEmoji.textContent = extEmoji;
     const txtExtLabel = document.getElementById('txt-ext-label');
@@ -2784,8 +2912,20 @@ window.synchroniserTouteLaMaison = async function(event) {
             }
         }
 
+        const effOutdoorScan = getEffectiveOutdoorAir();
         DONNEES_HABITAT['__ENV__'] = {
-            outdoorTemp, outdoorHumidity, outdoorWind, sunshineStatus, hourlyExtForecast: window.hourlyExtForecast
+            outdoorTemp: effOutdoorScan.tAir,
+            outdoorHumidity: effOutdoorScan.rhAir,
+            outdoorWind,
+            sunshineStatus: effOutdoorScan.hasDirectSun ? 'Clear' : sunshineStatus,
+            hourlyExtForecast: window.hourlyExtForecast,
+            t_ext_garden: effOutdoorScan.gardenSensor?.ta,
+            rh_ext_garden: effOutdoorScan.gardenSensor?.rh,
+            t_ext_street: effOutdoorScan.streetSensor?.ta,
+            rh_ext_street: effOutdoorScan.streetSensor?.rh,
+            delta_t_sun: effOutdoorScan.deltaSun,
+            has_direct_sun: effOutdoorScan.hasDirectSun,
+            source: effOutdoorScan.source
         };
         DONNEES_HABITAT['__BUFFER_TOGGLE__'] = includeBufferZones;
 
@@ -2826,16 +2966,24 @@ window.voirRecommandations = function(nomPiece) {
     sessionStorage.setItem('calculatedPMV', pmv);
     sessionStorage.setItem('indoorAirTemp', DONNEES_HABITAT[nomPiece].ta);
     sessionStorage.setItem('indoorHumidity', DONNEES_HABITAT[nomPiece].rh);
-    sessionStorage.setItem('outdoorTemp', outdoorTemp);
-    sessionStorage.setItem('outdoorHumidity', outdoorHumidity);
-    sessionStorage.setItem('sunshineStatus', sunshineStatus);
+    const effOutdoorRec = getEffectiveOutdoorAir();
+    sessionStorage.setItem('outdoorTemp', effOutdoorRec.tAir);
+    sessionStorage.setItem('outdoorHumidity', effOutdoorRec.rhAir);
+    sessionStorage.setItem('sunshineStatus', effOutdoorRec.hasDirectSun ? 'Clear' : sunshineStatus);
 
     const envPayload = {
-        t_ext: outdoorTemp,
-        rh_ext: outdoorHumidity,
-        sun_status: sunshineStatus,
+        t_ext: effOutdoorRec.tAir,
+        rh_ext: effOutdoorRec.rhAir,
+        sun_status: effOutdoorRec.hasDirectSun ? 'Clear' : sunshineStatus,
         wind_speed: outdoorWind,
-        p_ext: outdoorPressure
+        p_ext: outdoorPressure,
+        t_ext_garden: effOutdoorRec.gardenSensor?.ta,
+        rh_ext_garden: effOutdoorRec.gardenSensor?.rh,
+        t_ext_street: effOutdoorRec.streetSensor?.ta,
+        rh_ext_street: effOutdoorRec.streetSensor?.rh,
+        delta_t_sun: effOutdoorRec.deltaSun,
+        has_direct_sun: effOutdoorRec.hasDirectSun,
+        source: effOutdoorRec.source
     };
     localStorage.setItem('SOLSTICE_ENV_DATA', JSON.stringify(envPayload));
 
