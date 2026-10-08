@@ -365,7 +365,29 @@ function getEffectiveOutdoorAir() {
     const ahAir = calculateAbsoluteHumidity(tAir, rhAir);
 
     const deltaSun = (street && garden) ? parseFloat((street.ta - garden.ta).toFixed(1)) : 0;
-    const hasDirectSun = deltaSun >= 1.5;
+    
+    // Qualification physique de l'éclairage selon l'écart Rue - Jardin :
+    // - Faible (< 0.8 °C) : Ciel couvert / nuages denses
+    // - Modéré (0.8 à 2.4 °C) : Éclairage diffus / ciel voilé / nuages légers
+    // - Fort (>= 2.5 °C) : Soleil direct franc
+    let sunNature = 'couvert';
+    let sunFactor = 0.15;
+    if (deltaSun >= 2.5) {
+        sunNature = 'direct';
+        sunFactor = 1.0;
+    } else if (deltaSun >= 0.8) {
+        sunNature = 'diffus';
+        sunFactor = 0.45;
+    } else {
+        const isSunnyApi = (sunshineStatus || '').toLowerCase().includes('clear') || (sunshineStatus || '').toLowerCase().includes('sun');
+        if (isSunnyApi) {
+            sunNature = 'diffus';
+            sunFactor = 0.40;
+        }
+    }
+
+    const hasDirectSun = sunNature === 'direct';
+    const hasDiffuseSun = sunNature === 'diffus' || sunNature === 'direct';
 
     return {
         tAir,
@@ -374,7 +396,10 @@ function getEffectiveOutdoorAir() {
         gardenSensor: garden,
         streetSensor: street,
         deltaSun,
+        sunNature,
+        sunFactor,
         hasDirectSun,
+        hasDiffuseSun,
         source: garden ? 'in_situ' : 'api'
     };
 }
@@ -1398,7 +1423,8 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     }
 
     let gainsSolairesKw = 0;
-    const isSunnyInstant = sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun') || effOutdoor.hasDirectSun;
+    const isSunnyInstant = effOutdoor.hasDiffuseSun;
+    const sunModulation = effOutdoor.sunFactor;
 
     const glassMap = { 'single': 0.85, 'double_old': 0.75, 'double_standard': 0.68, 'double_recent': 0.60, 'triple': 0.45 };
     const maskMap = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 };
@@ -1422,7 +1448,7 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
             orients.forEach(o => { sumI += (orientMap[o] || 1.5); });
             let iSolar = orients.length > 0 ? (sumI / orients.length) : 1.5;
 
-            gainsSolairesKw += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 12));
+            gainsSolairesKw += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 12) * sunModulation);
         });
     }
 
@@ -1934,7 +1960,9 @@ function calculateGlobalHabitatMetrics() {
 
     const effOutdoor = getEffectiveOutdoorAir();
     const velExt = (outdoorWind || 0) / 3.6;
-    const dryingOutdoor = calculateDryingPotential(effOutdoor.tAir, effOutdoor.rhAir, velExt);
+    const tDryingExt = (effOutdoor.streetSensor && typeof effOutdoor.streetSensor.ta === 'number') ? effOutdoor.streetSensor.ta : effOutdoor.tAir;
+    const rhDryingExt = (effOutdoor.streetSensor && typeof effOutdoor.streetSensor.rh === 'number') ? effOutdoor.streetSensor.rh : effOutdoor.rhAir;
+    const dryingOutdoor = calculateDryingPotential(tDryingExt, rhDryingExt, velExt);
 
     const avgDryingIndoorIndex = weightedDryingIndex / totalVolume;
     const indoorDryingScore10 = (Math.min(100, Math.max(0, Math.round((avgDryingIndoorIndex / 1.8) * 100))) / 10).toFixed(1);
@@ -2327,27 +2355,26 @@ function actualiserCockpitGlobal() {
     // ============================================================
     // 4. FLUX THERMIQUES LASER COURT (Fenêtre & Mur - R+1, y=270)
     // ============================================================
-    // Flux Extérieur (fenêtre/enveloppe) - Origine sur le mur gauche (x=310, y=270)
-    const netExtKw = (metrics.totalGainsSolairesKw + metrics.totalGainsConductionKw) - metrics.totalDeperditionsKw;
+    // 4.1 Apports Solaires direct (Badge sous l'astre céleste)
+    const solGainKw = metrics.totalGainsSolairesKw || 0;
+    const txtFluxSolarVal = document.getElementById('txt-flux-solar-val');
+    if (txtFluxSolarVal) {
+        txtFluxSolarVal.textContent = solGainKw > 0 ? `+${solGainKw.toFixed(2)} kW` : `0.00 kW`;
+        txtFluxSolarVal.className = `font-black ${solGainKw > 0 ? 'text-amber-400' : 'text-slate-400'}`;
+    }
+
+    // 4.2 Déperditions Enveloppe & Ventilation (Origine sur la fenêtre R+1, x=310, y=270)
+    const depEnveloppeKw = metrics.totalDeperditionsKw || 0;
+    const condGainKw = metrics.totalGainsConductionKw || 0;
     const txtFluxExtTag = document.getElementById('txt-flux-ext-tag');
     const txtFluxExtVal = document.getElementById('txt-flux-ext-val');
     const lineExt = document.getElementById('flux-laser-ext-line');
     const haloExt = document.getElementById('flux-laser-ext-halo');
 
     if (txtFluxExtTag && txtFluxExtVal && lineExt && haloExt) {
-        if (netExtKw > 0.15) {
-            txtFluxExtTag.textContent = isSunny ? "☀️ Gain Solaire" : "🌡️ Apport Extérieur";
-            txtFluxExtVal.textContent = `+${netExtKw.toFixed(2)} kW`;
-            txtFluxExtVal.style.color = "#F59E0B";
-            lineExt.setAttribute('d', "M 310 270 L 430 270");
-            lineExt.setAttribute('stroke', "#F59E0B");
-            lineExt.setAttribute('class', "flow-laser laser-orange");
-            lineExt.setAttribute('marker-end', "url(#mk-laser-orange)");
-            haloExt.setAttribute('d', "M 310 270 L 430 270");
-            haloExt.setAttribute('stroke', "#F59E0B");
-        } else if (netExtKw < -0.15) {
-            txtFluxExtTag.textContent = "❄️ Pertes Extérieur";
-            txtFluxExtVal.textContent = `${netExtKw.toFixed(2)} kW`;
+        if (depEnveloppeKw > 0.05) {
+            txtFluxExtTag.textContent = "❄️ Pertes Ext.";
+            txtFluxExtVal.textContent = `-${depEnveloppeKw.toFixed(2)} kW`;
             txtFluxExtVal.style.color = "#38BDF8";
             lineExt.setAttribute('d', "M 310 270 L 190 270");
             lineExt.setAttribute('stroke', "#38BDF8");
@@ -2355,6 +2382,16 @@ function actualiserCockpitGlobal() {
             lineExt.setAttribute('marker-end', "url(#mk-laser-blue)");
             haloExt.setAttribute('d', "M 310 270 L 190 270");
             haloExt.setAttribute('stroke', "#38BDF8");
+        } else if (condGainKw > 0.05) {
+            txtFluxExtTag.textContent = "🌡️ Conduction Ext.";
+            txtFluxExtVal.textContent = `+${condGainKw.toFixed(2)} kW`;
+            txtFluxExtVal.style.color = "#F59E0B";
+            lineExt.setAttribute('d', "M 190 270 L 310 270");
+            lineExt.setAttribute('stroke', "#F59E0B");
+            lineExt.setAttribute('class', "flow-laser laser-orange");
+            lineExt.setAttribute('marker-end', "url(#mk-laser-orange)");
+            haloExt.setAttribute('d', "M 190 270 L 310 270");
+            haloExt.setAttribute('stroke', "#F59E0B");
         } else {
             txtFluxExtTag.textContent = "⚖️ Équilibre Ext.";
             txtFluxExtVal.textContent = "0.00 kW";
@@ -2368,8 +2405,8 @@ function actualiserCockpitGlobal() {
         }
     }
 
-    // Flux Murs (Batterie thermique) - Origine sur le mur droit (x=906, y=270)
-    const fluxWallKw = globalReserve.fluxPowerKw;
+    // 4.3 Flux Murs (Batterie thermique) - Origine sur le mur droit (x=906, y=270)
+    const fluxWallKw = globalReserve.fluxPowerKw || 0;
     const txtFluxWallTag = document.getElementById('txt-flux-wall-tag');
     const txtFluxWallVal = document.getElementById('txt-flux-wall-val');
     const lineWall = document.getElementById('flux-laser-wall-line');
@@ -2419,8 +2456,30 @@ function actualiserCockpitGlobal() {
     // ============================================================
     // 5. BILAN PROGRESSIF ET TRAJECTOIRE ÉNERGÉTIQUE
     // ============================================================
+    // Décomposition des 3 flux élémentaires dans la carte Balance
+    const txtFluxSolarDetail = document.getElementById('txt-flux-solar-detail');
+    if (txtFluxSolarDetail) {
+        txtFluxSolarDetail.textContent = solGainKw > 0 ? `+${solGainKw.toFixed(2)} kW` : `0.00 kW`;
+        txtFluxSolarDetail.className = `text-xs sm:text-sm font-black ${solGainKw > 0 ? 'text-amber-400' : 'text-slate-400'}`;
+    }
+
+    const txtFluxWallDetail = document.getElementById('txt-flux-wall-detail');
+    if (txtFluxWallDetail) {
+        const signWall = fluxWallKw > 0 ? '+' : '';
+        txtFluxWallDetail.textContent = `${signWall}${fluxWallKw.toFixed(2)} kW`;
+        txtFluxWallDetail.className = `text-xs sm:text-sm font-black ${fluxWallKw > 0.05 ? 'text-amber-400' : (fluxWallKw < -0.05 ? 'text-sky-400' : 'text-slate-300')}`;
+    }
+
+    const txtFluxLossDetail = document.getElementById('txt-flux-loss-detail');
+    if (txtFluxLossDetail) {
+        txtFluxLossDetail.textContent = `-${depEnveloppeKw.toFixed(2)} kW`;
+        txtFluxLossDetail.className = `text-xs sm:text-sm font-black ${depEnveloppeKw > 0 ? 'text-sky-400' : 'text-slate-400'}`;
+    }
+
+    // Solde Net Instantané unifié : Solde = Solaire + Conduction - Pertes + Murs
+    const soldeNetReel = solGainKw + condGainKw - depEnveloppeKw + fluxWallKw;
     const valPasse = metrics.totalBilanPasseKwh || 0;
-    const valFlux = metrics.totalPuissanceNetteKw || 0;
+    const valFlux = soldeNetReel;
     const valFinal = metrics.totalBilanNetKwh || 0;
 
     const txtKwhPassed = document.getElementById('txt-kwh-passed');
@@ -2457,10 +2516,10 @@ function actualiserCockpitGlobal() {
     const barLoss = document.getElementById('balance-bar-loss');
     const needle = document.getElementById('balance-needle');
     if (barGain && barLoss && needle) {
-        const apportsEstimes = Math.max(0.2, (metrics.totalGainsSolairesKw || 0) + (metrics.totalGainsConductionKw || 0) + (valFlux > 0 ? valFlux : 0.5));
-        const deperditionsEstimees = Math.max(0.2, (metrics.totalDeperditionsKw || 0) + (valFlux < 0 ? Math.abs(valFlux) : 0.5));
-        const totalFluxAbs = apportsEstimes + deperditionsEstimees;
-        const gainPct = Math.min(90, Math.max(10, Math.round((apportsEstimes / totalFluxAbs) * 100)));
+        const apportsTotaux = Math.max(0.1, solGainKw + condGainKw + (fluxWallKw > 0 ? fluxWallKw : 0));
+        const pertesTotales = Math.max(0.1, depEnveloppeKw + (fluxWallKw < 0 ? Math.abs(fluxWallKw) : 0));
+        const totalFluxAbs = apportsTotaux + pertesTotales;
+        const gainPct = Math.min(90, Math.max(10, Math.round((apportsTotaux / totalFluxAbs) * 100)));
         const lossPct = 100 - gainPct;
         
         barGain.style.width = `${gainPct}%`;

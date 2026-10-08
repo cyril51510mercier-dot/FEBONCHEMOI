@@ -379,6 +379,12 @@
                         </div>
                     </div>
 
+                    <!-- 1.1 APPORTS SOLAIRES (SOUS L'ASTRE SOLAIRE DANS LE FAISCEAU) -->
+                    <div class="absolute top-[24%] left-[10%] sm:left-[12%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-amber-400/40 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] backdrop-blur-xs shadow-md">
+                        <span class="font-bold text-amber-300">☀️ Solaire</span>
+                        <strong class="font-black text-amber-400" id="txt-flux-solar-val">+0.00 kW</strong>
+                    </div>
+
                     <!-- 2. FLUX EXTÉRIEUR / PERTES (DIRECTEMENT SUR LE DÉPART DE FLÈCHE À LA FENÊTRE R+1) -->
                     <div class="absolute top-[41%] left-[13%] sm:left-[15%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-sky-400/40 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-slate-300" id="txt-flux-ext-tag">❄️ Pertes Ext.</span>
@@ -465,15 +471,31 @@
                                 En Direct
                             </span>
                         </div>
-                        <p class="text-[10px] text-slate-400 m-0 mb-3">
-                            Rapport instantané entre apports de chaleur et déperditions de l'enveloppe
+                        <p class="text-[10px] text-slate-400 m-0 mb-2.5">
+                            Équilibre dynamique de l'air intérieur : apports solaires, pertes enveloppe et inertie
                         </p>
                     </div>
 
                     <div class="my-auto bg-slate-900/90 border border-slate-800/80 rounded-xl p-3">
+                        <!-- Décomposition des 3 flux élémentaires aboutissant au Solde Net -->
+                        <div class="grid grid-cols-3 gap-1.5 sm:gap-2 mb-2.5 text-center">
+                            <div class="bg-amber-950/30 border border-amber-500/30 rounded-lg p-1.5 flex flex-col">
+                                <span class="text-[9px] text-amber-300/90 font-semibold uppercase tracking-wider">☀️ Solaire</span>
+                                <strong id="txt-flux-solar-detail" class="text-xs sm:text-sm font-black text-amber-400">+0.00 kW</strong>
+                            </div>
+                            <div class="bg-slate-800/60 border border-slate-700/60 rounded-lg p-1.5 flex flex-col">
+                                <span class="text-[9px] text-slate-300/90 font-semibold uppercase tracking-wider">🧱 Murs</span>
+                                <strong id="txt-flux-wall-detail" class="text-xs sm:text-sm font-black text-slate-200">±0.00 kW</strong>
+                            </div>
+                            <div class="bg-sky-950/30 border border-sky-500/30 rounded-lg p-1.5 flex flex-col">
+                                <span class="text-[9px] text-sky-300/90 font-semibold uppercase tracking-wider">❄️ Pertes</span>
+                                <strong id="txt-flux-loss-detail" class="text-xs sm:text-sm font-black text-sky-400">-0.00 kW</strong>
+                            </div>
+                        </div>
+
                         <div class="flex justify-between items-center text-[10px] font-bold mb-1.5">
                             <span class="text-amber-400">☀️ Apports (+ kW)</span>
-                            <span class="text-sky-400">❄️ Pertes (− kW)</span>
+                            <span class="text-sky-400">❄️ Déperditions (− kW)</span>
                         </div>
                         <div class="thermal-balance-track">
                             <div id="balance-bar-gain" class="h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-500" style="width: 50%;"></div>
