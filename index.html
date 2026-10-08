@@ -75,15 +75,15 @@
                         ⏳ Analyse saison...
                     </span>
 
-                    <button id="btn-sync-all" onclick="synchroniserTouteLaMaison(event)" class="custom-pill-btn bg-[#D96B43] hover:bg-[#C25832] text-white border-0 px-3.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer shadow-md">
+                    <button id="btn-sync-all" onclick="synchroniserTouteLaMaison(event)" class="custom-pill-btn bg-[#D96B43] hover:bg-[#C25832] text-white border-0 px-3.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer shadow-md whitespace-nowrap">
                         ⚡ Super Scan
                     </button>
 
-                    <button onclick="voirToutesLesRecommandations()" class="custom-pill-btn bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer">
+                    <button onclick="voirToutesLesRecommandations()" class="custom-pill-btn bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 px-3.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
                         📋 Plan d'Action
                     </button>
 
-                    <a href="setup.html" class="custom-pill-btn bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center gap-1.5 no-underline">
+                    <a href="setup.html" class="custom-pill-btn bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center gap-1.5 no-underline whitespace-nowrap">
                         ⚙️ Config BEM
                     </a>
 
@@ -101,7 +101,7 @@
                     <!-- Nom de ville cliquable -->
                     <div onclick="toggleCityInput()" class="font-bold text-slate-300 flex items-center gap-1.5 cursor-pointer hover:text-white transition group" title="Cliquer pour changer de ville">
                         <span class="text-sm">📍</span>
-                        <span id="summary-city-name" class="text-amber-400 font-black text-sm sm:text-base border-b border-dashed border-amber-400/60 group-hover:border-amber-300 pb-0.5">Reims</span>
+                        <span id="summary-city-name" class="text-amber-400 font-black text-sm sm:text-base pb-0.5">Reims</span>
                         <span class="text-[11px] text-slate-400 group-hover:text-amber-300 transition">✏️</span>
                     </div>
 
@@ -341,23 +341,23 @@
                             <path d="M 695 400 Q 705 390 715 400 Z" fill="#F59E0B" stroke="#1E293B" stroke-width="1.5"/>
                         </g>
 
-                        <!-- 6. FLUX THERMIQUES LASER (ORIGINE SUR LES MURS DU 1ER ÉTAGE R+1) -->
-                        <!-- Flux Fenêtre R+1 (y = 285) -->
+                        <!-- 6. FLUX THERMIQUES LASER (ORIGINE SUR LES MURS DU 1ER ÉTAGE R+1, y = 270) -->
+                        <!-- Flux Fenêtre/Extérieur R+1 -->
                         <g id="flux-laser-ext-group">
-                            <path id="flux-laser-ext-halo" d="M 270 285 L 375 285" stroke="#F59E0B" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
-                            <path id="flux-laser-ext-line" d="M 270 285 L 375 285" stroke="#F59E0B" stroke-width="4" fill="none" class="flow-laser laser-orange" marker-end="url(#mk-laser-orange)"/>
+                            <path id="flux-laser-ext-halo" d="M 310 270 L 190 270" stroke="#38BDF8" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
+                            <path id="flux-laser-ext-line" d="M 310 270 L 190 270" stroke="#38BDF8" stroke-width="4" fill="none" class="flow-laser laser-blue" marker-end="url(#mk-laser-blue)"/>
                         </g>
-                        <!-- Flux Mur Massif R+1 (y = 285) -->
+                        <!-- Flux Mur Massif R+1 -->
                         <g id="flux-laser-wall-group">
-                            <path id="flux-laser-wall-halo" d="M 906 285 L 815 285" stroke="#F59E0B" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
-                            <path id="flux-laser-wall-line" d="M 906 285 L 815 285" stroke="#F59E0B" stroke-width="4" fill="none" class="flow-laser laser-orange" marker-end="url(#mk-laser-orange)"/>
+                            <path id="flux-laser-wall-halo" d="M 906 270 L 785 270" stroke="#F59E0B" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
+                            <path id="flux-laser-wall-line" d="M 906 270 L 785 270" stroke="#F59E0B" stroke-width="4" fill="none" class="flow-laser laser-orange" marker-end="url(#mk-laser-orange)"/>
                         </g>
 
                     </svg>
                 </div>
 
                 <!-- ============================================================== -->
-                <!-- COUCHE DES ENCARTS HUD : SUPERPOSÉS SUR PC, SOUS LE DESSIN SUR MOBILE -->
+                <!-- COUCHE DES ENCARTS HUD : DESIGN UNIFIÉ CRISTALLIN & COMPACT -->
                 <!-- ============================================================== -->
                 <div class="hud-mobile-grid">
                     
@@ -394,83 +394,81 @@
                         </div>
                     </div>
 
-                    <!-- B. BATTERIE DES MURS & AUTONOMIE (TOUCHANT LA TOITURE & POINTE 1ER ÉTAGE) -->
-                    <div class="hud-card-responsive md:top-[6%] md:left-[64%] md:-translate-x-1/2 w-full md:max-w-xs hud-glass-amber rounded-2xl p-2.5 sm:p-3 shadow-xl">
-                        <div class="flex items-center justify-between mb-1 pb-1 border-b border-amber-500/30">
-                            <div class="flex items-center gap-1.5">
-                                <span class="text-base drop-shadow">🛡️</span>
-                                <span class="text-[10px] font-bold text-amber-200 uppercase tracking-wider text-crisp">Batterie des Murs</span>
-                            </div>
-                            <strong class="text-sm sm:text-base font-black text-amber-300 text-crisp" id="txt-wall-temp">-- °C</strong>
+                    <!-- B. BATTERIE DES MURS & AUTONOMIE (TOUCHANT LA TOITURE & POINTE 1ER ÉTAGE, COMPACT) -->
+                    <div class="hud-card-responsive md:top-[6%] md:left-[64%] md:-translate-x-1/2 w-full md:w-48 crystalline-sheer rounded-xl p-2 shadow-lg">
+                        <div class="flex items-center justify-between mb-1 pb-1 border-b border-white/20">
+                            <span class="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1 text-crisp">
+                                <span>🛡️</span> Murs & Inertie
+                            </span>
+                            <strong class="text-xs sm:text-sm font-black text-amber-300 text-crisp" id="txt-wall-temp">-- °C</strong>
                         </div>
-                        <div class="flex items-center justify-between gap-2 mt-1">
+                        <div class="bg-black/30 px-2 py-1 rounded-lg border border-white/10 flex items-center justify-between gap-1.5">
                             <div class="text-left">
-                                <span class="text-[9px] text-slate-200 block text-crisp">Autonomie (~19°C)</span>
-                                <strong class="text-xs sm:text-sm font-black text-sky-300 text-crisp whitespace-nowrap" id="txt-autonomy-val">-- h</strong>
+                                <span class="text-[8px] text-slate-300 block text-crisp leading-tight">Autonomie (~19°C)</span>
+                                <strong class="text-[11px] sm:text-xs font-black text-sky-300 text-crisp whitespace-nowrap" id="txt-autonomy-val">-- h</strong>
                             </div>
-                            <div class="w-16 sm:w-20 bg-black/60 h-2 rounded-full overflow-hidden border border-amber-500/30 shrink-0">
+                            <div class="w-12 sm:w-16 bg-black/60 h-1.5 rounded-full overflow-hidden border border-white/10 shrink-0">
                                 <div id="txt-autonomy-bar" class="h-full bg-gradient-to-r from-[#D96B43] to-sky-400 rounded-full transition-all duration-500" style="width: 50%;"></div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- C. AIR INTÉRIEUR (CENTRÉ DANS L'HABITAT) -->
-                    <div class="hud-card-responsive md:top-[48%] md:left-[58%] md:-translate-x-1/2 w-full md:w-68 hud-glass-emerald rounded-2xl p-2.5 shadow-2xl text-center">
-                        <div class="flex items-center justify-between mb-1 pb-1 border-b border-emerald-500/20">
-                            <span class="text-[10px] sm:text-[11px] font-black text-emerald-300 flex items-center gap-1 text-crisp">
-                                <span>🌬️</span> Air Intérieur Moyen
+                    <!-- C. AIR INTÉRIEUR (CENTRÉ DANS L'HABITAT, COMPACT) -->
+                    <div class="hud-card-responsive md:top-[46%] md:left-[58%] md:-translate-x-1/2 w-full md:w-52 crystalline-sheer rounded-xl p-2 shadow-lg text-center">
+                        <div class="flex items-center justify-between mb-1 pb-1 border-b border-white/20">
+                            <span class="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1 text-crisp">
+                                <span>🌬️</span> Air Intérieur
                             </span>
-                            <span id="txt-pmv-badge" class="text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-400/50 text-emerald-200 text-crisp">
+                            <span id="txt-pmv-badge" class="text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-black/40 border border-emerald-400/40 text-emerald-300 text-crisp">
                                 Confort Idéal
                             </span>
                         </div>
-                        <div class="grid grid-cols-3 gap-1 mb-1.5">
-                            <div class="bg-black/35 p-1 rounded-lg border border-white/10">
+                        <div class="grid grid-cols-3 gap-1 mb-1">
+                            <div class="bg-black/30 p-1 rounded-lg border border-white/10">
                                 <span class="text-[8px] text-slate-300 block text-crisp">T° Air</span>
-                                <strong class="text-xs sm:text-sm font-black text-white text-crisp" id="txt-in-temp">-- °C</strong>
+                                <strong class="text-xs sm:text-[13px] font-black text-white text-crisp" id="txt-in-temp">-- °C</strong>
                             </div>
-                            <div class="bg-black/35 p-1 rounded-lg border border-white/10">
+                            <div class="bg-black/30 p-1 rounded-lg border border-white/10">
                                 <span class="text-[8px] text-slate-300 block text-crisp">Humid. Rel.</span>
-                                <strong class="text-xs sm:text-sm font-bold text-slate-100 text-crisp" id="txt-in-rh">-- %</strong>
+                                <strong class="text-xs sm:text-[13px] font-bold text-slate-100 text-crisp" id="txt-in-rh">-- %</strong>
                             </div>
-                            <div class="bg-black/35 p-1 rounded-lg border border-white/10">
+                            <div class="bg-black/30 p-1 rounded-lg border border-white/10">
                                 <span class="text-[8px] text-slate-300 block text-crisp">Humid. Abs.</span>
-                                <strong class="text-xs sm:text-sm font-bold text-sky-200 text-crisp" id="txt-in-ah">-- g/m³</strong>
+                                <strong class="text-xs sm:text-[13px] font-bold text-sky-200 text-crisp" id="txt-in-ah">-- g/m³</strong>
                             </div>
                         </div>
-                        <div class="flex items-center justify-between text-[10px] bg-black/30 px-2 py-0.5 rounded border border-white/10" id="box-hud-ventilation" title="Conseil d'aération différentielle par humidité absolue">
-                            <span class="text-slate-300 text-[9px] text-crisp">🪟 Aération flash :</span>
-                            <strong class="text-[11px] font-bold text-emerald-300 text-crisp" id="txt-hud-ventilation">--</strong>
+                        <div class="flex items-center justify-between text-[9px] bg-black/30 px-1.5 py-0.5 rounded-lg border border-white/10" id="box-hud-ventilation" title="Conseil d'aération différentielle par humidité absolue">
+                            <span class="text-slate-300 text-[8px] text-crisp">🪟 Aération :</span>
+                            <strong class="text-[10px] font-bold text-emerald-300 text-crisp" id="txt-hud-ventilation">--</strong>
                         </div>
                         <span id="txt-in-drying" style="display: none;">--</span>
                     </div>
 
-                    <!-- D. ENCART CLO & OCCUPANT (DESIGN STYLE BATTERIE DES MURS DANS LE SÉJOUR) -->
-                    <div class="hud-card-responsive md:bottom-[4%] md:left-[43%] md:-translate-x-1/2 w-full md:w-60 hud-glass-amber rounded-2xl p-2.5 sm:p-3 shadow-xl">
-                        <div class="flex items-center justify-between mb-1 pb-1 border-b border-amber-500/30">
-                            <div class="flex items-center gap-1.5">
-                                <span class="text-base drop-shadow">🧍</span>
-                                <span class="text-[10px] font-bold text-amber-200 uppercase tracking-wider text-crisp">Tenue de l'Occupant</span>
-                            </div>
-                            <strong class="text-sm font-black text-amber-300 text-crisp"><span id="currentCloValue">1.00</span> Clo</strong>
+                    <!-- D. ENCART CLO & OCCUPANT (DESIGN CRISTALLIN DANS LE SÉJOUR) -->
+                    <div class="hud-card-responsive md:bottom-[4%] md:left-[43%] md:-translate-x-1/2 w-full md:w-52 crystalline-sheer rounded-xl p-2 shadow-lg">
+                        <div class="flex items-center justify-between mb-1 pb-1 border-b border-white/20">
+                            <span class="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1 text-crisp">
+                                <span>🧍</span> Tenue Occupant
+                            </span>
+                            <strong class="text-xs sm:text-sm font-black text-amber-300 text-crisp"><span id="currentCloValue">1.00</span> Clo</strong>
                         </div>
-                        <div class="text-[10px] text-slate-300 text-crisp mb-1.5 text-center font-medium truncate" id="currentCloDesc">
+                        <div class="bg-black/30 px-2 py-0.5 rounded-lg border border-white/10 text-[9px] text-slate-300 text-crisp mb-1 text-center font-medium truncate" id="currentCloDesc">
                             Chemise & pull
                         </div>
-                        <div class="flex items-center justify-center gap-1.5 pt-0.5">
-                            <button onclick="adjustClothing(-0.2)" class="bg-black/40 hover:bg-black/60 text-slate-200 border border-white/15 rounded-lg px-2 py-0.5 text-[10px] font-bold cursor-pointer" title="Alléger tenue (-0.2 Clo)">➖ Alléger</button>
-                            <button onclick="adjustClothing(0.2)" class="bg-black/40 hover:bg-black/60 text-slate-200 border border-white/15 rounded-lg px-2 py-0.5 text-[10px] font-bold cursor-pointer" title="Couvrir tenue (+0.2 Clo)">➕ Couvrir</button>
-                            <button onclick="resetClothing()" class="bg-black/40 hover:bg-black/60 text-slate-300 border border-white/15 rounded-lg px-2 py-0.5 text-[10px] cursor-pointer" title="Réinitialiser saison">🔄</button>
+                        <div class="flex items-center justify-center gap-1">
+                            <button onclick="adjustClothing(-0.2)" class="bg-black/40 hover:bg-black/60 text-slate-200 border border-white/15 rounded-lg px-2 py-0.5 text-[9px] font-bold cursor-pointer" title="Alléger tenue (-0.2 Clo)">➖ Alléger</button>
+                            <button onclick="adjustClothing(0.2)" class="bg-black/40 hover:bg-black/60 text-slate-200 border border-white/15 rounded-lg px-2 py-0.5 text-[9px] font-bold cursor-pointer" title="Couvrir tenue (+0.2 Clo)">➕ Couvrir</button>
+                            <button onclick="resetClothing()" class="bg-black/40 hover:bg-black/60 text-slate-300 border border-white/15 rounded-lg px-1.5 py-0.5 text-[9px] cursor-pointer" title="Réinitialiser saison">🔄</button>
                         </div>
                     </div>
 
                     <!-- ÉTIQUETTES DE FLUX R+1 (SUPERPOSÉES AU 1ER ÉTAGE) -->
-                    <div class="hidden md:block absolute top-[43%] left-[27%] -translate-y-1/2 hud-glass-amber border-amber-400/50 px-2 py-0.5 rounded-lg text-center shadow-md">
+                    <div class="hidden md:block absolute top-[41%] left-[21%] -translate-y-1/2 crystalline-sheer border-white/20 px-2 py-0.5 rounded-lg text-center shadow-md">
                         <span class="text-[8px] text-slate-300 block font-semibold text-crisp" id="txt-flux-ext-tag">☀️ Gain Solaire</span>
                         <strong class="text-[10px] font-black text-amber-300 text-crisp" id="txt-flux-ext-val">+0.00 kW</strong>
                     </div>
 
-                    <div class="hidden md:block absolute top-[43%] right-[8%] -translate-y-1/2 hud-glass-amber border-amber-400/50 px-2 py-0.5 rounded-lg text-center shadow-md">
+                    <div class="hidden md:block absolute top-[41%] right-[14%] -translate-y-1/2 crystalline-sheer border-white/20 px-2 py-0.5 rounded-lg text-center shadow-md">
                         <span class="text-[8px] text-slate-300 block font-semibold text-crisp" id="txt-flux-wall-tag">🔥 Restitution</span>
                         <strong class="text-[10px] font-black text-amber-300 text-crisp" id="txt-flux-wall-val">+0.00 kW</strong>
                     </div>
@@ -479,10 +477,10 @@
 
             </div>
 
-            <!-- 4. BILAN THERMIQUE DU JOUR : BALANCE DES FLUX & HISTOGRAMME 3 TEMPS CÔTE-À-CÔTE -->
+            <!-- 4. BILAN THERMIQUE DU JOUR : BALANCE DES FLUX & TRAJECTOIRE ÉNERGÉTIQUE CÔTE-À-CÔTE -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
                 
-                <!-- COLONNE GAUCHE : BALANCE DES FLUX EN DIRECT (LG:COL-SPAN-5, PLUS COMPACTE) -->
+                <!-- COLONNE GAUCHE : BALANCE DES FLUX EN DIRECT (LG:COL-SPAN-5, COMPACTE) -->
                 <div class="lg:col-span-5 bg-slate-950/90 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-inner flex flex-col justify-between">
                     <div>
                         <div class="flex items-center justify-between mb-1 pb-1 border-b border-slate-800">
@@ -498,7 +496,7 @@
                         </p>
                     </div>
 
-                    <div class="my-2 bg-slate-900/90 border border-slate-800/80 rounded-xl p-3">
+                    <div class="my-auto bg-slate-900/90 border border-slate-800/80 rounded-xl p-3">
                         <div class="flex justify-between items-center text-[10px] font-bold mb-1.5">
                             <span class="text-amber-400">☀️ Apports (+ kW)</span>
                             <span class="text-sky-400">❄️ Pertes (− kW)</span>
@@ -514,84 +512,80 @@
                             <span>Décharge</span>
                         </div>
                     </div>
-
-                    <div class="text-[10px] text-slate-400 bg-black/25 p-2 rounded-xl border border-white/5 flex items-center justify-between">
-                        <span>Aiguille blanche :</span>
-                        <span class="font-medium text-slate-300">Solde instantané en direct</span>
-                    </div>
                 </div>
 
-                <!-- COLONNE DROITE : HISTOGRAMME & COURBE GRAPHIQUE DES 3 TEMPS DU JOUR (LG:COL-SPAN-7) -->
+                <!-- COLONNE DROITE : TRAJECTOIRE ÉNERGÉTIQUE SCIENTIFIQUE DU JOUR (LG:COL-SPAN-7) -->
                 <div class="lg:col-span-7 bg-slate-950/90 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-inner flex flex-col justify-between">
                     <div>
                         <div class="flex items-center justify-between mb-1 pb-1 border-b border-slate-800">
                             <span class="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-1.5">
                                 <span>📈</span> Trajectoire Thermique du Jour
                             </span>
-                            <span class="text-[10px] text-slate-400 font-medium">3 étapes : 00h ➔ En direct ➔ 24h</span>
+                            <span class="text-[10px] text-slate-400 font-medium">
+                                Énergie cumulée (kWh) & débit direct (kW)
+                            </span>
                         </div>
                     </div>
 
-                    <!-- Mini Graphique Vectoriel avec Histogramme & Courbe de Tendance -->
-                    <div class="w-full my-2 bg-slate-900/90 border border-slate-800/80 rounded-xl p-2.5">
-                        <svg viewBox="0 0 460 145" class="w-full h-auto select-none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Mini Graphique Vectoriel Scientifique (100% kWh avec Vitesse kW) -->
+                    <div class="w-full my-auto bg-slate-900/90 border border-slate-800/80 rounded-xl p-2.5">
+                        <svg viewBox="0 0 460 140" class="w-full h-auto select-none" xmlns="http://www.w3.org/2000/svg">
                             <defs>
                                 <linearGradient id="gradBarPassed" x1="0%" y1="0%" x2="0%" y2="100%">
                                     <stop offset="0%" stop-color="#10B981" stop-opacity="0.85"/>
-                                    <stop offset="100%" stop-color="#047857" stop-opacity="0.40"/>
-                                </linearGradient>
-                                <linearGradient id="gradBarFlux" x1="0%" y1="0%" x2="0%" y2="100%">
-                                    <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.85"/>
-                                    <stop offset="100%" stop-color="#D97706" stop-opacity="0.40"/>
+                                    <stop offset="100%" stop-color="#047857" stop-opacity="0.30"/>
                                 </linearGradient>
                                 <linearGradient id="gradBarFinal" x1="0%" y1="0%" x2="0%" y2="100%">
                                     <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.85"/>
-                                    <stop offset="100%" stop-color="#0284C7" stop-opacity="0.40"/>
+                                    <stop offset="100%" stop-color="#0284C7" stop-opacity="0.30"/>
                                 </linearGradient>
                             </defs>
 
-                            <!-- Ligne d'équilibre zéro -->
-                            <line x1="45" y1="72" x2="435" y2="72" stroke="#475569" stroke-width="1.2"/>
-                            <text x="36" y="75" fill="#64748B" font-size="9" text-anchor="end">0</text>
+                            <!-- Axe de référence 0 kWh -->
+                            <line x1="40" y1="70" x2="435" y2="70" stroke="#475569" stroke-width="1.2" stroke-dasharray="3 3"/>
+                            <text x="32" y="73" fill="#64748B" font-size="9" text-anchor="end" font-weight="bold">0</text>
+                            <text x="440" y="73" fill="#64748B" font-size="8" text-anchor="start">kWh</text>
 
-                            <!-- 1. Barre Passé (Cumulé depuis 00h) -->
+                            <!-- 1. Origine 00h -->
+                            <circle cx="55" cy="70" r="3.5" fill="#64748B"/>
+                            <text x="55" y="86" fill="#64748B" font-size="8.5" text-anchor="middle" font-weight="600">00h</text>
+                            <text x="55" y="97" fill="#475569" font-size="7.5" text-anchor="middle">Départ</text>
+
+                            <!-- 2. Zone Passé / Cumul à Maintenant (Barre kWh) -->
                             <g id="chart-bar-passed-group">
-                                <rect id="chart-bar-passed" x="75" y="38" width="48" height="34" rx="4" fill="url(#gradBarPassed)" stroke="#10B981" stroke-width="1.5"/>
-                                <text id="chart-txt-passed" x="99" y="32" fill="#34D399" font-size="11" font-weight="bold" text-anchor="middle">-- kWh</text>
-                                <text x="99" y="92" fill="#94A3B8" font-size="9" font-weight="bold" text-anchor="middle">1. Cumulé</text>
-                                <text x="99" y="103" fill="#64748B" font-size="8" text-anchor="middle">(depuis 00h)</text>
+                                <rect id="chart-bar-passed" x="160" y="40" width="36" height="30" rx="3" fill="url(#gradBarPassed)" stroke="#10B981" stroke-width="1.2"/>
+                                <text id="chart-txt-passed" x="178" y="32" fill="#34D399" font-size="11" font-weight="bold" text-anchor="middle">-- kWh</text>
+                                <text x="178" y="86" fill="#94A3B8" font-size="8.5" font-weight="bold" text-anchor="middle">Maintenant</text>
+                                <text x="178" y="97" fill="#64748B" font-size="7.5" text-anchor="middle">Cumulé</text>
                             </g>
 
-                            <!-- 2. Barre Direct (Flux instantané) -->
-                            <g id="chart-bar-flux-group">
-                                <rect id="chart-bar-flux" x="206" y="44" width="48" height="28" rx="4" fill="url(#gradBarFlux)" stroke="#F59E0B" stroke-width="1.5"/>
-                                <text id="chart-txt-flux" x="230" y="38" fill="#FBBF24" font-size="11" font-weight="bold" text-anchor="middle">-- kW</text>
-                                <text x="230" y="92" fill="#FCD34D" font-size="9" font-weight="bold" text-anchor="middle">2. En direct</text>
-                                <text x="230" y="103" fill="#B45309" font-size="8" text-anchor="middle">(puissance)</text>
+                            <!-- 3. Indicateur de Pente Dynamique / Flux Instantané en direct (kW) -->
+                            <g id="chart-flux-indicator" transform="translate(260, 40)">
+                                <rect id="chart-flux-badge-bg" x="-46" y="-12" width="92" height="23" rx="11" fill="#0F172A" stroke="#F59E0B" stroke-width="1.2"/>
+                                <text id="chart-txt-flux" x="0" y="3" fill="#FBBF24" font-size="10" font-weight="extrabold" text-anchor="middle">⚡ +0.00 kW ↗</text>
+                                <text id="chart-txt-flux-sub" x="0" y="19" fill="#94A3B8" font-size="7.5" text-anchor="middle">(débit direct)</text>
                             </g>
 
-                            <!-- 3. Barre Atterrissage (Projection 24h) -->
+                            <!-- 4. Zone Atterrissage / 24h Minuit (Barre kWh) -->
                             <g id="chart-bar-final-group">
-                                <rect id="chart-bar-final" x="337" y="28" width="48" height="44" rx="4" fill="url(#gradBarFinal)" stroke="#38BDF8" stroke-width="1.5"/>
-                                <text id="chart-txt-final" x="361" y="22" fill="#BAE6FD" font-size="11" font-weight="bold" text-anchor="middle">-- kWh</text>
-                                <text x="361" y="92" fill="#94A3B8" font-size="9" font-weight="bold" text-anchor="middle">3. Ce soir</text>
-                                <text x="361" y="103" fill="#64748B" font-size="8" text-anchor="middle">(projection)</text>
+                                <rect id="chart-bar-final" x="350" y="30" width="36" height="40" rx="3" fill="url(#gradBarFinal)" stroke="#38BDF8" stroke-width="1.2"/>
+                                <text id="chart-txt-final" x="368" y="22" fill="#BAE6FD" font-size="11" font-weight="bold" text-anchor="middle">-- kWh</text>
+                                <text x="368" y="86" fill="#94A3B8" font-size="8.5" font-weight="bold" text-anchor="middle">Minuit (24h)</text>
+                                <text x="368" y="97" fill="#64748B" font-size="7.5" text-anchor="middle">Projection</text>
                             </g>
 
-                            <!-- Courbe Spline de Liaison Visuelle -->
-                            <path id="chart-trend-curve" d="M 99 38 C 160 25, 175 44, 230 44 C 285 44, 300 28, 361 28" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
-                            <circle id="chart-dot-passed" cx="99" cy="38" r="4.5" fill="#10B981" stroke="#FFFFFF" stroke-width="1.5"/>
-                            <circle id="chart-dot-flux" cx="230" cy="44" r="5.5" fill="#F59E0B" stroke="#FFFFFF" stroke-width="2"/>
-                            <circle id="chart-dot-final" cx="361" cy="28" r="4.5" fill="#38BDF8" stroke="#FFFFFF" stroke-width="1.5"/>
+                            <!-- Trajectoire Continue Spline d'Énergie (100% kWh) -->
+                            <path id="chart-trend-curve" d="M 55 70 C 110 70, 130 50, 178 50 C 226 50, 290 40, 368 40" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
+                            <!-- Puces des jalons -->
+                            <circle id="chart-dot-passed" cx="178" cy="50" r="4.5" fill="#10B981" stroke="#FFFFFF" stroke-width="1.5"/>
+                            <circle id="chart-dot-final" cx="368" cy="40" r="4.5" fill="#38BDF8" stroke="#FFFFFF" stroke-width="1.5"/>
                         </svg>
                     </div>
 
-                    <!-- Résumé Textuel Chiffré -->
-                    <div class="flex flex-wrap justify-between items-center text-[10px] text-slate-400 border-t border-slate-800/80 pt-1.5 gap-2">
-                        <span>Énergie stockée : <strong id="txt-kwh-passed" class="text-emerald-400 font-bold">-- kWh</strong></span>
-                        <span>Flux direct : <strong id="txt-kw-flux-display" class="text-amber-400 font-bold">-- kW</strong></span>
-                        <span>Projection minuit : <strong id="txt-kwh-final" class="text-white font-bold">-- kWh</strong></span>
-                    </div>
+                    <!-- Éléments masqués conservés pour compatibilité engine.js -->
+                    <span id="txt-kwh-passed" style="display: none;"></span>
+                    <span id="txt-kw-flux-display" style="display: none;"></span>
+                    <span id="txt-kwh-final" style="display: none;"></span>
                 </div>
 
             </div>

@@ -2197,9 +2197,9 @@ function actualiserCockpitGlobal() {
     }
 
     // ============================================================
-    // 4. FLUX THERMIQUES LASER COURT (Fenêtre & Mur)
+    // 4. FLUX THERMIQUES LASER COURT (Fenêtre & Mur - R+1, y=270)
     // ============================================================
-    // Flux Extérieur (fenêtre/enveloppe)
+    // Flux Extérieur (fenêtre/enveloppe) - Origine sur le mur gauche (x=310, y=270)
     const netExtKw = (metrics.totalGainsSolairesKw + metrics.totalGainsConductionKw) - metrics.totalDeperditionsKw;
     const txtFluxExtTag = document.getElementById('txt-flux-ext-tag');
     const txtFluxExtVal = document.getElementById('txt-flux-ext-val');
@@ -2211,36 +2211,36 @@ function actualiserCockpitGlobal() {
             txtFluxExtTag.textContent = isSunny ? "☀️ Gain Solaire" : "🌡️ Apport Extérieur";
             txtFluxExtVal.textContent = `+${netExtKw.toFixed(2)} kW`;
             txtFluxExtVal.style.color = "#F59E0B";
-            lineExt.setAttribute('d', "M 310 220 L 440 220");
+            lineExt.setAttribute('d', "M 310 270 L 430 270");
             lineExt.setAttribute('stroke', "#F59E0B");
             lineExt.setAttribute('class', "flow-laser laser-orange");
             lineExt.setAttribute('marker-end', "url(#mk-laser-orange)");
-            haloExt.setAttribute('d', "M 310 220 L 440 220");
+            haloExt.setAttribute('d', "M 310 270 L 430 270");
             haloExt.setAttribute('stroke', "#F59E0B");
         } else if (netExtKw < -0.15) {
             txtFluxExtTag.textContent = "❄️ Pertes Extérieur";
             txtFluxExtVal.textContent = `${netExtKw.toFixed(2)} kW`;
             txtFluxExtVal.style.color = "#38BDF8";
-            lineExt.setAttribute('d', "M 440 220 L 310 220");
+            lineExt.setAttribute('d', "M 310 270 L 190 270");
             lineExt.setAttribute('stroke', "#38BDF8");
             lineExt.setAttribute('class', "flow-laser laser-blue");
             lineExt.setAttribute('marker-end', "url(#mk-laser-blue)");
-            haloExt.setAttribute('d', "M 440 220 L 310 220");
+            haloExt.setAttribute('d', "M 310 270 L 190 270");
             haloExt.setAttribute('stroke', "#38BDF8");
         } else {
             txtFluxExtTag.textContent = "⚖️ Équilibre Ext.";
             txtFluxExtVal.textContent = "0.00 kW";
             txtFluxExtVal.style.color = "#10B981";
-            lineExt.setAttribute('d', "M 310 220 L 440 220");
+            lineExt.setAttribute('d', "M 310 270 L 310 270");
             lineExt.setAttribute('stroke', "#10B981");
             lineExt.setAttribute('class', "flow-laser");
             lineExt.setAttribute('marker-end', "");
-            haloExt.setAttribute('d', "M 310 220 L 440 220");
+            haloExt.setAttribute('d', "M 310 270 L 310 270");
             haloExt.setAttribute('stroke', "#10B981");
         }
     }
 
-    // Flux Murs (Batterie thermique)
+    // Flux Murs (Batterie thermique) - Origine sur le mur droit (x=906, y=270)
     const fluxWallKw = globalReserve.fluxPowerKw;
     const txtFluxWallTag = document.getElementById('txt-flux-wall-tag');
     const txtFluxWallVal = document.getElementById('txt-flux-wall-val');
@@ -2252,31 +2252,31 @@ function actualiserCockpitGlobal() {
             txtFluxWallTag.textContent = "🔥 Restitution";
             txtFluxWallVal.textContent = `+${fluxWallKw.toFixed(2)} kW`;
             txtFluxWallVal.style.color = "#F59E0B";
-            lineWall.setAttribute('d', "M 948 220 L 830 220");
+            lineWall.setAttribute('d', "M 906 270 L 785 270");
             lineWall.setAttribute('stroke', "#F59E0B");
             lineWall.setAttribute('class', "flow-laser laser-orange");
             lineWall.setAttribute('marker-end', "url(#mk-laser-orange)");
-            haloWall.setAttribute('d', "M 948 220 L 830 220");
+            haloWall.setAttribute('d', "M 906 270 L 785 270");
             haloWall.setAttribute('stroke', "#F59E0B");
         } else if (fluxWallKw < -0.15) {
             txtFluxWallTag.textContent = "🧱 Absorption Murs";
             txtFluxWallVal.textContent = `${fluxWallKw.toFixed(2)} kW`;
             txtFluxWallVal.style.color = "#38BDF8";
-            lineWall.setAttribute('d', "M 830 220 L 948 220");
+            lineWall.setAttribute('d', "M 906 270 L 950 270");
             lineWall.setAttribute('stroke', "#38BDF8");
             lineWall.setAttribute('class', "flow-laser laser-blue");
             lineWall.setAttribute('marker-end', "url(#mk-laser-blue)");
-            haloWall.setAttribute('d', "M 830 220 L 948 220");
+            haloWall.setAttribute('d', "M 906 270 L 950 270");
             haloWall.setAttribute('stroke', "#38BDF8");
         } else {
             txtFluxWallTag.textContent = "⚖️ Équilibre Murs";
             txtFluxWallVal.textContent = "0.00 kW";
             txtFluxWallVal.style.color = "#10B981";
-            lineWall.setAttribute('d', "M 948 220 L 830 220");
+            lineWall.setAttribute('d', "M 906 270 L 906 270");
             lineWall.setAttribute('stroke', "#10B981");
             lineWall.setAttribute('class', "flow-laser");
             lineWall.setAttribute('marker-end', "");
-            haloWall.setAttribute('d', "M 948 220 L 830 220");
+            haloWall.setAttribute('d', "M 906 270 L 906 270");
             haloWall.setAttribute('stroke', "#10B981");
         }
     }
@@ -2289,11 +2289,14 @@ function actualiserCockpitGlobal() {
     });
 
     // ============================================================
-    // 5. BILAN PROGRESSIF EN 3 TEMPS ET BALANCE GRAPHIQUE
+    // 5. BILAN PROGRESSIF ET TRAJECTOIRE ÉNERGÉTIQUE
     // ============================================================
+    const valPasse = metrics.totalBilanPasseKwh || 0;
+    const valFlux = metrics.totalPuissanceNetteKw || 0;
+    const valFinal = metrics.totalBilanNetKwh || 0;
+
     const txtKwhPassed = document.getElementById('txt-kwh-passed');
     if (txtKwhPassed) {
-        const valPasse = metrics.totalBilanPasseKwh;
         const sign = valPasse > 0 ? '+' : '';
         txtKwhPassed.textContent = `${sign}${valPasse.toFixed(2)} kWh`;
         txtKwhPassed.className = `text-base sm:text-lg font-black ${valPasse >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
@@ -2301,7 +2304,6 @@ function actualiserCockpitGlobal() {
 
     const txtKwFlux = document.getElementById('txt-kw-flux');
     const txtKwFluxDisplay = document.getElementById('txt-kw-flux-display');
-    const valFlux = metrics.totalPuissanceNetteKw;
     const signFlux = valFlux > 0 ? '+' : '';
     const fluxFormatted = `${signFlux}${valFlux.toFixed(2)} kW`;
     const fluxColorClass = valFlux >= 0 ? 'text-amber-400' : 'text-sky-400';
@@ -2317,7 +2319,6 @@ function actualiserCockpitGlobal() {
 
     const txtKwhFinal = document.getElementById('txt-kwh-final');
     if (txtKwhFinal) {
-        const valFinal = metrics.totalBilanNetKwh;
         const sign = valFinal > 0 ? '+' : '';
         txtKwhFinal.textContent = `${sign}${valFinal.toFixed(2)} kWh`;
         txtKwhFinal.className = `text-base sm:text-lg font-black ${valFinal >= 0 ? 'text-white' : 'text-slate-300'}`;
@@ -2339,31 +2340,25 @@ function actualiserCockpitGlobal() {
         needle.style.left = `${gainPct}%`;
     }
 
-    // Mise à jour de l'Histogramme & Courbe Graphique des 3 Temps (SVG)
+    // Mise à jour de la Trajectoire Énergétique Graphique (SVG 100% kWh avec Vitesse en Direct kW)
     const elBarPassed = document.getElementById('chart-bar-passed');
     const elTxtPassed = document.getElementById('chart-txt-passed');
     const elDotPassed = document.getElementById('chart-dot-passed');
-    const elBarFlux = document.getElementById('chart-bar-flux');
+    const elFluxIndicator = document.getElementById('chart-flux-indicator');
     const elTxtFlux = document.getElementById('chart-txt-flux');
-    const elDotFlux = document.getElementById('chart-dot-flux');
     const elBarFinal = document.getElementById('chart-bar-final');
     const elTxtFinal = document.getElementById('chart-txt-final');
     const elDotFinal = document.getElementById('chart-dot-final');
     const elTrendCurve = document.getElementById('chart-trend-curve');
 
-    if (elBarPassed && elBarFlux && elBarFinal) {
-        // Hauteurs et positions Y basées sur la ligne médiane à y=72
-        const hP = Math.min(48, Math.max(8, Math.round(Math.abs(valPasse) * 2.5)));
-        const yP = valPasse >= 0 ? (72 - hP) : 72;
-        const dotYP = valPasse >= 0 ? (72 - hP) : (72 + hP);
+    if (elBarPassed && elBarFinal) {
+        const zeroY = 70;
+        const scaleKwh = 2.8;
 
-        const hF = Math.min(48, Math.max(8, Math.round(Math.abs(valFlux) * 12)));
-        const yF = valFlux >= 0 ? (72 - hF) : 72;
-        const dotYF = valFlux >= 0 ? (72 - hF) : (72 + hF);
-
-        const hFin = Math.min(48, Math.max(8, Math.round(Math.abs(valFinal) * 2.5)));
-        const yFin = valFinal >= 0 ? (72 - hFin) : 72;
-        const dotYFin = valFinal >= 0 ? (72 - hFin) : (72 + hFin);
+        // 1. Point Passé / Cumul à Maintenant (kWh)
+        const hP = Math.min(46, Math.max(6, Math.round(Math.abs(valPasse) * scaleKwh)));
+        const yP = valPasse >= 0 ? (zeroY - hP) : zeroY;
+        const dotYP = valPasse >= 0 ? (zeroY - hP) : (zeroY + hP);
 
         elBarPassed.setAttribute('y', yP);
         elBarPassed.setAttribute('height', hP);
@@ -2374,13 +2369,10 @@ function actualiserCockpitGlobal() {
         }
         if (elDotPassed) elDotPassed.setAttribute('cy', dotYP);
 
-        elBarFlux.setAttribute('y', yF);
-        elBarFlux.setAttribute('height', hF);
-        if (elTxtFlux) {
-            elTxtFlux.textContent = fluxFormatted;
-            elTxtFlux.setAttribute('y', Math.max(16, yF - 5));
-        }
-        if (elDotFlux) elDotFlux.setAttribute('cy', dotYF);
+        // 2. Point Atterrissage / 24h Minuit (kWh)
+        const hFin = Math.min(46, Math.max(6, Math.round(Math.abs(valFinal) * scaleKwh)));
+        const yFin = valFinal >= 0 ? (zeroY - hFin) : zeroY;
+        const dotYFin = valFinal >= 0 ? (zeroY - hFin) : (zeroY + hFin);
 
         elBarFinal.setAttribute('y', yFin);
         elBarFinal.setAttribute('height', hFin);
@@ -2391,8 +2383,22 @@ function actualiserCockpitGlobal() {
         }
         if (elDotFinal) elDotFinal.setAttribute('cy', dotYFin);
 
+        // 3. Indicateur de Pente Dynamique / Puissance en direct (kW)
+        if (elFluxIndicator) {
+            const fluxY = Math.min(85, Math.max(22, dotYP - 10));
+            elFluxIndicator.setAttribute('transform', `translate(260, ${fluxY})`);
+        }
+        if (elTxtFlux) {
+            const trendArrow = valFlux > 0.1 ? '↗' : (valFlux < -0.1 ? '↘' : '→');
+            elTxtFlux.textContent = `⚡ ${fluxFormatted} ${trendArrow}`;
+            elTxtFlux.setAttribute('fill', valFlux > 0 ? '#FBBF24' : (valFlux < 0 ? '#38BDF8' : '#34D399'));
+        }
+
+        // 4. Courbe Spline Continue d'Énergie (00h -> Maintenant -> Projection 24h)
         if (elTrendCurve) {
-            elTrendCurve.setAttribute('d', `M 99 ${dotYP} C 160 ${dotYP}, 175 ${dotYF}, 230 ${dotYF} C 285 ${dotYF}, 300 ${dotYFin}, 361 ${dotYFin}`);
+            const slopeOffset = Math.max(-16, Math.min(16, valFlux * 5));
+            const ctrlY1 = Math.min(95, Math.max(18, dotYP - slopeOffset));
+            elTrendCurve.setAttribute('d', `M 55 ${zeroY} C 110 ${zeroY}, 130 ${ctrlY1}, 178 ${dotYP} C 226 ${dotYP + slopeOffset}, 290 ${dotYFin}, 368 ${dotYFin}`);
         }
     }
 
@@ -2751,20 +2757,25 @@ window.synchroniserTouteLaMaison = async function(event) {
 
     const btn = document.getElementById('btn-sync-all');
     if (btn) {
-        btn.innerHTML = "⏳ Scan Global en cours...";
+        btn.innerHTML = "⏳ Scan...";
         btn.style.backgroundColor = "#475569";
     }
 
     try {
         const response = await fetch('https://hook.eu1.make.com/0jz9xnz6phk3nmn5pdwkijlylowdxosd');
-        if (!response.ok) throw new Error("Erreur Serveur Make");
+        if (!response.ok) throw new Error("Erreur Serveur Make (HTTP " + response.status + ")");
         
-        const dataPack = await response.json();
+        const rawData = await response.json();
+        const dataPack = Array.isArray(rawData) ? rawData : (rawData.data || rawData.sensors || []);
+        
+        const zonesConfig = GLOBAL_HOUSE_CONFIG.zones || GLOBAL_HOUSE_CONFIG;
+        const zonesArray = Object.values(zonesConfig || {});
+
         for (const capteur of dataPack) {
             const idCapteur = capteur.id;
             
-            const zone = Object.values(GLOBAL_HOUSE_CONFIG).find(z => z.sensorId === idCapteur || z.id === idCapteur);
-            const nomPiece = zone ? zone.name : null;
+            const zone = zonesArray.find(z => z && (z.sensorId === idCapteur || z.id === idCapteur));
+            const nomPiece = zone ? (zone.name || zone.nom || zone.title) : null;
             
             if (nomPiece && capteur.temperature !== null && capteur.humidity !== null) {
                 if (!DONNEES_HABITAT[nomPiece]) DONNEES_HABITAT[nomPiece] = {};
@@ -2800,12 +2811,12 @@ window.synchroniserTouteLaMaison = async function(event) {
         
     } catch (error) { 
         console.error("Erreur Bulk Scan:", error); 
-        alert("❌ Erreur lors du scan des capteurs."); 
-    }
-
-    if (btn) {
-        btn.innerHTML = "⚡ Interroger les capteurs (Super-Scan)";
-        btn.style.backgroundColor = "#D96B43";
+        alert("❌ Erreur lors du scan des capteurs : " + (error.message || error)); 
+    } finally {
+        if (btn) {
+            btn.innerHTML = "⚡ Super Scan";
+            btn.style.backgroundColor = "";
+        }
     }
 };
 

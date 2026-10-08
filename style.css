@@ -658,11 +658,11 @@ tr:last-child td {
     filter: drop-shadow(0 0 6px #F43F5E) drop-shadow(0 0 14px rgba(225, 29, 72, 0.85));
 }
 
-/* Verre Cristallin Ultra-Translucide (~94% transparent pour voir tout le paysage) */
+/* Verre Cristallin Élégant et Lisible (Design unifié pour tous les encarts HUD) */
 .crystalline-sheer {
-    background: rgba(11, 19, 38, 0.10);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: rgba(11, 19, 38, 0.72);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.16);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
 }
