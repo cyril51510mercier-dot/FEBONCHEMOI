@@ -204,12 +204,7 @@
                             <circle cx="135" cy="105" r="26" fill="#F59E0B" stroke="#FEF08A" stroke-width="2.5" id="svg-sky-core"/>
                         </g>
 
-                        <!-- RAYONS SOLAIRES FLÉCHÉS DIRECTIONNELS -->
-                        <g id="solar-rays-group">
-                            <line x1="165" y1="115" x2="435" y2="150" stroke="#D97706" stroke-width="2" class="anim-solar-ray" marker-end="url(#mk-ray-arrow)"/>
-                            <line x1="160" y1="130" x2="340" y2="280" stroke="#D97706" stroke-width="2" class="anim-solar-ray" marker-end="url(#mk-ray-arrow)"/>
-                            <line x1="150" y1="145" x2="270" y2="420" stroke="#D97706" stroke-width="2" class="anim-solar-ray" marker-end="url(#mk-ray-arrow)"/>
-                        </g>
+
 
                         <!-- ARBRE ET VÉGÉTATION STYLISÉE -->
                         <g id="garden-vegetation">
@@ -374,13 +369,8 @@
                         </div>
                         <div class="flex items-baseline gap-1.5">
                             <strong class="text-xl sm:text-2xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" id="txt-ext-temp">-- °C</strong>
-                        </div>
-                        <div class="flex items-center gap-1 text-[9px] sm:text-[10px] font-semibold text-slate-200">
-                            <span class="bg-black/55 px-1.5 py-0.5 rounded-md border border-white/15 drop-shadow">
-                                💧 <span id="txt-ext-rh" class="text-sky-300 font-bold">-- %</span>
-                            </span>
-                            <span class="bg-black/55 px-1.5 py-0.5 rounded-md border border-white/15 drop-shadow">
-                                <span id="txt-ext-ah" class="text-sky-200 font-bold">-- g/m³</span>
+                            <span class="bg-black/55 px-1.5 py-0.5 rounded-md border border-white/15 text-[9px] sm:text-[10px] text-slate-200 drop-shadow">
+                                💧 <span id="txt-ext-rh" class="text-slate-100 font-bold">-- %</span> | <span id="txt-ext-ah" class="text-sky-300 font-bold">-- g/m³</span>
                             </span>
                         </div>
                         <div class="inline-flex items-center gap-1 bg-black/55 border border-amber-500/30 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] text-slate-200 w-fit drop-shadow">
@@ -399,7 +389,7 @@
                     <div class="absolute top-[6%] sm:top-[7%] left-[64%] pointer-events-auto flex flex-col gap-1 text-xs">
                         <div class="flex items-center gap-1.5">
                             <span class="text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] flex items-center gap-1">
-                                <span>🛡️</span> Murs : <strong class="text-amber-300 font-black text-xs sm:text-sm ml-0.5" id="txt-wall-temp">-- °C</strong>
+                                <span>🛡️</span> Murs et inertie : <strong class="text-amber-300 font-black text-xs sm:text-sm ml-0.5" id="txt-wall-temp">-- °C</strong>
                             </span>
                         </div>
                         <div class="flex items-center gap-1.5 bg-black/65 border border-amber-500/30 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] backdrop-blur-xs w-fit shadow-sm">
@@ -418,7 +408,7 @@
                     </div>
 
                     <!-- 5. AIR INTÉRIEUR (AU CŒUR DU VOLUME DE LA MAISON, AU-DESSUS DU PLANCHER R+1) -->
-                    <div class="absolute top-[25%] left-[35%] sm:left-[36%] pointer-events-auto flex flex-col gap-1 text-xs">
+                    <div class="absolute top-[28%] sm:top-[29%] left-[45%] sm:left-[46%] pointer-events-auto flex flex-col gap-1 text-xs">
                         <div class="flex items-center gap-1.5">
                             <span class="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] flex items-center gap-1">
                                 <span>🌬️</span> Air Intérieur
@@ -433,17 +423,20 @@
                                 💧 <span id="txt-in-rh" class="text-slate-100 font-bold">-- %</span> | <span id="txt-in-ah" class="text-sky-300 font-bold">-- g/m³</span>
                             </span>
                         </div>
-                        <div class="flex items-center gap-1 text-[9px] sm:text-[10px] bg-black/65 border border-emerald-500/30 px-1.5 py-0.5 rounded-md w-fit text-slate-200 shadow-sm" id="box-hud-ventilation">
-                            <span class="text-slate-300">🪟 Aération :</span>
-                            <strong class="text-emerald-300 font-bold" id="txt-hud-ventilation">--</strong>
+                        <div class="inline-flex items-center gap-1 bg-black/55 border border-amber-500/30 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] text-slate-200 w-fit drop-shadow">
+                            <span class="text-slate-300">🧺 Séchage int. :</span>
+                            <strong class="text-amber-300 font-black" id="txt-in-drying">--/10</strong>
                         </div>
-                        <span id="txt-in-drying" style="display: none;">--</span>
+                        <span id="txt-hud-ventilation" style="display: none;"></span>
+                        <span id="box-hud-ventilation" style="display: none;"></span>
                     </div>
 
                     <!-- 6. TENUE DE L'OCCUPANT (CLO) (AU REZ-DE-CHAUSSÉE DANS LE SALON, À CÔTÉ DU PERSONNAGE) -->
-                    <div class="absolute bottom-[4%] sm:bottom-[6%] left-[33%] sm:left-[34%] pointer-events-auto flex flex-col gap-1 text-xs">
+                    <div class="absolute bottom-[4%] sm:bottom-[6%] left-[32%] sm:left-[33%] pointer-events-auto flex flex-col gap-1 text-xs">
+                        <span class="text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] flex items-center gap-1">
+                            <span>🧍</span> Tenue de l'occupant
+                        </span>
                         <div class="flex items-center gap-1 bg-black/65 border border-amber-500/30 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] backdrop-blur-xs w-fit shadow-sm">
-                            <span>🧍</span>
                             <strong class="text-amber-300 font-black"><span id="currentCloValue">1.00</span> Clo</strong>
                             <span class="text-slate-300 text-[8px] sm:text-[9px]" id="currentCloDesc">(Chemise & pull)</span>
                         </div>
