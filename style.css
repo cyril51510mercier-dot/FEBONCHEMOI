@@ -687,3 +687,169 @@ tr:last-child td {
     text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95), 0 0 2px rgba(0, 0, 0, 0.8);
 }
 
+/* ================================================================== */
+/* 9. NOUVEAU DESIGN SYSTEM - MAISON COUPÉE, COCKPIT & BILAN GRAPHIQUE */
+/* ================================================================== */
+
+/* Animations vectorielles de la maison */
+@keyframes solar-beam {
+    0%, 100% { opacity: 0.85; stroke-dashoffset: 0; }
+    50% { opacity: 1; stroke-dashoffset: -12; }
+}
+
+@keyframes air-breeze {
+    0% { transform: translateX(0); opacity: 0.85; }
+    50% { transform: translateX(8px); opacity: 1; }
+    100% { transform: translateX(0); opacity: 0.85; }
+}
+
+@keyframes radiator-glow {
+    0%, 100% { filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.4)); }
+    50% { filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.85)); }
+}
+
+.anim-solar-ray {
+    stroke-dasharray: 8 4;
+    animation: solar-beam 2.5s ease-in-out infinite;
+}
+
+.anim-natural-airflow {
+    animation: air-breeze 2s ease-in-out infinite;
+}
+
+.anim-radiator-heating {
+    animation: radiator-glow 2.5s ease-in-out infinite;
+}
+
+/* Barre de personnalisation (Ville, CLO, Pièces tampons) */
+.custom-pill-btn {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.custom-pill-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+.custom-pill-btn:active {
+    transform: translateY(0);
+}
+
+/* Bilan Thermique Graphique */
+.thermal-balance-track {
+    background: #0F172A;
+    border-radius: 9999px;
+    height: 12px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+}
+
+.balance-needle-marker {
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    width: 4px;
+    background: #FFFFFF;
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+    transition: left 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Switch d'affichage Pièces : Cartes vs Tableau */
+.view-mode-toggle {
+    display: inline-flex;
+    background: #E2E8F0;
+    padding: 3px;
+    border-radius: 10px;
+    gap: 3px;
+}
+.view-mode-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 14px;
+    border-radius: 7px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.view-mode-btn.active {
+    background: #FFFFFF;
+    color: #0F172A;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+
+/* Transformation responsive du tableau en cartes sur mobile */
+@media (max-width: 768px) {
+    .responsive-mobile-cards table,
+    .responsive-mobile-cards tbody {
+        display: block;
+        width: 100%;
+    }
+
+    .responsive-mobile-cards thead {
+        display: none;
+    }
+
+    .responsive-mobile-cards tr {
+        display: block;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 16px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    }
+
+    .responsive-mobile-cards td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 0 !important;
+        border: none !important;
+        text-align: right !important;
+        font-size: 0.85rem;
+    }
+
+    .responsive-mobile-cards td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #64748B;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        text-align: left;
+    }
+
+    .responsive-mobile-cards td:first-child {
+        border-bottom: 1px solid #F1F5F9 !important;
+        padding-bottom: 10px !important;
+        margin-bottom: 8px;
+        font-size: 1.05rem !important;
+        font-weight: 800 !important;
+        color: #0F172A !important;
+    }
+
+    .responsive-mobile-cards td:first-child::before {
+        display: none;
+    }
+
+    .responsive-mobile-cards td:last-child {
+        border-top: 1px solid #F1F5F9 !important;
+        padding-top: 10px !important;
+        margin-top: 8px;
+        justify-content: center;
+    }
+
+    .responsive-mobile-cards td:last-child::before {
+        display: none;
+    }
+
+    .responsive-mobile-cards td:last-child button,
+    .responsive-mobile-cards td:last-child a {
+        width: 100%;
+        padding: 8px 12px;
+        text-align: center;
+    }
+}
+

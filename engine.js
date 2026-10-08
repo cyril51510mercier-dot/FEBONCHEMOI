@@ -445,17 +445,17 @@ function initialiserDashboard() {
             const safeName = nomPiece.replace(/'/g, "\\'");
 
             tr.innerHTML = `
-                <td style="padding: 12px 14px; font-weight: 600; color: #0F172A;">${nomPiece}</td>
-                <td style="padding: 12px 10px; text-align: center;"><span id="status-${idCapteur}" style="background: #F1F5F9; color: #64748B; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; font-weight: 600;">En attente</span></td>
-                <td style="padding: 12px 10px; text-align: right; font-weight: 700; color: #0F172A;" id="temp-${idCapteur}">-- °C</td>
-                <td style="padding: 12px 10px; text-align: right; font-weight: 600; color: #334155;" id="hum-${idCapteur}">-- %</td>
-                <td style="padding: 12px 10px; text-align: right; font-weight: 600; color: #0284C7;" id="ah-${idCapteur}">-- g/m³</td>
-                <td style="padding: 12px 10px; text-align: center;"><span id="pmv-badge-${idCapteur}" style="font-weight: 700; padding: 4px 8px; border-radius: 6px; font-size: 0.82rem;">--</span></td>
-                <td style="padding: 12px 10px; text-align: right; font-weight: 600;" id="energy-${idCapteur}">-- kWh/j</td>
-                <td style="padding: 12px 10px; text-align: right; font-weight: 600; color: #D97706;" id="tstruct-${idCapteur}">-- °C</td>
-                <td style="padding: 12px 10px; text-align: center; font-weight: 600;" id="drying-${idCapteur}">--</td>
-                <td style="padding: 10px 12px; text-align: center;" id="action-${idCapteur}">
-                    <button onclick="voirRecommandations('${safeName}')" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 4px 10px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: #0F172A;">🔍 Diag</button>
+                <td data-label="Pièce" style="padding: 12px 14px; font-weight: 700; color: #0F172A;">${nomPiece}</td>
+                <td data-label="Statut" style="padding: 12px 10px; text-align: center;"><span id="status-${idCapteur}" style="background: #F1F5F9; color: #64748B; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; font-weight: 600;">En attente</span></td>
+                <td data-label="Température" style="padding: 12px 10px; text-align: right; font-weight: 700; color: #0F172A;" id="temp-${idCapteur}">-- °C</td>
+                <td data-label="Humidité Rel." style="padding: 12px 10px; text-align: right; font-weight: 600; color: #334155;" id="hum-${idCapteur}">-- %</td>
+                <td data-label="Humidité Abs." style="padding: 12px 10px; text-align: right; font-weight: 600; color: #0284C7;" id="ah-${idCapteur}">-- g/m³</td>
+                <td data-label="PMV (Confort)" style="padding: 12px 10px; text-align: center;"><span id="pmv-badge-${idCapteur}" style="font-weight: 700; padding: 4px 8px; border-radius: 6px; font-size: 0.82rem;">--</span></td>
+                <td data-label="Bilan Net (24h)" style="padding: 12px 10px; text-align: right; font-weight: 600;" id="energy-${idCapteur}">-- kWh/j</td>
+                <td data-label="T° Masse Parois" style="padding: 12px 10px; text-align: right; font-weight: 600; color: #D97706;" id="tstruct-${idCapteur}">-- °C</td>
+                <td data-label="Séchage Linge" style="padding: 12px 10px; text-align: center; font-weight: 600;" id="drying-${idCapteur}">--</td>
+                <td data-label="Action" style="padding: 10px 12px; text-align: center;" id="action-${idCapteur}">
+                    <button onclick="voirRecommandations('${safeName}')" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 5px 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer; color: #0F172A;">🔍 Diag</button>
                 </td>
             `;
             tableBody.appendChild(tr);
@@ -2289,22 +2289,30 @@ function actualiserCockpitGlobal() {
     });
 
     // ============================================================
-    // 5. BILAN PROGRESSIF EN 3 TEMPS
+    // 5. BILAN PROGRESSIF EN 3 TEMPS ET BALANCE GRAPHIQUE
     // ============================================================
     const txtKwhPassed = document.getElementById('txt-kwh-passed');
     if (txtKwhPassed) {
         const valPasse = metrics.totalBilanPasseKwh;
         const sign = valPasse > 0 ? '+' : '';
         txtKwhPassed.textContent = `${sign}${valPasse.toFixed(2)} kWh`;
-        txtKwhPassed.className = `text-sm sm:text-base font-black ${valPasse >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+        txtKwhPassed.className = `text-base sm:text-lg font-black ${valPasse >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
     }
 
     const txtKwFlux = document.getElementById('txt-kw-flux');
+    const txtKwFluxDisplay = document.getElementById('txt-kw-flux-display');
+    const valFlux = metrics.totalPuissanceNetteKw;
+    const signFlux = valFlux > 0 ? '+' : '';
+    const fluxFormatted = `${signFlux}${valFlux.toFixed(2)} kW`;
+    const fluxColorClass = valFlux >= 0 ? 'text-amber-400' : 'text-sky-400';
+
     if (txtKwFlux) {
-        const valFlux = metrics.totalPuissanceNetteKw;
-        const sign = valFlux > 0 ? '+' : '';
-        txtKwFlux.textContent = `${sign}${valFlux.toFixed(2)} kW`;
-        txtKwFlux.className = `text-sm sm:text-base font-black ${valFlux >= 0 ? 'text-amber-400' : 'text-sky-400'}`;
+        txtKwFlux.textContent = fluxFormatted;
+        txtKwFlux.className = `font-extrabold ${fluxColorClass}`;
+    }
+    if (txtKwFluxDisplay) {
+        txtKwFluxDisplay.textContent = fluxFormatted;
+        txtKwFluxDisplay.className = `text-base sm:text-lg font-black ${fluxColorClass}`;
     }
 
     const txtKwhFinal = document.getElementById('txt-kwh-final');
@@ -2312,7 +2320,50 @@ function actualiserCockpitGlobal() {
         const valFinal = metrics.totalBilanNetKwh;
         const sign = valFinal > 0 ? '+' : '';
         txtKwhFinal.textContent = `${sign}${valFinal.toFixed(2)} kWh`;
-        txtKwhFinal.className = `text-sm sm:text-base font-black ${valFinal >= 0 ? 'text-white' : 'text-slate-300'}`;
+        txtKwhFinal.className = `text-base sm:text-lg font-black ${valFinal >= 0 ? 'text-white' : 'text-slate-300'}`;
+    }
+
+    // Animation & Positionnement de la Jauge de Balance Graphique
+    const barGain = document.getElementById('balance-bar-gain');
+    const barLoss = document.getElementById('balance-bar-loss');
+    const needle = document.getElementById('balance-needle');
+    if (barGain && barLoss && needle) {
+        const apportsEstimes = Math.max(0.2, (metrics.totalGainsSolairesKw || 0) + (metrics.totalGainsConductionKw || 0) + (valFlux > 0 ? valFlux : 0.5));
+        const deperditionsEstimees = Math.max(0.2, (metrics.totalDeperditionsKw || 0) + (valFlux < 0 ? Math.abs(valFlux) : 0.5));
+        const totalFluxAbs = apportsEstimes + deperditionsEstimees;
+        const gainPct = Math.min(90, Math.max(10, Math.round((apportsEstimes / totalFluxAbs) * 100)));
+        const lossPct = 100 - gainPct;
+        
+        barGain.style.width = `${gainPct}%`;
+        barLoss.style.width = `${lossPct}%`;
+        needle.style.left = `${gainPct}%`;
+    }
+
+    // Mise à jour des flèches d'aération naturelle et du radiateur dans le SVG
+    const airflowArrows = document.getElementById('natural-ventilation-arrows');
+    if (airflowArrows) {
+        if (deltaAhGlobal >= 0.5 && metrics.avgRH > 58) {
+            airflowArrows.style.opacity = '1';
+            airflowArrows.style.filter = 'drop-shadow(0 0 8px rgba(249, 115, 22, 0.7))';
+        } else if (deltaAhGlobal < 0.2 && metrics.avgRH >= 58) {
+            airflowArrows.style.opacity = '0.2';
+            airflowArrows.style.filter = 'none';
+        } else {
+            airflowArrows.style.opacity = '0.7';
+            airflowArrows.style.filter = 'none';
+        }
+    }
+
+    const radiatorGroup = document.getElementById('radiator-heating-group');
+    if (radiatorGroup) {
+        const isHeatingOn = typeof isHeatingSeasonActive === 'function' ? isHeatingSeasonActive() : false;
+        if (isHeatingOn) {
+            radiatorGroup.classList.add('anim-radiator-heating');
+            radiatorGroup.style.opacity = '1';
+        } else {
+            radiatorGroup.classList.remove('anim-radiator-heating');
+            radiatorGroup.style.opacity = '0.45';
+        }
     }
 
     // ============================================================
