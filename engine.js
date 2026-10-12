@@ -2241,7 +2241,7 @@ function actualiserCockpitGlobal() {
         extLabel = `${extLabel} (in situ)`;
     }
 
-    // Rendu Carte Extérieur
+    // Rendu Carte Extérieur (Desktop & Mobile)
     const txtExtTemp = document.getElementById('txt-ext-temp');
     if (txtExtTemp) {
         txtExtTemp.textContent = `${extTemp.toFixed(1)} °C`;
@@ -2254,10 +2254,19 @@ function actualiserCockpitGlobal() {
             txtExtTemp.title = tooltip;
         }
     }
+    const txtExtTempM = document.getElementById('txt-ext-temp-m');
+    if (txtExtTempM) txtExtTempM.textContent = `${extTemp.toFixed(1)} °C`;
+
     const txtExtRh = document.getElementById('txt-ext-rh');
     if (txtExtRh) txtExtRh.textContent = `${extRh.toFixed(0)} %`;
+    const txtExtRhM = document.getElementById('txt-ext-rh-m');
+    if (txtExtRhM) txtExtRhM.textContent = `${extRh.toFixed(0)}%`;
+
     const txtExtAh = document.getElementById('txt-ext-ah');
     if (txtExtAh) txtExtAh.textContent = `${extAh.toFixed(1)} g/m³`;
+    const txtExtAhM = document.getElementById('txt-ext-ah-m');
+    if (txtExtAhM) txtExtAhM.textContent = `${extAh.toFixed(1)} g/m³`;
+
     const txtExtDrying = document.getElementById('txt-ext-drying');
     if (txtExtDrying) {
         txtExtDrying.textContent = `${extDrying}/10`;
@@ -2268,10 +2277,18 @@ function actualiserCockpitGlobal() {
         }
         txtExtDrying.parentElement.title = dryingTooltip;
     }
+    const txtExtDryingM = document.getElementById('txt-ext-drying-m');
+    if (txtExtDryingM) txtExtDryingM.textContent = `${extDrying}/10`;
+
     const txtExtEmoji = document.getElementById('txt-ext-emoji');
     if (txtExtEmoji) txtExtEmoji.textContent = extEmoji;
+    const txtExtEmojiM = document.getElementById('txt-ext-emoji-m');
+    if (txtExtEmojiM) txtExtEmojiM.textContent = extEmoji;
+
     const txtExtLabel = document.getElementById('txt-ext-label');
     if (txtExtLabel) txtExtLabel.textContent = extLabel;
+    const txtExtLabelM = document.getElementById('txt-ext-label-m');
+    if (txtExtLabelM) txtExtLabelM.textContent = extLabel;
 
     // Rendu SVG Astre Céleste (Soleil / Lune / Nuages)
     const svgSkyCore = document.getElementById('svg-sky-core');
@@ -2311,14 +2328,20 @@ function actualiserCockpitGlobal() {
 
     const txtWallTemp = document.getElementById('txt-wall-temp');
     if (txtWallTemp) txtWallTemp.textContent = `${metrics.avgTStruct.toFixed(1)} °C`;
+    const txtWallTempM = document.getElementById('txt-wall-temp-m');
+    if (txtWallTempM) txtWallTempM.textContent = `${metrics.avgTStruct.toFixed(1)} °C`;
+
     const txtAutonomyVal = document.getElementById('txt-autonomy-val');
     if (txtAutonomyVal) {
         txtAutonomyVal.textContent = globalReserve.autonomyText;
         txtAutonomyVal.title = globalReserve.autonomyDetail || globalReserve.autonomyText;
     }
+    const txtAutonomyValM = document.getElementById('txt-autonomy-val-m');
+    if (txtAutonomyValM) txtAutonomyValM.textContent = globalReserve.autonomyText;
     
     const txtAutonomyBar = document.getElementById('txt-autonomy-bar');
-    if (txtAutonomyBar) {
+    const txtAutonomyBarM = document.getElementById('txt-autonomy-bar-m');
+    if (txtAutonomyBar || txtAutonomyBarM) {
         let barPct = 50;
         if (globalReserve.hoursTo19 !== undefined && !isNaN(globalReserve.hoursTo19) && !globalReserve.autonomyText.includes('Illimitée') && !globalReserve.autonomyText.includes('> 48 h')) {
             barPct = Math.min(100, Math.max(5, Math.round((globalReserve.hoursTo19 / 36) * 100)));
@@ -2327,8 +2350,14 @@ function actualiserCockpitGlobal() {
         } else if (globalReserve.autonomyText.includes('19°C') || globalReserve.autonomyText.includes('<= 19') || globalReserve.hoursTo19 === 0) {
             barPct = 0;
         }
-        txtAutonomyBar.style.width = `${barPct}%`;
-        txtAutonomyBar.parentElement.title = globalReserve.autonomyDetail || globalReserve.autonomyText;
+        if (txtAutonomyBar) {
+            txtAutonomyBar.style.width = `${barPct}%`;
+            txtAutonomyBar.parentElement.title = globalReserve.autonomyDetail || globalReserve.autonomyText;
+        }
+        if (txtAutonomyBarM) {
+            txtAutonomyBarM.style.width = `${barPct}%`;
+            txtAutonomyBarM.parentElement.title = globalReserve.autonomyDetail || globalReserve.autonomyText;
+        }
     }
 
     // ============================================================
@@ -2336,12 +2365,23 @@ function actualiserCockpitGlobal() {
     // ============================================================
     const txtInTemp = document.getElementById('txt-in-temp');
     if (txtInTemp) txtInTemp.textContent = `${metrics.avgTemp.toFixed(1)} °C`;
+    const txtInTempM = document.getElementById('txt-in-temp-m');
+    if (txtInTempM) txtInTempM.textContent = `${metrics.avgTemp.toFixed(1)} °C`;
+
     const txtInRh = document.getElementById('txt-in-rh');
     if (txtInRh) txtInRh.textContent = `${metrics.avgRH} %`;
+    const txtInRhM = document.getElementById('txt-in-rh-m');
+    if (txtInRhM) txtInRhM.textContent = `${metrics.avgRH}%`;
+
     const txtInAh = document.getElementById('txt-in-ah');
     if (txtInAh) txtInAh.textContent = `${metrics.avgAH.toFixed(1)} g/m³`;
+    const txtInAhM = document.getElementById('txt-in-ah-m');
+    if (txtInAhM) txtInAhM.textContent = `${metrics.avgAH.toFixed(1)} g/m³`;
+
     const txtInDrying = document.getElementById('txt-in-drying');
     if (txtInDrying) txtInDrying.textContent = `${metrics.indoorDryingScore10}/10`;
+    const txtInDryingM = document.getElementById('txt-in-drying-m');
+    if (txtInDryingM) txtInDryingM.textContent = `${metrics.indoorDryingScore10}/10`;
 
     // 3.1 Statut d'aération différentielle globale
     const txtHudVent = document.getElementById('txt-hud-ventilation');
@@ -2364,6 +2404,7 @@ function actualiserCockpitGlobal() {
     }
 
     const txtPmvBadge = document.getElementById('txt-pmv-badge');
+    const txtPmvBadgeM = document.getElementById('txt-pmv-badge-m');
     let pmvLabel = "Confort Idéal";
     let pmvClass = "bg-emerald-950/80 border-emerald-400/50 text-emerald-200";
     if (metrics.avgPMV > 0.75) {
@@ -2383,6 +2424,10 @@ function actualiserCockpitGlobal() {
     if (txtPmvBadge) {
         txtPmvBadge.textContent = `${pmvLabel} (${signPmv}${metrics.avgPMV.toFixed(2)})`;
         txtPmvBadge.className = `text-[10px] font-extrabold px-2 py-0.5 rounded-full border text-crisp ${pmvClass}`;
+    }
+    if (txtPmvBadgeM) {
+        txtPmvBadgeM.textContent = `${pmvLabel} (${signPmv}${metrics.avgPMV.toFixed(2)})`;
+        txtPmvBadgeM.className = `text-[8px] font-extrabold px-1.5 py-0.5 rounded-full border text-crisp ${pmvClass}`;
     }
 
     // ============================================================
@@ -2677,11 +2722,16 @@ window.resetClothing = function() {
 
 function updateClothingDisplay() { 
     const currentCloEl = document.getElementById('currentCloValue');
+    const currentCloElM = document.getElementById('currentCloValue-m');
     const currentCloDescEl = document.getElementById('currentCloDesc');
+    const currentCloDescElM = document.getElementById('currentCloDesc-m');
     const totalClo = getBaseCloAndMet(null).totalClo;
+    const desc = getClothingDescription(totalClo);
 
     if (currentCloEl) currentCloEl.textContent = totalClo.toFixed(2); 
-    if (currentCloDescEl) currentCloDescEl.textContent = getClothingDescription(totalClo);
+    if (currentCloElM) currentCloElM.textContent = totalClo.toFixed(2); 
+    if (currentCloDescEl) currentCloDescEl.textContent = desc;
+    if (currentCloDescElM) currentCloDescElM.textContent = desc;
 }
 
 // ============================================================

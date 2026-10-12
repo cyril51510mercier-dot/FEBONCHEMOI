@@ -352,53 +352,54 @@
                 </div>
 
                 <!-- ============================================================== -->
+                <!-- ============================================================== -->
                 <!-- TÉLÉMÉTRIE INTÉGRÉE DIRECTEMENT SUR LE DESSIN (SANS ENCARTS) -->
                 <!-- ============================================================== -->
                 <div class="absolute inset-0 pointer-events-none select-none">
                     
                     <!-- 1. EXTÉRIEUR (DIRECTEMENT SUR LE PAYSAGE À GAUCHE) -->
-                    <div class="absolute top-[48%] left-[2%] sm:left-[3%] pointer-events-auto flex flex-col gap-1 text-xs">
-                        <div class="flex items-center gap-1.5">
-                            <span class="bg-black/65 border border-sky-400/40 px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-black uppercase tracking-wider text-sky-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm">
-                                <span>🌍</span> Extérieur
+                    <div class="absolute top-[48%] left-[2%] sm:left-[3%] pointer-events-auto flex flex-col gap-0.5 sm:gap-1 text-xs">
+                        <div class="flex items-center gap-1">
+                            <span class="bg-black/65 border border-sky-400/40 px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-xs font-black uppercase tracking-wider text-sky-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm">
+                                <span>🌍</span> <span class="hidden sm:inline">Extérieur</span><span class="sm:hidden">Ext.</span>
                             </span>
-                            <span class="bg-black/60 border border-sky-400/40 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] text-sky-200 font-bold backdrop-blur-xs flex items-center gap-1 shadow-sm">
+                            <span class="hidden sm:flex bg-black/60 border border-sky-400/40 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] text-sky-200 font-bold backdrop-blur-xs items-center gap-1 shadow-sm">
                                 <span id="txt-ext-emoji">☀️</span>
                                 <span id="txt-ext-label">--</span>
                             </span>
                         </div>
                         <div class="flex items-baseline gap-1.5">
-                            <strong class="text-xl sm:text-2xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" id="txt-ext-temp">-- °C</strong>
-                            <span class="bg-black/55 px-1.5 py-0.5 rounded-md border border-white/15 text-[9px] sm:text-[10px] text-slate-200 drop-shadow">
+                            <strong class="text-base sm:text-2xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" id="txt-ext-temp">-- °C</strong>
+                            <span class="hidden sm:inline bg-black/55 px-1.5 py-0.5 rounded-md border border-white/15 text-[9px] sm:text-[10px] text-slate-200 drop-shadow">
                                 💧 <span id="txt-ext-rh" class="text-slate-100 font-bold">-- %</span> | <span id="txt-ext-ah" class="text-sky-300 font-bold">-- g/m³</span>
                             </span>
                         </div>
-                        <div class="inline-flex items-center gap-1 bg-black/55 border border-amber-500/30 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] text-slate-200 w-fit drop-shadow">
+                        <div class="hidden sm:inline-flex items-center gap-1 bg-black/55 border border-amber-500/30 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] text-slate-200 w-fit drop-shadow">
                             <span class="text-slate-300">🧺 Séchage :</span>
                             <strong class="text-amber-300 font-black" id="txt-ext-drying">--/10</strong>
                         </div>
                     </div>
 
                     <!-- 1.1 APPORTS SOLAIRES (SOUS L'ASTRE SOLAIRE DANS LE FAISCEAU) -->
-                    <div class="absolute top-[24%] left-[10%] sm:left-[12%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-amber-400/40 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] backdrop-blur-xs shadow-md">
+                    <div class="absolute top-[24%] left-[10%] sm:left-[12%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-amber-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-amber-300">☀️ Solaire</span>
                         <strong class="font-black text-amber-400" id="txt-flux-solar-val">+0.00 kW</strong>
                     </div>
 
                     <!-- 2. FLUX EXTÉRIEUR / PERTES (DIRECTEMENT SUR LE DÉPART DE FLÈCHE À LA FENÊTRE R+1) -->
-                    <div class="absolute top-[41%] left-[13%] sm:left-[15%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-sky-400/40 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] backdrop-blur-xs shadow-md">
+                    <div class="absolute top-[41%] left-[13%] sm:left-[15%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-sky-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-slate-300" id="txt-flux-ext-tag">❄️ Pertes Ext.</span>
                         <strong class="font-black text-sky-300" id="txt-flux-ext-val">-- kW</strong>
                     </div>
 
                     <!-- 3. BATTERIE DES MURS & AUTONOMIE (DIRECTEMENT DANS LA POINTE DU TOIT) -->
-                    <div class="absolute top-[6%] sm:top-[7%] left-[64%] pointer-events-auto flex flex-col gap-1 text-xs">
+                    <div class="absolute top-[6%] sm:top-[7%] right-[3%] sm:right-auto sm:left-[64%] pointer-events-auto flex flex-col gap-1 text-xs">
                         <div class="flex items-center gap-1.5">
-                            <span class="bg-black/65 border border-amber-500/40 px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm">
-                                <span>🛡️</span> Murs et inertie : <strong class="text-amber-300 font-black text-xs sm:text-sm ml-0.5" id="txt-wall-temp">-- °C</strong>
+                            <span class="bg-black/65 border border-amber-500/40 px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-xs font-black uppercase tracking-wider text-amber-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm">
+                                <span>🛡️</span> <span class="hidden sm:inline">Murs et inertie :</span><span class="sm:hidden">Murs :</span> <strong class="text-amber-300 font-black text-xs sm:text-sm ml-0.5" id="txt-wall-temp">-- °C</strong>
                             </span>
                         </div>
-                        <div class="flex items-center gap-1.5 bg-black/65 border border-amber-500/30 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] backdrop-blur-xs w-fit shadow-sm">
+                        <div class="hidden sm:flex items-center gap-1.5 bg-black/65 border border-amber-500/30 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] backdrop-blur-xs w-fit shadow-sm">
                             <span class="text-slate-300 font-medium">Autonomie (~19°C) :</span>
                             <strong class="text-sky-300 font-black" id="txt-autonomy-val">-- h</strong>
                             <div class="w-10 sm:w-14 bg-black/80 h-1.5 rounded-full overflow-hidden border border-white/20 shrink-0">
@@ -408,28 +409,28 @@
                     </div>
 
                     <!-- 4. FLUX MURS / RESTITUTION (DIRECTEMENT SUR LE DÉPART DE FLÈCHE AU MUR DROIT R+1) -->
-                    <div class="absolute top-[41%] right-[8%] sm:right-[11%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-amber-400/40 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] backdrop-blur-xs shadow-md">
+                    <div class="absolute top-[41%] right-[3%] sm:right-[11%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-amber-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-slate-300" id="txt-flux-wall-tag">🔥 Restitution</span>
                         <strong class="font-black text-amber-300" id="txt-flux-wall-val">-- kW</strong>
                     </div>
 
                     <!-- 5. AIR INTÉRIEUR (AU CŒUR DU VOLUME DE LA MAISON, AU-DESSUS DU PLANCHER R+1) -->
-                    <div class="absolute top-[28%] sm:top-[29%] left-[45%] sm:left-[46%] pointer-events-auto flex flex-col gap-1 text-xs">
+                    <div class="absolute top-[28%] sm:top-[29%] left-[44%] sm:left-[46%] pointer-events-auto flex flex-col gap-0.5 sm:gap-1 text-xs">
                         <div class="flex items-center gap-1.5">
-                            <span class="bg-black/65 border border-emerald-500/40 px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm">
-                                <span>🌬️</span> Air Intérieur
+                            <span class="bg-black/65 border border-emerald-500/40 px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-xs font-black uppercase tracking-wider text-emerald-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm">
+                                <span>🌬️</span> <span class="hidden sm:inline">Air Intérieur</span><span class="sm:hidden">Intérieur</span>
                             </span>
-                            <span id="txt-pmv-badge" class="text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-400/50 text-emerald-200">
+                            <span id="txt-pmv-badge" class="hidden sm:inline text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-400/50 text-emerald-200">
                                 Confort Idéal
                             </span>
                         </div>
                         <div class="flex items-baseline gap-1.5">
-                            <strong class="text-lg sm:text-xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" id="txt-in-temp">-- °C</strong>
-                            <span class="bg-black/55 px-1.5 py-0.5 rounded-md border border-white/15 text-[9px] sm:text-[10px] text-slate-200 drop-shadow">
+                            <strong class="text-base sm:text-xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" id="txt-in-temp">-- °C</strong>
+                            <span class="hidden sm:inline bg-black/55 px-1.5 py-0.5 rounded-md border border-white/15 text-[9px] sm:text-[10px] text-slate-200 drop-shadow">
                                 💧 <span id="txt-in-rh" class="text-slate-100 font-bold">-- %</span> | <span id="txt-in-ah" class="text-sky-300 font-bold">-- g/m³</span>
                             </span>
                         </div>
-                        <div class="inline-flex items-center gap-1 bg-black/55 border border-amber-500/30 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] text-slate-200 w-fit drop-shadow">
+                        <div class="hidden sm:inline-flex items-center gap-1 bg-black/55 border border-amber-500/30 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] text-slate-200 w-fit drop-shadow">
                             <span class="text-slate-300">🧺 Séchage int. :</span>
                             <strong class="text-amber-300 font-black" id="txt-in-drying">--/10</strong>
                         </div>
@@ -437,8 +438,8 @@
                         <span id="box-hud-ventilation" style="display: none;"></span>
                     </div>
 
-                    <!-- 6. TENUE DE L'OCCUPANT (CLO) (AU REZ-DE-CHAUSSÉE DANS LE SALON, À CÔTÉ DU PERSONNAGE) -->
-                    <div class="absolute bottom-[4%] sm:bottom-[6%] left-[32%] sm:left-[33%] pointer-events-auto flex flex-col gap-1 text-xs">
+                    <!-- 6. TENUE DE L'OCCUPANT (CLO) (AU REZ-DE-CHAUSSÉE DANS LE SALON - DESKTOP UNIQUEMENT) -->
+                    <div class="hidden sm:flex absolute bottom-[4%] sm:bottom-[6%] left-[32%] sm:left-[33%] pointer-events-auto flex-col gap-1 text-xs">
                         <span class="bg-black/65 border border-amber-500/40 px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm">
                             <span>🧍</span> Tenue de l'occupant
                         </span>
@@ -455,6 +456,88 @@
 
                 </div>
 
+            </div>
+
+            <!-- 3.1 CARTES DE SYNTHÈSE DÉDIÉES MOBILE (LISIBLES, AÉRÉES ET TACTILES) -->
+            <div class="grid grid-cols-2 gap-2 mt-2.5 mb-3 sm:hidden select-none">
+                <!-- Carte 1 : Extérieur -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between shadow-sm">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] font-bold text-sky-400 flex items-center gap-1">
+                            <span>🌍</span> Extérieur
+                        </span>
+                        <span class="text-[9px] font-semibold text-sky-200 bg-sky-950/60 px-1.5 py-0.5 rounded-full border border-sky-500/30 flex items-center gap-1">
+                            <span id="txt-ext-emoji-m">☀️</span> <span id="txt-ext-label-m">--</span>
+                        </span>
+                    </div>
+                    <div class="flex items-baseline justify-between">
+                        <strong class="text-base font-black text-white" id="txt-ext-temp-m">-- °C</strong>
+                        <span class="text-[9px] text-slate-300">
+                            💧 <span id="txt-ext-rh-m" class="font-bold text-slate-100">--%</span> (<span id="txt-ext-ah-m" class="text-sky-300 font-bold">-- g/m³</span>)
+                        </span>
+                    </div>
+                    <div class="text-[9px] text-slate-400 mt-1 flex items-center justify-between border-t border-slate-800/80 pt-1">
+                        <span>🧺 Séchage ext. :</span>
+                        <strong class="text-amber-300 font-black" id="txt-ext-drying-m">--/10</strong>
+                    </div>
+                </div>
+
+                <!-- Carte 2 : Air Intérieur -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between shadow-sm">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                            <span>🌬️</span> Intérieur
+                        </span>
+                        <span id="txt-pmv-badge-m" class="text-[8px] font-extrabold px-1.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-400/50 text-emerald-200">
+                            Confort
+                        </span>
+                    </div>
+                    <div class="flex items-baseline justify-between">
+                        <strong class="text-base font-black text-white" id="txt-in-temp-m">-- °C</strong>
+                        <span class="text-[9px] text-slate-300">
+                            💧 <span id="txt-in-rh-m" class="font-bold text-slate-100">--%</span> (<span id="txt-in-ah-m" class="text-sky-300 font-bold">-- g/m³</span>)
+                        </span>
+                    </div>
+                    <div class="text-[9px] text-slate-400 mt-1 flex items-center justify-between border-t border-slate-800/80 pt-1">
+                        <span>🧺 Séchage int. :</span>
+                        <strong class="text-amber-300 font-black" id="txt-in-drying-m">--/10</strong>
+                    </div>
+                </div>
+
+                <!-- Carte 3 : Murs & Inertie -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between shadow-sm">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] font-bold text-amber-400 flex items-center gap-1">
+                            <span>🛡️</span> Murs & Inertie
+                        </span>
+                        <strong class="text-xs font-black text-amber-300" id="txt-wall-temp-m">-- °C</strong>
+                    </div>
+                    <div class="flex flex-col gap-1 mt-0.5">
+                        <div class="flex items-center justify-between text-[9px] text-slate-300">
+                            <span class="text-slate-400">Autonomie :</span>
+                            <strong class="text-sky-300 font-bold truncate max-w-[90px]" id="txt-autonomy-val-m">--</strong>
+                        </div>
+                        <div class="w-full bg-black/80 h-1.5 rounded-full overflow-hidden border border-white/20">
+                            <div id="txt-autonomy-bar-m" class="h-full bg-gradient-to-r from-[#D96B43] to-sky-400 rounded-full transition-all duration-500" style="width: 50%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Carte 4 : Tenue Occupant (CLO) -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between shadow-sm">
+                    <div class="flex items-center justify-between mb-0.5">
+                        <span class="text-[10px] font-bold text-amber-400 flex items-center gap-1">
+                            <span>🧍</span> Occupant
+                        </span>
+                        <strong class="text-xs font-black text-amber-300"><span id="currentCloValue-m">1.00</span> Clo</strong>
+                    </div>
+                    <p class="text-[8px] text-slate-400 m-0 truncate" id="currentCloDesc-m">(Chemise & pull)</p>
+                    <div class="flex items-center gap-1 mt-1 pt-1 border-t border-slate-800/80 justify-between">
+                        <button onclick="adjustClothing(-0.2)" class="flex-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-white/20 rounded py-0.5 text-[9px] font-bold text-center" title="Alléger tenue (-0.2 Clo)">−0.2</button>
+                        <button onclick="adjustClothing(0.2)" class="flex-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-white/20 rounded py-0.5 text-[9px] font-bold text-center" title="Couvrir tenue (+0.2 Clo)">+0.2</button>
+                        <button onclick="resetClothing()" class="px-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 border border-white/20 rounded py-0.5 text-[9px] font-bold text-center" title="Réinitialiser saison">↺</button>
+                    </div>
+                </div>
             </div>
 
             <!-- 4. BILAN THERMIQUE DU JOUR : BALANCE DES FLUX & TRAJECTOIRE ÉNERGÉTIQUE CÔTE-À-CÔTE -->
