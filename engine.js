@@ -367,15 +367,15 @@ function getEffectiveOutdoorAir() {
     const deltaSun = (street && garden) ? parseFloat((street.ta - garden.ta).toFixed(1)) : 0;
     
     // Qualification physique de l'éclairage selon l'écart Rue - Jardin :
-    // - Faible (< 0.8 °C) : Ciel couvert / nuages denses
-    // - Modéré (0.8 à 2.4 °C) : Éclairage diffus / ciel voilé / nuages légers
-    // - Fort (>= 2.5 °C) : Soleil direct franc
+    // - Faible (< 2.0 °C) : Ciel couvert / nuages denses / nuit
+    // - Modéré (2.0 à 3.9 °C) : Éclairage diffus / ciel voilé / soleil rasant
+    // - Fort (>= 4.0 °C) : Soleil direct franc non ambigu
     let sunNature = 'couvert';
     let sunFactor = 0.15;
-    if (deltaSun >= 2.5) {
+    if (deltaSun >= 4.0) {
         sunNature = 'direct';
         sunFactor = 1.0;
-    } else if (deltaSun >= 0.8) {
+    } else if (deltaSun >= 2.0) {
         sunNature = 'diffus';
         sunFactor = 0.45;
     } else {
@@ -1398,7 +1398,25 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const hWall = uWall * wallArea * (bW1 + bW2 + bW3 + bW4);
     const hCeiling = uCeiling * area * bCeiling;
     const hFloor = uFloor * area * bFloor;
-    const hSurfacique = hWall + hCeiling + hFloor;
+
+    let hWindows = 0;
+    const glassUProps = {
+        'single': 5.7,
+        'double_old': 2.8,
+        'double_standard': 1.5,
+        'double_recent': 1.2,
+        'triple': 0.7
+    };
+    if (Array.isArray(zoneConfig.windows) && zoneConfig.windows.length > 0) {
+        zoneConfig.windows.forEach(win => {
+            const wArea = parseFloat(win.area) || 0;
+            if (wArea <= 0) return;
+            const uWin = glassUProps[win.glass] || 1.4;
+            hWindows += (uWin * wArea);
+        });
+    }
+
+    const hSurfacique = hWall + hCeiling + hFloor + hWindows;
 
     let ach = 0.5;
     const vmc = zoneConfig.equipment?.vmcSystem;
@@ -1602,16 +1620,16 @@ function calculateEquilibriumTstruct(zoneConfig, tOp, tExt24h) {
     if (!zoneConfig) return tOp;
 
     const ins = zoneConfig.insulation || 'iti_recent';
-    let rInt = 0.13;
-    let rExt = 0.04;
+    // Chute thermique moyenne des parois intérieures (doublages, cloisons, dalles)
+    // R_surf / R_total = (1/h_i) / (1/h_i + R_isol + R_paroi + 1/h_e)
+    // En ITI moderne : R_total ~ 3.5 => DeltaT ~ (0.13 / 3.5) * (tOp - tExt24h) ~ 0.037 * DeltaT
+    let factorDelta = 0.035;
+    if (ins === 'iti_recent' || ins === 'ite_heavy') factorDelta = 0.035;
+    else if (ins === 'iti_old' || ins === 'ite_old') factorDelta = 0.075;
+    else factorDelta = 0.18; // Non isolé
 
-    if (ins === 'iti_recent') { rInt += 3.2; rExt += 0.2; }
-    else if (ins === 'iti_old') { rInt += 1.4; rExt += 0.2; }
-    else if (ins === 'ite_heavy') { rInt += 0.2; rExt += 3.8; }
-    else if (ins === 'ite_old') { rInt += 0.2; rExt += 1.8; }
-    else { rInt += 0.1; rExt += 0.1; }
-
-    return (rExt * tOp + rInt * tExt24h) / (rInt + rExt);
+    const tEquilibrium = tOp - factorDelta * (tOp - tExt24h);
+    return parseFloat(tEquilibrium.toFixed(2));
 }
 
 function updateStructureTemperature(nomPiece, currentTa) {
@@ -1643,11 +1661,19 @@ function updateStructureTemperature(nomPiece, currentTa) {
         }
     }
 
-    if (lastTstruct === undefined || !lastTimestamp) {
+    // Si pas de données, ou données aberrantes en cache (écart > 2.5°C avec l'ambiance) : réinitialiser à l'équilibre physique réaliste
+    if (lastTstruct === undefined || isNaN(lastTstruct) || Math.abs(lastTstruct - currentTop) > 2.5 || !lastTimestamp) {
         const initialTstruct = calculateEquilibriumTstruct(zoneConfig, currentTop, tExt24h);
         roomData.tStruct = parseFloat(initialTstruct.toFixed(2));
         roomData.lastTop = parseFloat(currentTop.toFixed(2));
         roomData.lastTimestamp = now;
+        try {
+            localStorage.setItem(`SOLSTICE_TSTRUCT_${nomPiece}`, JSON.stringify({
+                tStruct: roomData.tStruct,
+                lastTop: roomData.lastTop,
+                lastTimestamp: now
+            }));
+        } catch (e) {}
         return roomData.tStruct;
     }
 
@@ -1682,15 +1708,22 @@ function updateStructureTemperature(nomPiece, currentTa) {
     roomData.tStruct = parseFloat(newTstruct.toFixed(2));
     roomData.lastTop = parseFloat(currentTop.toFixed(2));
     roomData.lastTimestamp = now;
+    try {
+        localStorage.setItem(`SOLSTICE_TSTRUCT_${nomPiece}`, JSON.stringify({
+            tStruct: roomData.tStruct,
+            lastTop: roomData.lastTop,
+            lastTimestamp: now
+        }));
+    } catch (e) {}
 
     return roomData.tStruct;
 }
 
 function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel = 18.0, options = {}) {
     const deltaFlux = tStruct - tAir;
-    // Conductance volumique surfacique d'échange convectif & radiatif intérieur h_i * S_parois / V
-    // En résidentiel standard : h_i ~ 7.7 W/(m²K), ratio S_parois/V ~ 2.2 m²/m³ => ~ 17 W/(K·m³)
-    const fluxPowerKw = (totalVolumeM3 * 17 * deltaFlux) / 1000;
+    // Conductance volumique surfacique d'échange convectif & radiatif intérieur h_i * S_parois_actives / V
+    // En résidentiel standard : h_i ~ 7.7 W/(m²K), ratio S_parois_actives/V ~ 1.1 m²/m³ => ~ 8.5 W/(K·m³)
+    const fluxPowerKw = (totalVolumeM3 * 8.5 * deltaFlux) / 1000;
     const absPowerKw = Math.abs(fluxPowerKw).toFixed(2);
 
     let fluxStatusText = "";
@@ -1786,8 +1819,8 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
     let autonomyDetail = '';
 
     if (tStruct <= tCible) {
-        autonomyText = 'Parois ≤ 19°C (0 h)';
-        autonomyDetail = 'Batterie déchargée : la température moyenne des parois est déjà inférieure ou égale à 19°C.';
+        autonomyText = `Seuil 19°C atteint (${tStruct.toFixed(1)}°C)`;
+        autonomyDetail = `Température moyenne des parois à ${tStruct.toFixed(1)}°C (seuil de confort de base fixé à 19.0°C).`;
         hoursTo19 = 0;
     } else if (hoursTo19 === null) {
         // Aucune chute sous 19°C constatée sur les 48h de prévision !

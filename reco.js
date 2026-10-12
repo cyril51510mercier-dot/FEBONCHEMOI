@@ -79,7 +79,8 @@ document.addEventListener('DOMContentLoaded', function() {
             let deltaTSun = 0;
             if (gardenT !== null && streetT !== null) {
                 deltaTSun = parseFloat((streetT - gardenT).toFixed(1));
-                if (deltaTSun >= 1.5) sunStatus = 'clear';
+                if (deltaTSun >= 4.0) sunStatus = 'clear';
+                else if (deltaTSun >= 2.0) sunStatus = 'partlycloudy';
             }
 
             return {
