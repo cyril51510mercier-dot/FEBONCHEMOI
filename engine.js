@@ -2423,7 +2423,7 @@ function actualiserCockpitGlobal() {
     const signPmv = metrics.avgPMV > 0 ? "+" : "";
     if (txtPmvBadge) {
         txtPmvBadge.textContent = `${pmvLabel} (${signPmv}${metrics.avgPMV.toFixed(2)})`;
-        txtPmvBadge.className = `text-[10px] font-extrabold px-2 py-0.5 rounded-full border text-crisp ${pmvClass}`;
+        txtPmvBadge.className = `hidden sm:inline text-[8px] sm:text-[10px] font-extrabold px-1.5 sm:px-2 py-0.5 rounded-full border text-crisp ${pmvClass}`;
     }
     if (txtPmvBadgeM) {
         txtPmvBadgeM.textContent = `${pmvLabel} (${signPmv}${metrics.avgPMV.toFixed(2)})`;
@@ -2673,19 +2673,35 @@ function actualiserCockpitGlobal() {
         let synthese = "";
         const tAir = metrics.avgTemp.toFixed(1);
         const tExt = outdoorTemp.toFixed(1);
+        const isHeatingOn = typeof isHeatingSeasonActive === 'function' ? isHeatingSeasonActive() : false;
+        const isColdOrHeatingSeason = isHeatingOn || outdoorTemp < 18.5;
+        const isWarmSeason = !isHeatingOn && outdoorTemp >= 22.0;
 
         if (fluxWallKw > 0.15) {
-            synthese = `Dehors il fait ${tExt}°C, et votre intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}). Vos murs restituent leur chaleur (+${Math.abs(fluxWallKw).toFixed(2)} kW) : ${globalReserve.autonomyDetail || `vous avez ${globalReserve.autonomyText} d'autonomie sans chauffage.`}`;
+            if (isColdOrHeatingSeason) {
+                const autoText = globalReserve.autonomyDetail || (globalReserve.autonomyText ? `vous disposez d'environ ${globalReserve.autonomyText} d'autonomie thermique sans surconsommer de chauffage.` : "elles soutiennent la température intérieure sans surconsommation.");
+                synthese = `Dehors il fait ${tExt}°C, et votre intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}). Vos parois massives restituent leur chaleur emmagasinée (+${Math.abs(fluxWallKw).toFixed(2)} kW) : ${autoText}`;
+            } else if (isWarmSeason) {
+                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois chaudes déchargent leur chaleur accumulée (+${Math.abs(fluxWallKw).toFixed(2)} kW) dans l'air intérieur : surventilez dès que la fraîcheur extérieure le permet.`;
+            } else {
+                synthese = `Dehors il fait ${tExt}°C, et votre intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}). Vos parois massives restituent doucement leur chaleur (+${Math.abs(fluxWallKw).toFixed(2)} kW) pour stabiliser le confort.`;
+            }
         } else if (fluxWallKw < -0.15) {
-            synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives absorbent activement la chaleur (${fluxWallKw.toFixed(2)} kW) pour préserver votre fraîcheur.`;
+            if (isColdOrHeatingSeason) {
+                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives absorbent activement la chaleur (${fluxWallKw.toFixed(2)} kW) : elles rechargent votre volant thermique pour stabiliser la température et créer une réserve nocturne.`;
+            } else if (isWarmSeason) {
+                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives absorbent activement la chaleur (${fluxWallKw.toFixed(2)} kW) pour amortir la hausse de température et préserver votre fraîcheur.`;
+            } else {
+                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives absorbent les calories (${fluxWallKw.toFixed(2)} kW) pour équilibrer la température ambiante.`;
+            }
         } else {
-            synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C au confort stable. Les échanges thermiques entre l'air et les murs sont équilibrés.`;
+            synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C avec un confort thermique stable. Les échanges thermiques entre l'air intérieur et la masse des parois sont équilibrés.`;
         }
 
         if (metrics.avgRH > 58 && deltaAhGlobal >= 0.5) {
             synthese += " 💡 Conseil aération : ouvrez 5 à 7 min en grand pour évacuer l'humidité sans refroidir vos parois massives.";
         } else if (metrics.avgRH >= 58 && deltaAhGlobal < 0.2) {
-            synthese += " ⚠️ Conseil aération : l'air extérieur est saturé en vapeur d'eau, gardez les fenêtres bien fermées pour préserver vos murs.";
+            synthese += " ⚠️ Conseil aération : l'air extérieur est saturé en vapeur d'eau, évitez d'aérer longuement pour ne pas humidifier vos parois.";
         }
         txtSummary.textContent = synthese;
     }
