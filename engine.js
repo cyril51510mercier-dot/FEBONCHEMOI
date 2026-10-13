@@ -1480,6 +1480,8 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     let bilanNocturnekWh = 0;
     let bilanPasseKwh = 0;
     let bilanFuturKwh = 0;
+    const cumulativeNetHours = [];
+    let runningNet = 0;
 
     const currentHour = new Date().getHours();
     const sunriseH = window.solsticeEphemeris?.sunriseHour || 7;
@@ -1524,6 +1526,8 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
             gainsSolaireskWh += gainsSolHour;
 
             const netHour = (gainsCondHour + gainsSolHour) - depHour;
+            runningNet += netHour;
+            cumulativeNetHours.push(parseFloat(runningNet.toFixed(3)));
             
             if (slot.hour >= sunriseH && slot.hour < sunsetH) {
                 bilanDiurnekWh += netHour;
@@ -1549,6 +1553,9 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
         const totalNetJour = (gainsConductionKw + gainsSolairesKw - depKw) * 24;
         bilanPasseKwh = totalNetJour * fractionPassee;
         bilanFuturKwh = totalNetJour * (1 - fractionPassee);
+        for (let h = 1; h <= 24; h++) {
+            cumulativeNetHours.push(parseFloat(((totalNetJour / 24) * h).toFixed(3)));
+        }
     }
 
     const gainsTotauxkWh = gainsSolaireskWh + gainsConductionkWh;
@@ -1569,6 +1576,7 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
         bilanFuturKwh: parseFloat(bilanFuturKwh.toFixed(2)),
         bilanDiurnekWh: parseFloat(bilanDiurnekWh.toFixed(2)),
         bilanNocturnekWh: parseFloat(bilanNocturnekWh.toFixed(2)),
+        cumulativeNetHours,
         currentHour
     };
 }
@@ -1941,6 +1949,7 @@ function calculateGlobalHabitatMetrics() {
     let totalBilanDiurnekWh = 0;
     let totalBilanNocturnekWh = 0;
     let totalHTotalWPerK = 0;
+    const totalCumulativeHours = new Array(24).fill(0);
 
     for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
         if (nomPiece === '__ENV__' || nomPiece === '__BUFFER_TOGGLE__') continue;
@@ -1983,6 +1992,12 @@ function calculateGlobalHabitatMetrics() {
         totalBilanPasseKwh += energy.bilanPasseKwh;
         totalBilanFuturKwh += energy.bilanFuturKwh;
 
+        if (Array.isArray(energy.cumulativeNetHours)) {
+            for (let h = 0; h < 24; h++) {
+                totalCumulativeHours[h] += (energy.cumulativeNetHours[h] || 0);
+            }
+        }
+
         totalBilanDiurnekWh += energy.bilanDiurnekWh;
         totalBilanNocturnekWh += energy.bilanNocturnekWh;
         totalHTotalWPerK += energy.hTotalWPerK;
@@ -2018,6 +2033,7 @@ function calculateGlobalHabitatMetrics() {
         totalBilanFuturKwh: parseFloat(totalBilanFuturKwh.toFixed(2)),
         totalBilanDiurnekWh: parseFloat(totalBilanDiurnekWh.toFixed(2)),
         totalBilanNocturnekWh: parseFloat(totalBilanNocturnekWh.toFixed(2)),
+        totalCumulativeHours: totalCumulativeHours.map(v => parseFloat(v.toFixed(2))),
         totalHTotalWPerK: parseFloat(totalHTotalWPerK.toFixed(1)),
         totalVolumeM3: parseFloat(totalVolume.toFixed(1))
     };
@@ -2605,20 +2621,24 @@ function actualiserCockpitGlobal() {
         needle.style.left = `${gainPct}%`;
     }
 
-    // Mise à jour de la Trajectoire Énergétique Graphique (SVG 100% kWh, courbe orange)
+    // Mise à jour de la Trajectoire Énergétique Graphique (SVG Double Courbe : Théorique stable vs Réel in situ)
     const elBarPassed = document.getElementById('chart-bar-passed');
     const elTxtPassed = document.getElementById('chart-txt-passed');
     const elDotPassed = document.getElementById('chart-dot-passed');
     const elBarFinal = document.getElementById('chart-bar-final');
     const elTxtFinal = document.getElementById('chart-txt-final');
     const elDotFinal = document.getElementById('chart-dot-final');
+    const elDotTheo = document.getElementById('chart-dot-theo');
     const elTrendCurve = document.getElementById('chart-trend-curve');
+    const elProjCurve = document.getElementById('chart-proj-curve');
+    const elTheoCurve = document.getElementById('chart-theo-curve');
+    const txtTheoLandingLegend = document.getElementById('txt-theo-landing-legend');
 
     if (elBarPassed && elBarFinal) {
         const zeroY = 70;
         const scaleKwh = 2.8;
 
-        // 1. Point Passé / Cumul à Maintenant (kWh)
+        // 1. Point Réel Passé / Cumul à Maintenant (kWh)
         const hP = Math.min(46, Math.max(6, Math.round(Math.abs(valPasse) * scaleKwh)));
         const yP = valPasse >= 0 ? (zeroY - hP) : zeroY;
         const dotYP = valPasse >= 0 ? (zeroY - hP) : (zeroY + hP);
@@ -2632,7 +2652,7 @@ function actualiserCockpitGlobal() {
         }
         if (elDotPassed) elDotPassed.setAttribute('cy', dotYP);
 
-        // 2. Point Atterrissage / 24h Minuit (kWh)
+        // 2. Point Atterrissage Projeté / 24h Minuit (kWh)
         const hFin = Math.min(46, Math.max(6, Math.round(Math.abs(valFinal) * scaleKwh)));
         const yFin = valFinal >= 0 ? (zeroY - hFin) : zeroY;
         const dotYFin = valFinal >= 0 ? (zeroY - hFin) : (zeroY + hFin);
@@ -2646,10 +2666,50 @@ function actualiserCockpitGlobal() {
         }
         if (elDotFinal) elDotFinal.setAttribute('cy', dotYFin);
 
-        // 3. Courbe Orange de Trajectoire (00h -> Maintenant -> Projection 24h)
+        // 3. Trajectoire Théorique Prévisionnelle (24h de référence stable)
+        const currentH = new Date().getHours();
+        const theoCumulArr = metrics.totalCumulativeHours || [];
+        const valTheoPasse = (theoCumulArr.length === 24 && currentH > 0) ? theoCumulArr[currentH - 1] : (metrics.totalBilanPasseKwh || valPasse);
+        const valTheoFinal = (theoCumulArr.length === 24) ? theoCumulArr[23] : (metrics.totalBilanNetKwh || valFinal);
+
+        const hTheoP = Math.min(46, Math.max(4, Math.round(Math.abs(valTheoPasse) * scaleKwh)));
+        const dotYTheoP = valTheoPasse >= 0 ? (zeroY - hTheoP) : (zeroY + hTheoP);
+        const hTheoFin = Math.min(46, Math.max(4, Math.round(Math.abs(valTheoFinal) * scaleKwh)));
+        const dotYTheoFin = valTheoFinal >= 0 ? (zeroY - hTheoFin) : (zeroY + hTheoFin);
+
+        if (elDotTheo) {
+            elDotTheo.setAttribute('cy', dotYTheoFin);
+            const signTheoFin = valTheoFinal > 0 ? '+' : '';
+            elDotTheo.setAttribute('title', `Prévision théorique initiale : ${signTheoFin}${valTheoFinal.toFixed(1)} kWh à minuit`);
+        }
+
+        // Tracé de la courbe théorique 24h (pointillés bleu-gris de 00h à Minuit)
+        if (elTheoCurve) {
+            elTheoCurve.setAttribute('d', `M 55 ${zeroY} C 115 ${zeroY}, 135 ${dotYTheoP}, 190 ${dotYTheoP} C 255 ${dotYTheoP}, 305 ${dotYTheoFin}, 370 ${dotYTheoFin}`);
+        }
+
+        // 4. Tracé du Réel in situ (trait plein orange de 00h à Maintenant x=190)
         if (elTrendCurve) {
-            elTrendCurve.setAttribute('d', `M 55 ${zeroY} C 115 ${zeroY}, 135 ${dotYP}, 190 ${dotYP} C 255 ${dotYP}, 305 ${dotYFin}, 370 ${dotYFin}`);
+            elTrendCurve.setAttribute('d', `M 55 ${zeroY} C 115 ${zeroY}, 135 ${dotYP}, 190 ${dotYP}`);
             elTrendCurve.setAttribute('stroke', '#F59E0B');
+        }
+
+        // 5. Tracé du Prolongement Projeté (tirets orange de Maintenant x=190 à Minuit x=370)
+        if (elProjCurve) {
+            elProjCurve.setAttribute('d', `M 190 ${dotYP} C 255 ${dotYP}, 305 ${dotYFin}, 370 ${dotYFin}`);
+            elProjCurve.setAttribute('stroke', '#F59E0B');
+        }
+
+        if (elTxtPassed && elTxtPassed.parentElement) {
+            const diffSolar = valPasse - valTheoPasse;
+            const diffSign = diffSolar >= 0 ? '+' : '';
+            const tooltipStr = `Réel in situ : ${valPasse > 0 ? '+' : ''}${valPasse.toFixed(1)} kWh | Prévision météo : ${valTheoPasse > 0 ? '+' : ''}${valTheoPasse.toFixed(1)} kWh (${diffSign}${diffSolar.toFixed(1)} kWh d'écart)`;
+            elTxtPassed.parentElement.setAttribute('title', tooltipStr);
+        }
+
+        if (txtTheoLandingLegend) {
+            const signTheo = valTheoFinal > 0 ? '+' : '';
+            txtTheoLandingLegend.textContent = `Prévision théorique (${signTheo}${valTheoFinal.toFixed(1)} kWh)`;
         }
     }
 
@@ -2808,17 +2868,33 @@ function rechercherMeteoParNomVille(city) {
 }
 
 function processOneCallHourlyForecast(hourlyList) {
+    if (!Array.isArray(hourlyList) || hourlyList.length === 0) return [];
     const hourly = [];
     const now = new Date();
+    const currentH = now.getHours();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime() / 1000;
+    const dateKey = `${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, '0')}_${String(now.getDate()).padStart(2, '0')}`;
+
+    // Historique persistant des mesures de la journée pour ne jamais écraser le passé
+    let savedHistory = {};
+    try {
+        const rawHist = localStorage.getItem(`SOLSTICE_DAY_LOG_${dateKey}`);
+        if (rawHist) savedHistory = JSON.parse(rawHist);
+    } catch(e) {}
+
+    // Plage thermique prévisionnelle (creux nocturne et pic diurne)
+    const temps = hourlyList.map(item => item.temp);
+    const tMinPrevue = Math.min(...temps);
+    const tMaxPrevue = Math.max(...temps);
+    const ampPrevue = Math.max(2.0, (tMaxPrevue - tMinPrevue) / 2);
+    const tMoyPrevue = (tMaxPrevue + tMinPrevue) / 2;
 
     for (let h = 0; h < 24; h++) {
         const targetTs = startOfDay + (h * 3600);
         
-        let closest = hourlyList[0];
-        let minDiff = Math.abs(hourlyList[0].dt - targetTs);
-
-        for (let i = 1; i < hourlyList.length; i++) {
+        let closest = null;
+        let minDiff = Infinity;
+        for (let i = 0; i < hourlyList.length; i++) {
             const diff = Math.abs(hourlyList[i].dt - targetTs);
             if (diff < minDiff) {
                 minDiff = diff;
@@ -2827,16 +2903,48 @@ function processOneCallHourlyForecast(hourlyList) {
         }
 
         const isDaytime = (h >= 7 && h <= 19);
-        const weatherMain = closest.weather[0]?.main || 'Clouds';
-        const isSunny = isDaytime && (weatherMain.toLowerCase().includes('clear') || weatherMain.toLowerCase().includes('sun'));
+        let finalTemp = 15;
+        let finalHumidity = 60;
+        let isSunny = false;
+
+        if (savedHistory[h]) {
+            // A. Donnée réelle observée et enregistrée plus tôt aujourd'hui
+            finalTemp = savedHistory[h].temp;
+            finalHumidity = savedHistory[h].humidity ?? 60;
+            isSunny = !!savedHistory[h].isSunny;
+        } else if (minDiff <= 2400 && closest) {
+            // B. Créneau présent ou futur disponible dans l'API météo
+            finalTemp = closest.temp;
+            finalHumidity = closest.humidity;
+            const weatherMain = closest.weather?.[0]?.main || 'Clouds';
+            isSunny = isDaytime && (weatherMain.toLowerCase().includes('clear') || weatherMain.toLowerCase().includes('sun'));
+        } else {
+            // C. Heure passée non enregistrée : Reconstitution sinusoïdale réaliste (creux à 06h, pic à 15h)
+            finalTemp = parseFloat((tMoyPrevue - ampPrevue * Math.cos(((h - 15) * 2 * Math.PI) / 24)).toFixed(1));
+            finalHumidity = isDaytime ? 60 : 85;
+            // La nuit n'a jamais de soleil direct !
+            isSunny = isDaytime && (closest ? (closest.weather?.[0]?.main || '').toLowerCase().includes('clear') : false);
+        }
 
         hourly.push({
             hour: h,
-            temp: closest.temp,
-            humidity: closest.humidity,
+            temp: finalTemp,
+            humidity: finalHumidity,
             isSunny: isSunny
         });
     }
+
+    // Mémoriser l'heure actuelle dans l'historique de la journée
+    try {
+        if (typeof outdoorTemp === 'number') {
+            savedHistory[currentH] = {
+                temp: outdoorTemp,
+                humidity: outdoorHumidity,
+                isSunny: (currentH >= 7 && currentH <= 19) && (typeof effOutdoorScan !== 'undefined' ? effOutdoorScan.hasDiffuseSun : (sunshineStatus === 'Clear'))
+            };
+            localStorage.setItem(`SOLSTICE_DAY_LOG_${dateKey}`, JSON.stringify(savedHistory));
+        }
+    } catch(e) {}
 
     return hourly;
 }
