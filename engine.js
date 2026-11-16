@@ -1929,6 +1929,7 @@ function updateStructureTemperature(nomPiece, currentTa) {
     let lastTstruct = roomData.tStruct;
     let lastTop = roomData.lastTop;
     let lastTimestamp = roomData.lastTimestamp;
+    let modelVersion = roomData.modelVersion;
 
     if (lastTstruct === undefined) {
         const lastDataRaw = localStorage.getItem(`SOLSTICE_TSTRUCT_${nomPiece}`);
@@ -1938,21 +1939,24 @@ function updateStructureTemperature(nomPiece, currentTa) {
                 lastTstruct = parsed.tStruct;
                 lastTop = parsed.lastTop;
                 lastTimestamp = parsed.lastTimestamp;
+                modelVersion = parsed.modelVersion;
             } catch (e) {}
         }
     }
 
-    // Si pas de données, ou données aberrantes en cache (écart > 2.5°C avec l'ambiance) : réinitialiser à l'équilibre 2R2C réaliste
-    if (lastTstruct === undefined || isNaN(lastTstruct) || Math.abs(lastTstruct - currentTa) > 2.5 || !lastTimestamp) {
+    // Si pas de données, cache d'un ancien modèle (pré-2R2C), ou écart > 2.5°C : réinitialiser à l'équilibre 2R2C réaliste
+    if (modelVersion !== '2R2C_v1' || lastTstruct === undefined || isNaN(lastTstruct) || Math.abs(lastTstruct - currentTa) > 2.5 || !lastTimestamp) {
         const initialTstruct = calculateEquilibriumTstruct(zoneConfig, currentTa, tExt24h);
         roomData.tStruct = parseFloat(initialTstruct.toFixed(2));
         roomData.lastTop = parseFloat(currentTargetTm.toFixed(2));
         roomData.lastTimestamp = now;
+        roomData.modelVersion = '2R2C_v1';
         try {
             localStorage.setItem(`SOLSTICE_TSTRUCT_${nomPiece}`, JSON.stringify({
                 tStruct: roomData.tStruct,
                 lastTop: roomData.lastTop,
-                lastTimestamp: now
+                lastTimestamp: now,
+                modelVersion: '2R2C_v1'
             }));
         } catch (e) {}
         return roomData.tStruct;
@@ -1989,11 +1993,13 @@ function updateStructureTemperature(nomPiece, currentTa) {
     roomData.tStruct = parseFloat(newTstruct.toFixed(2));
     roomData.lastTop = parseFloat(currentTargetTm.toFixed(2));
     roomData.lastTimestamp = now;
+    roomData.modelVersion = '2R2C_v1';
     try {
         localStorage.setItem(`SOLSTICE_TSTRUCT_${nomPiece}`, JSON.stringify({
             tStruct: roomData.tStruct,
             lastTop: roomData.lastTop,
-            lastTimestamp: now
+            lastTimestamp: now,
+            modelVersion: '2R2C_v1'
         }));
     } catch (e) {}
 
