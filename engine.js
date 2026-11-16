@@ -2775,11 +2775,12 @@ function actualiserCockpitGlobal() {
         if (txtFluxSolarVal.parentElement) txtFluxSolarVal.parentElement.title = solarTooltip;
     }
 
-    // 4.2 Flux Direct Rapide Air <-> Extérieur (Vitrages + Renouvellement d'air, hors murs opaques)
+    // 4.2 Flux Direct Rapide Air <-> Extérieur (Vitrages + Renouvellement d'air VMC, hors murs opaques)
     const depEnveloppeKw = metrics.totalDeperditionsKw || 0;
     const condGainKw = metrics.totalGainsConductionKw || 0;
     const depOpaqueKw = metrics.totalDepOpaqueMassKw || 0;
-    const lossTooltip = `❄️ Flux direct rapide Air ↔ Extérieur : -${depEnveloppeKw.toFixed(2)} kW\n• Éléments sans inertie (Vitrages + Ventilation/Infiltrations) : H_rapide = ${metrics.totalHRapideWPerK || 0} W/K\n• Déperdition lente des parois opaques (prélevée sur la masse Tm) : -${depOpaqueKw.toFixed(2)} kW (H_op = ${metrics.totalHOpaqueWPerK || 0} W/K)`;
+    const gainsOpaqueKw = metrics.totalGainsOpaqueMassKw || 0;
+    const lossTooltip = `❄️ Échange direct rapide Vitrages & VMC ↔ Extérieur : -${depEnveloppeKw.toFixed(2)} kW\n• Éléments sans inertie (Vitres + VMC/Infiltrations) : H_rapide = ${metrics.totalHRapideWPerK || 0} W/K\n• Air intérieur : ${metrics.avgTemp.toFixed(1)} °C ↔ Air extérieur : ${extTemp.toFixed(1)} °C`;
 
     const txtFluxExtTag = document.getElementById('txt-flux-ext-tag');
     const txtFluxExtVal = document.getElementById('txt-flux-ext-val');
@@ -2789,7 +2790,7 @@ function actualiserCockpitGlobal() {
     if (txtFluxExtTag && txtFluxExtVal && lineExt && haloExt) {
         if (txtFluxExtVal.parentElement) txtFluxExtVal.parentElement.title = lossTooltip;
         if (depEnveloppeKw > 0.05) {
-            txtFluxExtTag.textContent = "❄️ Pertes Ext.";
+            txtFluxExtTag.textContent = "❄️ Vitres & VMC";
             txtFluxExtVal.textContent = `-${depEnveloppeKw.toFixed(2)} kW`;
             txtFluxExtVal.style.color = "#38BDF8";
             lineExt.setAttribute('d', "M 310 270 L 190 270");
@@ -2799,7 +2800,7 @@ function actualiserCockpitGlobal() {
             haloExt.setAttribute('d', "M 310 270 L 190 270");
             haloExt.setAttribute('stroke', "#38BDF8");
         } else if (condGainKw > 0.05) {
-            txtFluxExtTag.textContent = "🌡️ Apport Ext.";
+            txtFluxExtTag.textContent = "🌡️ Vitres & VMC";
             txtFluxExtVal.textContent = `+${condGainKw.toFixed(2)} kW`;
             txtFluxExtVal.style.color = "#F59E0B";
             lineExt.setAttribute('d', "M 190 270 L 310 270");
@@ -2809,7 +2810,7 @@ function actualiserCockpitGlobal() {
             haloExt.setAttribute('d', "M 190 270 L 310 270");
             haloExt.setAttribute('stroke', "#F59E0B");
         } else {
-            txtFluxExtTag.textContent = "⚖️ Équilibre Ext.";
+            txtFluxExtTag.textContent = "⚖️ Vitres & VMC";
             txtFluxExtVal.textContent = "0.00 kW";
             txtFluxExtVal.style.color = "#10B981";
             lineExt.setAttribute('d', "M 310 270 L 310 270");
@@ -2821,9 +2822,51 @@ function actualiserCockpitGlobal() {
         }
     }
 
-    // 4.3 Flux Convectif Murs <-> Air (Nœud Masse Tm <-> Nœud Air Ta, avec h_ci convectif pur)
+    // 4.2b Flux Lent Parois Lourdes <-> Air Extérieur (Déperdition/Gain de la masse Tm à travers l'isolation)
+    const opaqueExtTooltip = `🧱↔🌍 Échange lent Parois Lourdes ↔ Extérieur : ${depOpaqueKw > 0 ? '-' + depOpaqueKw.toFixed(2) : (gainsOpaqueKw > 0 ? '+' + gainsOpaqueKw.toFixed(2) : '0.00')} kW\n• Masse des parois (Tm) : ${metrics.avgTStruct.toFixed(1)} °C ↔ Extérieur : ${extTemp.toFixed(1)} °C\n• Conductance enveloppe opaque (Murs hors vitres + Toit + Dalle) : H_op = ${metrics.totalHOpaqueWPerK || 0} W/K`;
+    const txtFluxOpaqueExtTag = document.getElementById('txt-flux-opaque-ext-tag');
+    const txtFluxOpaqueExtVal = document.getElementById('txt-flux-opaque-ext-val');
+    const lineOpaqueExt = document.getElementById('flux-laser-opaque-ext-line');
+    const haloOpaqueExt = document.getElementById('flux-laser-opaque-ext-halo');
+
+    if (txtFluxOpaqueExtTag && txtFluxOpaqueExtVal && lineOpaqueExt && haloOpaqueExt) {
+        if (txtFluxOpaqueExtVal.parentElement) txtFluxOpaqueExtVal.parentElement.title = opaqueExtTooltip;
+        if (depOpaqueKw > 0.03) {
+            txtFluxOpaqueExtTag.textContent = "❄️ Parois → Ext.";
+            txtFluxOpaqueExtVal.textContent = `-${depOpaqueKw.toFixed(2)} kW`;
+            txtFluxOpaqueExtVal.style.color = "#38BDF8";
+            lineOpaqueExt.setAttribute('d', "M 820 150 L 945 150");
+            lineOpaqueExt.setAttribute('stroke', "#38BDF8");
+            lineOpaqueExt.setAttribute('class', "flow-laser laser-blue");
+            lineOpaqueExt.setAttribute('marker-end', "url(#mk-laser-blue)");
+            haloOpaqueExt.setAttribute('d', "M 820 150 L 945 150");
+            haloOpaqueExt.setAttribute('stroke', "#38BDF8");
+        } else if (gainsOpaqueKw > 0.03) {
+            txtFluxOpaqueExtTag.textContent = "🌡️ Ext. → Parois";
+            txtFluxOpaqueExtVal.textContent = `+${gainsOpaqueKw.toFixed(2)} kW`;
+            txtFluxOpaqueExtVal.style.color = "#F59E0B";
+            lineOpaqueExt.setAttribute('d', "M 945 150 L 820 150");
+            lineOpaqueExt.setAttribute('stroke', "#F59E0B");
+            lineOpaqueExt.setAttribute('class', "flow-laser laser-orange");
+            lineOpaqueExt.setAttribute('marker-end', "url(#mk-laser-orange)");
+            haloOpaqueExt.setAttribute('d', "M 945 150 L 820 150");
+            haloOpaqueExt.setAttribute('stroke', "#F59E0B");
+        } else {
+            txtFluxOpaqueExtTag.textContent = "⚖️ Parois ↔ Ext.";
+            txtFluxOpaqueExtVal.textContent = "0.00 kW";
+            txtFluxOpaqueExtVal.style.color = "#10B981";
+            lineOpaqueExt.setAttribute('d', "M 820 150 L 820 150");
+            lineOpaqueExt.setAttribute('stroke', "#10B981");
+            lineOpaqueExt.setAttribute('class', "flow-laser");
+            lineOpaqueExt.setAttribute('marker-end', "");
+            haloOpaqueExt.setAttribute('d', "M 820 150 L 820 150");
+            haloOpaqueExt.setAttribute('stroke', "#10B981");
+        }
+    }
+
+    // 4.3 Flux Convectif Interne : Parois Lourdes <-> Air Intérieur (Nœud Masse Tm <-> Nœud Air Ta)
     const fluxWallKw = (metrics.totalFluxWallKw !== undefined) ? metrics.totalFluxWallKw : (globalReserve.fluxPowerKw || 0);
-    const wallTooltip = `🧱 Échange convectif Masse ↔ Air : ${fluxWallKw > 0 ? '+' : ''}${fluxWallKw.toFixed(2)} kW\n• Température Masse (Tm) : ${metrics.avgTStruct.toFixed(1)} °C vs Air (Ta) : ${metrics.avgTemp.toFixed(1)} °C\n• Couplage convectif pur H_ci = ${metrics.totalHCiWPerK || 0} W/K (h_ci ~ 2.5-2.8 W/m²K)`;
+    const wallTooltip = `🧱 Échange convectif interne Parois ↔ Air : ${fluxWallKw > 0 ? '+' : ''}${fluxWallKw.toFixed(2)} kW\n• Température Masse (Tm) : ${metrics.avgTStruct.toFixed(1)} °C vs Air (Ta) : ${metrics.avgTemp.toFixed(1)} °C\n• Couplage convectif pur H_ci = ${metrics.totalHCiWPerK || 0} W/K (h_ci ~ 2.5-2.8 W/m²K)`;
 
     const txtFluxWallTag = document.getElementById('txt-flux-wall-tag');
     const txtFluxWallVal = document.getElementById('txt-flux-wall-val');
@@ -2833,34 +2876,34 @@ function actualiserCockpitGlobal() {
     if (txtFluxWallTag && txtFluxWallVal && lineWall && haloWall) {
         if (txtFluxWallVal.parentElement) txtFluxWallVal.parentElement.title = wallTooltip;
         if (fluxWallKw > 0.10) {
-            txtFluxWallTag.textContent = "🔥 Restitution";
+            txtFluxWallTag.textContent = "🔥 Murs → Air";
             txtFluxWallVal.textContent = `+${fluxWallKw.toFixed(2)} kW`;
             txtFluxWallVal.style.color = "#F59E0B";
-            lineWall.setAttribute('d', "M 906 270 L 785 270");
+            lineWall.setAttribute('d', "M 902 270 L 785 270");
             lineWall.setAttribute('stroke', "#F59E0B");
             lineWall.setAttribute('class', "flow-laser laser-orange");
             lineWall.setAttribute('marker-end', "url(#mk-laser-orange)");
-            haloWall.setAttribute('d', "M 906 270 L 785 270");
+            haloWall.setAttribute('d', "M 902 270 L 785 270");
             haloWall.setAttribute('stroke', "#F59E0B");
         } else if (fluxWallKw < -0.10) {
-            txtFluxWallTag.textContent = "🧱 Absorption Murs";
+            txtFluxWallTag.textContent = "🧱 Air → Murs";
             txtFluxWallVal.textContent = `${fluxWallKw.toFixed(2)} kW`;
             txtFluxWallVal.style.color = "#38BDF8";
-            lineWall.setAttribute('d', "M 906 270 L 950 270");
+            lineWall.setAttribute('d', "M 805 270 L 902 270");
             lineWall.setAttribute('stroke', "#38BDF8");
             lineWall.setAttribute('class', "flow-laser laser-blue");
             lineWall.setAttribute('marker-end', "url(#mk-laser-blue)");
-            haloWall.setAttribute('d', "M 906 270 L 950 270");
+            haloWall.setAttribute('d', "M 805 270 L 902 270");
             haloWall.setAttribute('stroke', "#38BDF8");
         } else {
-            txtFluxWallTag.textContent = "⚖️ Équilibre Murs";
+            txtFluxWallTag.textContent = "⚖️ Murs ↔ Air";
             txtFluxWallVal.textContent = "0.00 kW";
             txtFluxWallVal.style.color = "#10B981";
-            lineWall.setAttribute('d', "M 906 270 L 906 270");
+            lineWall.setAttribute('d', "M 902 270 L 902 270");
             lineWall.setAttribute('stroke', "#10B981");
             lineWall.setAttribute('class', "flow-laser");
             lineWall.setAttribute('marker-end', "");
-            haloWall.setAttribute('d', "M 906 270 L 906 270");
+            haloWall.setAttribute('d', "M 902 270 L 902 270");
             haloWall.setAttribute('stroke', "#10B981");
         }
     }
