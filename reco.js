@@ -396,8 +396,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const volume = area * height;
             const tau = engine.calculateDynamicTau ? engine.calculateDynamicTau(zone) : 18;
 
+            const params2R2C = engine.calculateZone2R2CParams ? engine.calculateZone2R2CParams(zone) : null;
             const tStruct = engine.updateStructureTemperature ? engine.updateStructureTemperature(zoneName, ta) : ta;
-            const rawReserve = engine.calculateStructureReserve ? engine.calculateStructureReserve(tStruct, ta, volume, tau) : {};
+            const rawReserve = engine.calculateStructureReserve
+                ? engine.calculateStructureReserve(tStruct, ta, volume, tau, params2R2C ? { hTotalWPerK: params2R2C.hTotal, hCiWPerK: params2R2C.hCi } : {})
+                : {};
 
             const chargeCalories = Math.max(0, Math.min(100, Math.round(((tStruct - 15) / (22 - 15)) * 100)));
             const chargeFrigories = Math.max(0, Math.min(100, Math.round(((26 - tStruct) / (26 - 18)) * 100)));
@@ -415,7 +418,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const nbVerres = Math.max(1, Math.round(mEau / 150));
             const verresTxt = `~${nbVerres} verre${nbVerres > 1 ? 's' : ''} d'eau`;
 
-            const tr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(zone, ta) : ta;
+            const tr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(zone, ta, tStruct) : ta;
             const vel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zone, zoneName) : 0.1;
             const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(zone) : { met: 1.2, totalClo: 1.0 };
 
