@@ -336,16 +336,21 @@
                             <path d="M 695 400 Q 705 390 715 400 Z" fill="#F59E0B" stroke="#1E293B" stroke-width="1.5"/>
                         </g>
 
-                        <!-- 6. FLUX THERMIQUES LASER (ORIGINE SUR LES MURS DU 1ER ÉTAGE R+1, y = 270) -->
-                        <!-- Flux Fenêtre/Extérieur R+1 -->
+                        <!-- 6. FLUX THERMIQUES LASER 2R2C -->
+                        <!-- Flux Rapide Direct : Vitrages & VMC <-> Air Extérieur (Fenêtre R+1 gauche, y = 270) -->
                         <g id="flux-laser-ext-group">
                             <path id="flux-laser-ext-halo" d="M 310 270 L 190 270" stroke="#38BDF8" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
                             <path id="flux-laser-ext-line" d="M 310 270 L 190 270" stroke="#38BDF8" stroke-width="4" fill="none" class="flow-laser laser-blue" marker-end="url(#mk-laser-blue)"/>
                         </g>
-                        <!-- Flux Mur Massif R+1 -->
+                        <!-- Flux Lent Enveloppe Opaque : Parois Lourdes <-> Air Extérieur (Toiture/Mur droit externe, y = 150) -->
+                        <g id="flux-laser-opaque-ext-group">
+                            <path id="flux-laser-opaque-ext-halo" d="M 820 150 L 945 150" stroke="#38BDF8" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
+                            <path id="flux-laser-opaque-ext-line" d="M 820 150 L 945 150" stroke="#38BDF8" stroke-width="4" fill="none" class="flow-laser laser-blue" marker-end="url(#mk-laser-blue)"/>
+                        </g>
+                        <!-- Flux Convectif Interne : Parois Lourdes <-> Air Intérieur (Mur droit R+1, y = 270) -->
                         <g id="flux-laser-wall-group">
-                            <path id="flux-laser-wall-halo" d="M 906 270 L 785 270" stroke="#F59E0B" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
-                            <path id="flux-laser-wall-line" d="M 906 270 L 785 270" stroke="#F59E0B" stroke-width="4" fill="none" class="flow-laser laser-orange" marker-end="url(#mk-laser-orange)"/>
+                            <path id="flux-laser-wall-halo" d="M 902 270 L 785 270" stroke="#F59E0B" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
+                            <path id="flux-laser-wall-line" d="M 902 270 L 785 270" stroke="#F59E0B" stroke-width="4" fill="none" class="flow-laser laser-orange" marker-end="url(#mk-laser-orange)"/>
                         </g>
 
                     </svg>
@@ -386,9 +391,9 @@
                         <strong class="font-black text-amber-400" id="txt-flux-solar-val">+0.00 kW</strong>
                     </div>
 
-                    <!-- 2. FLUX EXTÉRIEUR / PERTES (DIRECTEMENT SUR LE DÉPART DE FLÈCHE À LA FENÊTRE R+1) -->
-                    <div class="absolute top-[41%] left-[13%] sm:left-[15%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-sky-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
-                        <span class="font-bold text-slate-300" id="txt-flux-ext-tag">❄️ Pertes Ext.</span>
+                    <!-- 2. FLUX DIRECT RAPIDE : VITRAGES & VMC <-> EXTÉRIEUR (À LA FENÊTRE R+1) -->
+                    <div class="absolute top-[41%] left-[11%] sm:left-[14%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-sky-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
+                        <span class="font-bold text-slate-300" id="txt-flux-ext-tag">❄️ Vitres & VMC</span>
                         <strong class="font-black text-sky-300" id="txt-flux-ext-val">-- kW</strong>
                     </div>
 
@@ -408,9 +413,15 @@
                         </div>
                     </div>
 
-                    <!-- 4. FLUX MURS / RESTITUTION (DIRECTEMENT SUR LE DÉPART DE FLÈCHE AU MUR DROIT R+1) -->
+                    <!-- 3.1 FLUX LENT ENVELOPPE OPAQUE : PAROIS LOURDES <-> EXTÉRIEUR (SUR L'ENVELOPPE EXTÉRIEURE DROITE) -->
+                    <div class="absolute top-[23%] right-[3%] sm:right-[6%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-sky-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
+                        <span class="font-bold text-slate-300" id="txt-flux-opaque-ext-tag">❄️ Parois → Ext.</span>
+                        <strong class="font-black text-sky-300" id="txt-flux-opaque-ext-val">-- kW</strong>
+                    </div>
+
+                    <!-- 4. FLUX CONVECTIF INTERNE : PAROIS LOURDES <-> AIR INTÉRIEUR (AU MUR DROIT R+1) -->
                     <div class="absolute top-[41%] right-[3%] sm:right-[11%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-amber-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
-                        <span class="font-bold text-slate-300" id="txt-flux-wall-tag">🔥 Restitution</span>
+                        <span class="font-bold text-slate-300" id="txt-flux-wall-tag">🔥 Murs → Air</span>
                         <strong class="font-black text-amber-300" id="txt-flux-wall-val">-- kW</strong>
                     </div>
 

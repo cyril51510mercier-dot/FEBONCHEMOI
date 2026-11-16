@@ -1712,8 +1712,9 @@ function calculateDailyThermalBalance(zoneConfig, ta, tStructOpt = null) {
         gainsConductionKw = (hRapide * (tExtRef - ta)) / 1000;
     }
 
-    // Déperdition lente des parois opaques (du nœud Masse vers l'extérieur, non comptée deux fois sur l'air)
+    // Déperdition / gain lent des parois opaques (entre le nœud Masse Tm et l'extérieur, non compté deux fois sur l'air)
     const depOpaqueMassKw = (hOpaque * Math.max(0, tMassNow - tExtRef)) / 1000;
+    const gainsOpaqueMassKw = (hOpaque * Math.max(0, tExtRef - tMassNow)) / 1000;
 
     // 2. Apports solaires instantanés (avec répartition Air diatherme vs Masse tache solaire)
     const isSunnyInstant = effOutdoor.hasDiffuseSun;
@@ -1847,6 +1848,7 @@ function calculateDailyThermalBalance(zoneConfig, ta, tStructOpt = null) {
         hCiWPerK: parseFloat(hCi.toFixed(1)),
         depKw: parseFloat(depKw.toFixed(2)),
         depOpaqueMassKw: parseFloat(depOpaqueMassKw.toFixed(2)),
+        gainsOpaqueMassKw: parseFloat(gainsOpaqueMassKw.toFixed(2)),
         gainsConductionKw: parseFloat(gainsConductionKw.toFixed(2)),
         gainsSolairesKw: parseFloat(gainsSolairesKw.toFixed(2)),
         gainsSolairesAirKw: parseFloat(gainsSolairesAirKw.toFixed(2)),
@@ -2209,6 +2211,7 @@ function calculateGlobalHabitatMetrics() {
 
     let totalDeperditionsKw = 0;
     let totalDepOpaqueMassKw = 0;
+    let totalGainsOpaqueMassKw = 0;
     let totalGainsConductionKw = 0;
     let totalGainsSolairesKw = 0;
     let totalGainsSolairesAirKw = 0;
@@ -2265,6 +2268,7 @@ function calculateGlobalHabitatMetrics() {
 
         totalDeperditionsKw += energy.depKw;
         totalDepOpaqueMassKw += (energy.depOpaqueMassKw || 0);
+        totalGainsOpaqueMassKw += (energy.gainsOpaqueMassKw || 0);
         totalGainsConductionKw += energy.gainsConductionKw;
         totalGainsSolairesKw += energy.gainsSolairesKw;
         totalGainsSolairesAirKw += (energy.gainsSolairesAirKw || 0);
@@ -2318,6 +2322,7 @@ function calculateGlobalHabitatMetrics() {
         outdoorDryingScore10: dryingOutdoor.score10,
         totalDeperditionsKw: parseFloat(totalDeperditionsKw.toFixed(2)),
         totalDepOpaqueMassKw: parseFloat(totalDepOpaqueMassKw.toFixed(2)),
+        totalGainsOpaqueMassKw: parseFloat(totalGainsOpaqueMassKw.toFixed(2)),
         totalGainsConductionKw: parseFloat(totalGainsConductionKw.toFixed(2)),
         totalGainsSolairesKw: parseFloat(totalGainsSolairesKw.toFixed(2)),
         totalGainsSolairesAirKw: parseFloat(totalGainsSolairesAirKw.toFixed(2)),
