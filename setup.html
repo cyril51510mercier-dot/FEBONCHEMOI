@@ -503,6 +503,11 @@
                 userProfileSelect.value = globalCfg.userProfile;
             }
 
+            const mainEnergySelect = document.getElementById('mainEnergySource');
+            if (mainEnergySelect && globalCfg.mainEnergySource) {
+                mainEnergySelect.value = globalCfg.mainEnergySource;
+            }
+
             // Restauration de l'état de la saison de chauffe
             const heatingCb = document.getElementById('heatingSeasonActive');
             if (heatingCb) {
@@ -525,6 +530,16 @@
                     setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
                 }
             });
+
+            const mainEnergySelect = document.getElementById('mainEnergySource');
+            if (mainEnergySelect) {
+                mainEnergySelect.addEventListener('change', () => {
+                    const allConfig = SolsticeStore.getAllZones();
+                    allConfig.global = allConfig.global || {};
+                    allConfig.global.mainEnergySource = mainEnergySelect.value;
+                    localStorage.setItem(SolsticeStore.STORAGE_KEY, JSON.stringify(allConfig));
+                });
+            }
 
             // Écouteurs pour la visibilité dynamique des portes
             [1, 2, 3, 4].forEach(i => {
@@ -668,7 +683,7 @@
                 }
             });
 
-            document.getElementById('saveConfigBtn').addEventListener('click', );
+            document.getElementById('saveConfigBtn').addEventListener('click', handleSave);
         }
 
         function toggleOutdoorMode() {
@@ -902,6 +917,9 @@
             document.getElementById('wallMaterial').value = data.wallMat || 'cinderblock';
             document.getElementById('wallThickness').value = data.wallThick || '';
             document.getElementById('zoneInsulation').value = data.insulation || 'iti_recent';
+            if (document.getElementById('customWallU')) {
+                document.getElementById('customWallU').value = data.uWall || '';
+            }
             document.getElementById('ceilingMaterial').value = data.ceilingMat || 'leger';
             document.getElementById('ceilingInsulation').value = data.ceilingInsulation || 'iti_recent';
             document.getElementById('floorMaterial').value = data.floorMat || 'lourd';
@@ -930,6 +948,9 @@
 
             if (data.equipment) {
                 document.getElementById('heatingSystem').value = data.equipment.heating?.system || 'none';
+                if (document.getElementById('heatingEnergySource')) {
+                    document.getElementById('heatingEnergySource').value = data.equipment.heating?.energySource || 'inherit';
+                }
                 document.querySelectorAll('input[name="heatingRegulation"]').forEach(cb => {
                     cb.checked = Array.isArray(data.equipment.heating?.regulation) && data.equipment.heating.regulation.includes(cb.value);
                 });
@@ -943,6 +964,12 @@
 
                 document.getElementById('fanSystem').value = data.equipment.fanSystem || 'aucun';
                 document.getElementById('vmcSystem').value = data.equipment.vmcSystem || 'none';
+                if (document.getElementById('vmcType')) {
+                    document.getElementById('vmcType').value = data.equipment.vmcType || 'none';
+                }
+                if (document.getElementById('vmcAirflow')) {
+                    document.getElementById('vmcAirflow').value = data.equipment.vmcAirflow || '';
+                }
             }
 
             windowsContainer.innerHTML = '';
@@ -972,6 +999,9 @@
             document.getElementById('roomArea').value = '';
             document.getElementById('ceilingHeight').value = '2.5';
             document.getElementById('wallThickness').value = '';
+            if (document.getElementById('customWallU')) {
+                document.getElementById('customWallU').value = '';
+            }
             document.getElementById('adjWall1').value = 'outside';
             document.getElementById('adjWall2').value = 'heated';
             document.getElementById('adjWall3').value = 'heated';
@@ -988,10 +1018,19 @@
             document.querySelectorAll('input[name="coolingRegulation"]').forEach(cb => cb.checked = false);
 
             document.getElementById('heatingSystem').value = 'none';
+            if (document.getElementById('heatingEnergySource')) {
+                document.getElementById('heatingEnergySource').value = 'inherit';
+            }
             document.getElementById('coolingSystem').value = 'aucun';
             document.getElementById('heatingIntermittency').value = 'no';
             document.getElementById('coolingIntermittency').value = 'no';
             document.getElementById('vmcSystem').value = 'none';
+            if (document.getElementById('vmcType')) {
+                document.getElementById('vmcType').value = 'none';
+            }
+            if (document.getElementById('vmcAirflow')) {
+                document.getElementById('vmcAirflow').value = '';
+            }
 
             windowsContainer.innerHTML = '';
             windowCounter = 0;

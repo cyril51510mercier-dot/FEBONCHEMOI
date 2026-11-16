@@ -627,13 +627,14 @@ function getRoomMetric(nomPiece, colIndex) {
     if (colIndex === 3) return rh;
     if (colIndex === 4) return calculateAbsoluteHumidity(ta, rh);
 
+    const tStruct = isOutdoor ? ta : updateStructureTemperature(nomPiece, ta);
     const vel = calculateAirVelocity(zoneConfig, nomPiece);
-    const tr = calculateMeanRadiantTemp(zoneConfig, ta);
+    const tr = calculateMeanRadiantTemp(zoneConfig, ta, tStruct);
     const { met, totalClo } = getBaseCloAndMet(zoneConfig);
 
     if (colIndex === 5) return isOutdoor ? -999 : calculatePMV(ta, tr, vel, rh, met, totalClo);
-    if (colIndex === 6) return isOutdoor ? -999 : calculateDailyThermalBalance(zoneConfig, ta).bilanNetkWh;
-    if (colIndex === 7) return isOutdoor ? -999 : ta;
+    if (colIndex === 6) return isOutdoor ? -999 : calculateDailyThermalBalance(zoneConfig, ta, tStruct).bilanNetkWh;
+    if (colIndex === 7) return isOutdoor ? -999 : tStruct;
     if (colIndex === 8) {
         const effectiveVel = isOutdoor ? ((outdoorWind || 0) / 3.6) : vel;
         return parseFloat(calculateDryingPotential(ta, rh, effectiveVel).score10);
@@ -744,13 +745,18 @@ function extractAdjacency(adjValue) {
     return adjValue || 'heated';
 }
 
-function getUValueParoi(typeParoi, materiau, isolation) {
-    const mapInsulationR = { 'ite_recent': 3.8, 'iti_recent': 3.2, 'ite_old': 1.8, 'iti_old': 1.4, 'low': 0.6, 'none': 0.0 };
+function getUValueParoi(typeParoi, materiau, isolation, epaisseurCm = 20, customU = null) {
+    if (typeParoi === 'wall' && customU !== null && customU !== undefined && customU !== '' && !isNaN(parseFloat(customU)) && parseFloat(customU) > 0) {
+        return parseFloat(customU);
+    }
+    const mapInsulationR = { 'ite_heavy': 4.2, 'ite_recent': 3.8, 'iti_recent': 3.2, 'ite_old': 1.8, 'iti_old': 1.4, 'low': 0.6, 'none': 0.0 };
     const mapLambda = { 'cinderblock': 1.3, 'brick': 0.45, 'concrete': 1.7, 'stone': 2.3, 'wood': 0.13, 'leger': 0.15, 'lourd': 1.8 };
 
     const rIns = mapInsulationR[isolation] ?? 2.0;
     const lambda = mapLambda[materiau] ?? 1.0;
-    const epaisseurMetre = 0.20;
+    const epaisseurMetre = (epaisseurCm && !isNaN(parseFloat(epaisseurCm)) && parseFloat(epaisseurCm) > 0)
+        ? (parseFloat(epaisseurCm) / 100)
+        : 0.20;
 
     let rSurface = 0.17;
     if (typeParoi === 'ceiling') rSurface = 0.14;
@@ -797,7 +803,7 @@ function getBaseCloAndMet(zoneConfig) {
     return { met, totalClo };
 }
 
-function calculateMeanRadiantTemp(zone, t_air) {
+function calculateMeanRadiantTemp(zone, t_air, t_masse_opt = null) {
     if (!zone) return t_air;
 
     const area = parseFloat(zone.area) || 16;
@@ -806,37 +812,52 @@ function calculateMeanRadiantTemp(zone, t_air) {
     const wallArea = side * h; 
     const floorArea = area;
 
-    const uWall = getUValueParoi('wall', zone.wallMat, zone.insulation);
+    const uWall = getUValueParoi('wall', zone.wallMat, zone.insulation, zone.wallThick, zone.uWall);
     const uCeiling = getUValueParoi('ceiling', zone.ceilingMat, zone.ceilingInsulation);
     const uFloor = getUValueParoi('floor', zone.floorMat, zone.floorInsulation);
 
     const hi = 7.7; 
+    const effOutdoor = (typeof getEffectiveOutdoorAir === 'function') ? getEffectiveOutdoorAir() : { tAir: outdoorTemp, hasDiffuseSun: false, sunFactor: 0 };
+    const tExtNow = effOutdoor.tAir ?? outdoorTemp;
 
-    function getSurfaceTemp(adjRaw, U) {
+    // Récupération de la température dynamique du nœud Masse (Tm) du modèle 2R2C si disponible
+    let tMasse = t_masse_opt;
+    if ((tMasse === null || tMasse === undefined || isNaN(tMasse)) && zone.name && DONNEES_HABITAT[zone.name]?.tStruct !== undefined) {
+        tMasse = DONNEES_HABITAT[zone.name].tStruct;
+    }
+
+    function getStaticSurfaceTemp(adjRaw, U) {
         const adj = extractAdjacency(adjRaw);
         if (adj === 'heated') return t_air;
-        let tExtEquivalent = outdoorTemp;
-        if (adj === 'unheated') tExtEquivalent = (t_air + outdoorTemp) / 2;
+        let tExtEquivalent = tExtNow;
+        if (adj === 'unheated') tExtEquivalent = (t_air + tExtNow) / 2;
         if (adj === 'ground') tExtEquivalent = 12.0; 
         return t_air - (U / hi) * (t_air - tExtEquivalent);
     }
 
     let totalArea = 0;
-    let sumAreaTemp = 0;
+    let sumOpaqueArea = 0;
+    let sumStaticOpaqueTempArea = 0;
 
     const wallsAdj = [zone.adj?.wall1, zone.adj?.wall2, zone.adj?.wall3, zone.adj?.wall4];
     wallsAdj.forEach(adj => {
-        const tSurf = getSurfaceTemp(adj, uWall);
-        sumAreaTemp += (tSurf * wallArea);
+        const tSurf = getStaticSurfaceTemp(adj, uWall);
+        sumStaticOpaqueTempArea += (tSurf * wallArea);
+        sumOpaqueArea += wallArea;
         totalArea += wallArea;
     });
 
-    sumAreaTemp += (getSurfaceTemp(zone.adj?.ceiling, uCeiling) * floorArea);
-    sumAreaTemp += (getSurfaceTemp(zone.adj?.floor, uFloor) * floorArea);
+    sumStaticOpaqueTempArea += (getStaticSurfaceTemp(zone.adj?.ceiling, uCeiling) * floorArea);
+    sumStaticOpaqueTempArea += (getStaticSurfaceTemp(zone.adj?.floor, uFloor) * floorArea);
+    sumOpaqueArea += (floorArea * 2);
     totalArea += (floorArea * 2);
 
+    let totalWindowArea = 0;
+    let sumWindowTempArea = 0;
+
     if (Array.isArray(zone.windows) && zone.windows.length > 0) {
-        const isSunny = sunshineStatus.toLowerCase().includes('clear') || sunshineStatus.toLowerCase().includes('sun');
+        const isSunny = effOutdoor.hasDiffuseSun || (sunshineStatus || '').toLowerCase().includes('clear') || (sunshineStatus || '').toLowerCase().includes('sun');
+        const sunMod = (effOutdoor.sunFactor !== undefined && effOutdoor.sunFactor > 0) ? effOutdoor.sunFactor : (isSunny ? 0.65 : 0);
 
         zone.windows.forEach(win => {
             const wArea = parseFloat(win.area) || 0;
@@ -851,29 +872,39 @@ function calculateMeanRadiantTemp(zone, t_air) {
             };
 
             const spec = glassProps[win.glass] || glassProps['double_recent'];
-            let tWin = getSurfaceTemp('outside', spec.U);
+            // Le vitrage n'a aucune inertie : sa surface intérieure réagit instantanément à (T_air - T_ext) et au rayonnement solaire
+            let tWin = getStaticSurfaceTemp('outside', spec.U);
             const maskFactor = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 }[win.mask] ?? 1.0;
             const shutterFactor = {
                 'aucun': 1.0, 'store_banne': 0.25, 'store_interieur': 0.75, 'rideau_interieur': 0.80,
                 'roulant_pvc': 0.10, 'roulant_metal': 0.15, 'battant_bois': 0.10, 'persienne': 0.30
             }[win.shutter] ?? 1.0;
 
-            if (isSunny && maskFactor > 0.1) {
+            if (isSunny && maskFactor > 0.1 && sunMod > 0) {
                 const orientArr = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
                 const orientFactors = { 'S': 3.2, 'SE': 2.5, 'SW': 2.5, 'E': 1.8, 'W': 1.8, 'N': 0.6 };
                 let sumOrientFactor = 0;
                 orientArr.forEach(o => { sumOrientFactor += (orientFactors[o] || 1.5); });
                 const orientFactor = orientArr.length > 0 ? (sumOrientFactor / orientArr.length) : 1.5;
                 const tiltFactor = { 'verticale': 1.0, 'inclinee': 1.3, 'horizontale': 1.5 }[win.tilt] ?? 1.0;
-                tWin += (spec.g * orientFactor * tiltFactor * maskFactor * shutterFactor * 5.0);
+                tWin += (spec.g * orientFactor * tiltFactor * maskFactor * shutterFactor * 5.0 * sunMod);
             }
 
-            sumAreaTemp -= (getSurfaceTemp('outside', uWall) * wArea);
-            sumAreaTemp += (tWin * wArea);
+            totalWindowArea += wArea;
+            sumWindowTempArea += (tWin * wArea);
+            sumStaticOpaqueTempArea -= (getStaticSurfaceTemp('outside', uWall) * wArea);
+            sumOpaqueArea -= wArea;
         });
     }
 
-    return sumAreaTemp / totalArea;
+    const netOpaqueArea = Math.max(1.0, sumOpaqueArea);
+    // Si le nœud Masse dynamique 2R2C (tMasse) est connu, les parois opaques (murs, dalle, plafond) rayonnent à tMasse
+    const effectiveOpaqueTemp = (tMasse !== null && tMasse !== undefined && !isNaN(tMasse))
+        ? tMasse
+        : (sumStaticOpaqueTempArea / netOpaqueArea);
+
+    const totalRadiantArea = netOpaqueArea + totalWindowArea;
+    return ((effectiveOpaqueTemp * netOpaqueArea) + sumWindowTempArea) / Math.max(1.0, totalRadiantArea);
 }
 
 function calculateAirVelocity(zoneConfig, nomPiece = '') {
@@ -1359,12 +1390,73 @@ function calculateHabitatAccordageScore(metrics, completedRatio = 0.0) {
 const calculateHabitatHarmonyScore = calculateHabitatAccordageScore;
 
 // ============================================================
-// BALANCEMENT THERMIQUE : INSTANTANÉ (kW) ET PROJECTION 24H (kWh)
+// MODÉLISATION DYNAMIQUE 2R2C (NŒUD AIR Ta & NŒUD MASSE Tm)
+// Conforme EN ISO 52016-1 : Séparation Flux Rapides / Masse Tampon
 // ============================================================
 
-function calculateDailyThermalBalance(zoneConfig, ta) {
+function calculatePassiveInternalGainsW(zoneConfig, hour = new Date().getHours(), dayOfWeek = new Date().getDay()) {
+    if (!zoneConfig || isOutdoorZone(zoneConfig.name || '', zoneConfig) || isBufferZone(zoneConfig.name || '', zoneConfig)) {
+        return { totalW: 0, convectiveAirW: 0, radiativeMassW: 0 };
+    }
+
+    const area = parseFloat(zoneConfig.area) || 15;
+    const usages = Array.isArray(zoneConfig.usages) ? zoneConfig.usages : [];
+    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+
+    let sensibleW = 0;
+
+    if (usages.length === 0) {
+        // Pièce chauffée générique : profil résidentiel moyen (~2.2 W/m²)
+        const factorH = (hour >= 7 && hour <= 22) ? 2.5 : 1.5;
+        sensibleW = area * factorH;
+    } else {
+        // Base veille équipements selon surface
+        sensibleW += area * 0.5;
+
+        if (usages.includes('kitchen')) {
+            sensibleW += 35; // Réfrigérateur / veille permanente
+            if (hour >= 7 && hour <= 8) sensibleW += 90;
+            else if (hour >= 12 && hour <= 13) sensibleW += (isWeekend ? 180 : 80);
+            else if (hour >= 19 && hour <= 21) sensibleW += 200;
+        }
+        if (usages.includes('living') || usages.includes('dining')) {
+            if (hour >= 7 && hour <= 9) sensibleW += 65;
+            else if (hour > 9 && hour < 18) sensibleW += (isWeekend ? 130 : 30);
+            else if (hour >= 18 && hour <= 23) sensibleW += 155;
+        }
+        if (usages.includes('office')) {
+            if (hour >= 8 && hour <= 18) sensibleW += (isWeekend ? 35 : 130);
+            else sensibleW += 10;
+        }
+        if (usages.includes('bedroom')) {
+            if (hour >= 22 || hour < 7) sensibleW += 65; // Métabolisme nocturne (~65 W sensibles)
+            else if (hour === 7 || hour === 21) sensibleW += 35;
+        }
+        if (usages.includes('bath') || usages.includes('bathroom')) {
+            if ((hour >= 7 && hour <= 8) || (hour >= 19 && hour <= 20)) sensibleW += 70;
+        }
+    }
+
+    // Répartition physique : 70% convectif direct vers l'air, 30% radiatif vers les parois (masse)
+    const convectiveAirW = sensibleW * 0.70;
+    const radiativeMassW = sensibleW * 0.30;
+
+    return {
+        totalW: parseFloat(sensibleW.toFixed(1)),
+        convectiveAirW: parseFloat(convectiveAirW.toFixed(1)),
+        radiativeMassW: parseFloat(radiativeMassW.toFixed(1))
+    };
+}
+
+function calculateZone2R2CParams(zoneConfig) {
     if (!zoneConfig || (Array.isArray(zoneConfig.usages) && zoneConfig.usages.includes('outdoor'))) {
-        return { hTotalWPerK: 0, deperditionskWh: 0, gainsConductionkWh: 0, gainsSolaireskWh: 0, gainsTotauxkWh: 0, bilanNetkWh: 0, bilanDiurnekWh: 0, bilanNocturnekWh: 0, depKw: 0, gainsConductionKw: 0, gainsSolairesKw: 0 };
+        return {
+            area: 0, height: 2.5, volume: 0,
+            hWindows: 0, hVentilation: 0, hRapide: 0,
+            hWallOpaque: 0, hCeiling: 0, hFloor: 0, hOpaque: 0, hTotal: 0,
+            hCi: 0, cAirWhPerK: 1, cMassWhPerK: 1, tauHours: 20,
+            fSolAir: 0.18, fSolMass: 0.82
+        };
     }
 
     const area = parseFloat(zoneConfig.area) || 15;
@@ -1373,7 +1465,7 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const side = Math.sqrt(area);
     const wallArea = side * h;
 
-    const uWall = getUValueParoi('wall', zoneConfig.wallMat || 'cinderblock', zoneConfig.insulation || 'iti_recent');
+    const uWall = getUValueParoi('wall', zoneConfig.wallMat || 'cinderblock', zoneConfig.insulation || 'iti_recent', zoneConfig.wallThick, zoneConfig.uWall);
     const uCeiling = getUValueParoi('ceiling', zoneConfig.ceilingMat || 'leger', zoneConfig.ceilingInsulation || 'iti_recent');
     const uFloor = getUValueParoi('floor', zoneConfig.floorMat || 'lourd', zoneConfig.floorInsulation || 'iti_recent');
 
@@ -1381,10 +1473,12 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
         if (Array.isArray(adj)) {
             if (adj.includes('outside')) return 1.0;
             if (adj.includes('unheated')) return 0.5;
+            if (adj.includes('ground')) return 0.4;
             return 0.0;
         }
         if (adj === 'outside') return 1.0;
         if (adj === 'unheated') return 0.5;
+        if (adj === 'ground') return 0.4;
         return 0.0;
     };
 
@@ -1395,11 +1489,10 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     const bCeiling = getBFactor(zoneConfig.adj?.ceiling || ['heated']);
     const bFloor = getBFactor(zoneConfig.adj?.floor || ['heated']);
 
-    const hWall = uWall * wallArea * (bW1 + bW2 + bW3 + bW4);
-    const hCeiling = uCeiling * area * bCeiling;
-    const hFloor = uFloor * area * bFloor;
-
+    // 1. Vitrages (conductance directe sans inertie + fraction solaire)
     let hWindows = 0;
+    let totalWindowArea = 0;
+    let weightedFSolAir = 0;
     const glassUProps = {
         'single': 5.7,
         'double_old': 2.8,
@@ -1407,42 +1500,135 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
         'double_recent': 1.2,
         'triple': 0.7
     };
+
     if (Array.isArray(zoneConfig.windows) && zoneConfig.windows.length > 0) {
         zoneConfig.windows.forEach(win => {
             const wArea = parseFloat(win.area) || 0;
             if (wArea <= 0) return;
             const uWin = glassUProps[win.glass] || 1.4;
             hWindows += (uWin * wArea);
+            totalWindowArea += wArea;
+
+            // Si rideau ou store intérieur : le rayonnement arrêté chauffe immédiatement l'air par convection (50% air / 50% masse)
+            // Sinon : l'air est diatherme (18% convectif immédiat sur vitre/mobilier léger, 82% absorbé par la tache solaire sur dalle/murs)
+            const isInteriorBlind = (win.shutter === 'store_interieur' || win.shutter === 'rideau_interieur');
+            const winFSolAir = isInteriorBlind ? 0.50 : 0.18;
+            weightedFSolAir += (winFSolAir * wArea);
         });
     }
 
-    const hSurfacique = hWall + hCeiling + hFloor + hWindows;
+    const fSolAir = totalWindowArea > 0 ? (weightedFSolAir / totalWindowArea) : 0.18;
+    const fSolMass = 1.0 - fSolAir;
 
-    let ach = 0.5;
-    const vmc = zoneConfig.equipment?.vmcSystem;
-    if (vmc === 'marche_forcee') ach = 1.0;
-    else if (vmc === 'continue_non_pilotable') ach = 0.7;
-    else if (vmc === 'trappe') ach = 0.5;
-    else if (vmc === 'none') ach = 0.25;
+    // 2. Parois opaques (déduction de la surface vitrée sur les murs extérieurs pour éviter tout double comptage)
+    const extWallFactorSum = bW1 + bW2 + bW3 + bW4;
+    const grossExtWallArea = wallArea * extWallFactorSum;
+    const netExtWallArea = Math.max(0, grossExtWallArea - totalWindowArea);
 
-    const hVentilation = 0.34 * volume * ach;
-    const hTotal = hSurfacique + hVentilation;
+    const hWallOpaque = uWall * netExtWallArea;
+    const hCeiling = uCeiling * area * bCeiling;
+    const hFloor = uFloor * area * bFloor;
+    const hOpaque = hWallOpaque + hCeiling + hFloor;
 
-    let depKw = 0;
-    let gainsConductionKw = 0;
+    // 3. Renouvellement d'air aéraulique (VMC + infiltrations parasites)
+    let qvEffM3h = 0;
+    const vmcType = zoneConfig.equipment?.vmcType || 'none';
+    const customAirflow = parseFloat(zoneConfig.equipment?.vmcAirflow);
+    const vmcSys = zoneConfig.equipment?.vmcSystem || 'none';
 
-    const effOutdoor = getEffectiveOutdoorAir();
-    const tExtRef = effOutdoor.tAir;
-
-    if (ta > tExtRef) {
-        depKw = (hTotal * (ta - tExtRef)) / 1000;
+    if (!isNaN(customAirflow) && customAirflow > 0) {
+        const recoveryFactor = (vmcType === 'df_eff') ? 0.15 : 1.0; // Double flux : 85% récupérés
+        const infiltrationM3h = volume * 0.12; // Infiltrations parasites enveloppe
+        qvEffM3h = (customAirflow * recoveryFactor) + infiltrationM3h;
     } else {
-        gainsConductionKw = (hTotal * (tExtRef - ta)) / 1000;
+        let ach = 0.45;
+        if (vmcSys === 'marche_forcee') ach = 0.90;
+        else if (vmcSys === 'continue_non_pilotable') ach = 0.60;
+        else if (vmcSys === 'trappe') ach = 0.45;
+        else if (vmcSys === 'none') ach = 0.22;
+
+        if (vmcType === 'df_eff') ach *= 0.25; // VMC Double Flux + infiltrations résiduelles
+        else if (vmcType === 'sf_hygro') ach *= 0.75; // Régulation hygro-réglable
+
+        qvEffM3h = volume * ach;
     }
 
-    let gainsSolairesKw = 0;
-    const isSunnyInstant = effOutdoor.hasDiffuseSun;
-    const sunModulation = effOutdoor.sunFactor;
+    const hVentilation = 0.34 * qvEffM3h;
+
+    // Conductance directe rapide (Air <-> Extérieur : Vitrages + Renouvellement d'air)
+    const hRapide = hWindows + hVentilation;
+    const hTotal = hRapide + hOpaque;
+
+    // 4. Couplage convectif pur Air <-> Masse (H_ci = somme h_ci * S_active)
+    // Coefficient purement convectif h_ci (~2.5 W/m²K vertical, ~2.8 W/m²K horizontal moyen), SANS le terme radiatif h_ri (5.2 W/m²K)
+    const ins = zoneConfig.insulation || 'iti_recent';
+    const floorMat = zoneConfig.floorMat || 'lourd';
+    const ceilingMat = zoneConfig.ceilingMat || 'leger';
+    const wallMat = zoneConfig.wallMat || 'cinderblock';
+
+    const totalInternalWallArea = Math.max(4.0, (4 * wallArea) - totalWindowArea);
+    const activeWallRatio = (ins.startsWith('ite') || ins === 'none') ? 0.90 : 0.45;
+    const activeFloorRatio = (floorMat === 'lourd') ? 0.95 : 0.45;
+    const activeCeilingRatio = (ceilingMat === 'lourd') ? 0.85 : 0.35;
+
+    const hCiWalls = 2.5 * (totalInternalWallArea * activeWallRatio);
+    const hCiSlabs = 2.8 * area * (activeFloorRatio + activeCeilingRatio);
+    const hCi = Math.max(volume * 1.8, hCiWalls + hCiSlabs);
+
+    // 5. Capacités thermiques C_air et C_masse (en Wh/K) et constante de temps dynamique tau
+    const cAirWhPerK = 1.0 * volume; // Air (0.34 Wh/m³K) + mobilier léger immédiatement couplé (~3x air)
+
+    let cmPerM2 = 45; // Base inertie moyenne (parpaing + plâtre + cloisons)
+    if (['concrete', 'stone'].includes(wallMat)) cmPerM2 += 35;
+    else if (wallMat === 'wood' || wallMat === 'brique_creuse' || wallMat === 'brick') cmPerM2 -= 12;
+
+    const wallThickCm = parseFloat(zoneConfig.wallThick) || 20;
+    if (wallThickCm > 25 && !ins.startsWith('iti')) {
+        cmPerM2 += Math.min(30, (wallThickCm - 20) * 0.8);
+    }
+
+    if (ins.startsWith('ite')) cmPerM2 += 30;
+    else if (ins.startsWith('iti')) cmPerM2 -= 15;
+
+    if (floorMat === 'lourd') cmPerM2 += 18;
+    if (ceilingMat === 'lourd') cmPerM2 += 12;
+
+    cmPerM2 = Math.max(22, cmPerM2);
+    const cMassWhPerK = cmPerM2 * area;
+
+    // Constante de temps effective du nœud Masse dans le réseau 2R2C
+    let rMoyen = 2.2;
+    if (ins.includes('recent') || ins.includes('heavy')) rMoyen = 3.6;
+    else if (ins.includes('old')) rMoyen = 1.8;
+    else if (ins === 'none') rMoyen = 0.6;
+
+    const tauHours = Math.max(8.0, Math.min(72.0, parseFloat(((cmPerM2 * rMoyen) / 4.0).toFixed(1))));
+
+    return {
+        area,
+        height: h,
+        volume,
+        hWindows: parseFloat(hWindows.toFixed(2)),
+        hVentilation: parseFloat(hVentilation.toFixed(2)),
+        hRapide: parseFloat(hRapide.toFixed(2)),
+        hWallOpaque: parseFloat(hWallOpaque.toFixed(2)),
+        hCeiling: parseFloat(hCeiling.toFixed(2)),
+        hFloor: parseFloat(hFloor.toFixed(2)),
+        hOpaque: parseFloat(hOpaque.toFixed(2)),
+        hTotal: parseFloat(hTotal.toFixed(2)),
+        hCi: parseFloat(hCi.toFixed(2)),
+        cAirWhPerK: parseFloat(cAirWhPerK.toFixed(1)),
+        cMassWhPerK: parseFloat(cMassWhPerK.toFixed(1)),
+        tauHours,
+        fSolAir: parseFloat(fSolAir.toFixed(2)),
+        fSolMass: parseFloat(fSolMass.toFixed(2))
+    };
+}
+
+function calculateWindowSolarGainW(zoneConfig, isSunny, sunModulation = 1.0) {
+    if (!zoneConfig || !isSunny || !Array.isArray(zoneConfig.windows) || zoneConfig.windows.length === 0) {
+        return { totalW: 0, airW: 0, massW: 0 };
+    }
 
     const glassMap = { 'single': 0.85, 'double_old': 0.75, 'double_standard': 0.68, 'double_recent': 0.60, 'triple': 0.45 };
     const maskMap = { 'none': 1.0, 'partial': 0.5, 'heavy': 0.1 };
@@ -1452,91 +1638,182 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     };
     const orientMap = { 'S': 3.2, 'SE': 2.5, 'SW': 2.5, 'E': 1.8, 'W': 1.8, 'N': 0.6 };
 
-    if (Array.isArray(zoneConfig.windows) && isSunnyInstant) {
-        zoneConfig.windows.forEach(win => {
-            const wArea = parseFloat(win.area) || 0;
-            if (wArea <= 0) return;
+    let totalKw = 0;
+    let airKw = 0;
+    let massKw = 0;
 
-            const gFactor = glassMap[win.glass] ?? 0.60;
-            const maskFactor = maskMap[win.mask] ?? 1.0;
-            const shutterFactor = shutterMap[win.shutter] ?? 1.0;
+    zoneConfig.windows.forEach(win => {
+        const wArea = parseFloat(win.area) || 0;
+        if (wArea <= 0) return;
 
-            const orients = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
-            let sumI = 0;
-            orients.forEach(o => { sumI += (orientMap[o] || 1.5); });
-            let iSolar = orients.length > 0 ? (sumI / orients.length) : 1.5;
+        const gFactor = glassMap[win.glass] ?? 0.60;
+        const maskFactor = maskMap[win.mask] ?? 1.0;
+        const shutterFactor = shutterMap[win.shutter] ?? 1.0;
 
-            gainsSolairesKw += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 12) * sunModulation);
-        });
+        const orients = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
+        let sumI = 0;
+        orients.forEach(o => { sumI += (orientMap[o] || 1.5); });
+        const iSolar = orients.length > 0 ? (sumI / orients.length) : 1.5;
+
+        const winKw = wArea * gFactor * maskFactor * shutterFactor * (iSolar / 12) * sunModulation;
+        const isInteriorBlind = (win.shutter === 'store_interieur' || win.shutter === 'rideau_interieur');
+        const fAir = isInteriorBlind ? 0.50 : 0.18;
+
+        totalKw += winKw;
+        airKw += (winKw * fAir);
+        massKw += (winKw * (1.0 - fAir));
+    });
+
+    return {
+        totalW: totalKw * 1000,
+        airW: airKw * 1000,
+        massW: massKw * 1000
+    };
+}
+
+function calculateDailyThermalBalance(zoneConfig, ta, tStructOpt = null) {
+    if (!zoneConfig || (Array.isArray(zoneConfig.usages) && zoneConfig.usages.includes('outdoor'))) {
+        return {
+            hTotalWPerK: 0, hRapideWPerK: 0, hOpaqueWPerK: 0, hCiWPerK: 0,
+            deperditionskWh: 0, gainsConductionkWh: 0, gainsSolaireskWh: 0, gainsTotauxkWh: 0,
+            bilanNetkWh: 0, bilanPasseKwh: 0, bilanFuturKwh: 0, bilanDiurnekWh: 0, bilanNocturnekWh: 0,
+            depKw: 0, depOpaqueMassKw: 0, gainsConductionKw: 0, gainsSolairesKw: 0, gainsSolairesAirKw: 0, gainsSolairesMasseKw: 0,
+            gainsInternesKw: 0, fluxWallKw: 0, puissanceNetteKw: 0,
+            cumulativeNetHours: new Array(24).fill(0), theoCumulativeHours: new Array(24).fill(0)
+        };
     }
 
-    const puissanceNetteKw = (gainsConductionKw + gainsSolairesKw) - depKw;
+    const params = calculateZone2R2CParams(zoneConfig);
+    const { hRapide, hOpaque, hTotal, hCi, tauHours, fSolAir, fSolMass } = params;
 
+    const now = new Date();
+    const currentHour = now.getHours();
+    const dayOfWeek = now.getDay();
+    const sunriseH = window.solsticeEphemeris?.sunriseHour || 7;
+    const sunsetH = window.solsticeEphemeris?.sunsetHour || 19;
+
+    const effOutdoor = getEffectiveOutdoorAir();
+    const tExtRef = effOutdoor.tAir;
+
+    // Température actuelle du nœud Masse (Tm)
+    let tMassNow = tStructOpt;
+    if (tMassNow === null || tMassNow === undefined || isNaN(tMassNow)) {
+        tMassNow = (zoneConfig.name && DONNEES_HABITAT[zoneConfig.name]?.tStruct !== undefined)
+            ? DONNEES_HABITAT[zoneConfig.name].tStruct
+            : calculateEquilibriumTstruct(zoneConfig, ta, getDailyOutdoorTemp());
+    }
+
+    // 1. Flux directs rapides entre l'air intérieur (Ta) et l'air extérieur (Text) : Vitrages + Renouvellement d'air
+    let depKw = 0;
+    let gainsConductionKw = 0;
+    if (ta > tExtRef) {
+        depKw = (hRapide * (ta - tExtRef)) / 1000;
+    } else {
+        gainsConductionKw = (hRapide * (tExtRef - ta)) / 1000;
+    }
+
+    // Déperdition lente des parois opaques (du nœud Masse vers l'extérieur, non comptée deux fois sur l'air)
+    const depOpaqueMassKw = (hOpaque * Math.max(0, tMassNow - tExtRef)) / 1000;
+
+    // 2. Apports solaires instantanés (avec répartition Air diatherme vs Masse tache solaire)
+    const isSunnyInstant = effOutdoor.hasDiffuseSun;
+    const sunModulation = effOutdoor.sunFactor;
+    const solarInstant = calculateWindowSolarGainW(zoneConfig, isSunnyInstant, sunModulation);
+    const gainsSolairesKw = solarInstant.totalW / 1000;
+    const gainsSolairesAirKw = solarInstant.airW / 1000;
+    const gainsSolairesMasseKw = solarInstant.massW / 1000;
+
+    // 3. Apports internes passifs (selon type de pièce, jour et heure)
+    const internalInstant = calculatePassiveInternalGainsW(zoneConfig, currentHour, dayOfWeek);
+    const gainsInternesKw = internalInstant.totalW / 1000;
+    const gainsInternesAirKw = internalInstant.convectiveAirW / 1000;
+
+    // 4. Flux convectif entre le nœud Masse (Tm) et le nœud Air (Ta)
+    const fluxWallKw = (hCi * (tMassNow - ta)) / 1000;
+
+    // Solde net instantané autour du dénominateur commun Ta
+    const puissanceNetteKw = (gainsSolairesKw + gainsConductionKw + fluxWallKw) - depKw;
+
+    // ============================================================
+    // SIMULATION HORAIRE 24H COUPLÉE 2R2C (THÉORIQUE VS RÉEL IN SITU)
+    // ============================================================
     let deperditionskWh = 0;
     let gainsConductionkWh = 0;
     let gainsSolaireskWh = 0;
-    
     let bilanDiurnekWh = 0;
     let bilanNocturnekWh = 0;
     let bilanPasseKwh = 0;
     let bilanFuturKwh = 0;
+
     const cumulativeNetHours = [];
-    let runningNet = 0;
+    const theoCumulativeHours = [];
+    let runningRealNet = 0;
+    let runningTheoNet = 0;
 
-    const currentHour = new Date().getHours();
-    const sunriseH = window.solsticeEphemeris?.sunriseHour || 7;
-    const sunsetH = window.solsticeEphemeris?.sunsetHour || 19;
-
-    // Fixation de la température intérieure de référence à 20°C pour stabiliser la projection
-    const tIntRef = 20.0; 
+    // Référence théorique fixe à 20.0°C pour garantir l'invariance de la feuille de route théorique sur 24h
+    const tIntRef = 20.0;
+    const tExt24h = getDailyOutdoorTemp();
+    let simMassTheo = calculateEquilibriumTstruct(zoneConfig, tIntRef, tExt24h);
+    let simMassReal = calculateEquilibriumTstruct(zoneConfig, ta, tExt24h);
 
     if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length === 24) {
         window.hourlyExtForecast.forEach(slot => {
+            const hSlot = slot.hour;
             const tExtHour = slot.temp;
-            let depHour = 0;
-            let gainsCondHour = 0;
-            let gainsSolHour = 0;
+            const intHour = calculatePassiveInternalGainsW(zoneConfig, hSlot, dayOfWeek);
 
-            if (tIntRef > tExtHour) {
-                depHour = (hTotal * (tIntRef - tExtHour)) / 1000;
-            } else {
-                gainsCondHour = (hTotal * (tExtHour - tIntRef)) / 1000;
-            }
+            // Modulation solaire horaire sinusoïdale réaliste entre lever et coucher du soleil
+            const dayLen = Math.max(6, sunsetH - sunriseH);
+            const sinSun = (hSlot >= sunriseH && hSlot <= sunsetH)
+                ? Math.max(0.25, Math.sin(((hSlot - sunriseH + 0.5) / dayLen) * Math.PI))
+                : 0;
 
-            if (slot.isSunny && Array.isArray(zoneConfig.windows)) {
-                zoneConfig.windows.forEach(win => {
-                    const wArea = parseFloat(win.area) || 0;
-                    if (wArea <= 0) return;
+            // --- A. TRAJECTOIRE THÉORIQUE DE RÉFÉRENCE (24H STABLE) ---
+            const solTheo = calculateWindowSolarGainW(zoneConfig, slot.isSunny && sinSun > 0, sinSun);
+            const tMassEqTheo = (hCi * tIntRef + hOpaque * tExtHour + solTheo.massW + intHour.radiativeMassW) / Math.max(1, hCi + hOpaque);
+            simMassTheo = tMassEqTheo + (simMassTheo - tMassEqTheo) * Math.exp(-1.0 / tauHours);
 
-                    const gFactor = glassMap[win.glass] ?? 0.60;
-                    const maskFactor = maskMap[win.mask] ?? 1.0;
-                    const shutterFactor = shutterMap[win.shutter] ?? 1.0;
+            const depRapidTheoKw = (hRapide * Math.max(0, tIntRef - tExtHour)) / 1000;
+            const condRapidTheoKw = (hRapide * Math.max(0, tExtHour - tIntRef)) / 1000;
+            const wallFluxTheoKw = (hCi * (simMassTheo - tIntRef)) / 1000;
+            const netTheoHour = (solTheo.totalW / 1000) + condRapidTheoKw + wallFluxTheoKw - depRapidTheoKw;
 
-                    const orients = Array.isArray(win.orient) ? win.orient : [win.orient || 'S'];
-                    let sumI = 0;
-                    orients.forEach(o => { sumI += (orientMap[o] || 1.5); });
-                    let iSolar = orients.length > 0 ? (sumI / orients.length) : 1.5;
+            runningTheoNet += netTheoHour;
+            theoCumulativeHours.push(parseFloat(runningTheoNet.toFixed(3)));
 
-                    gainsSolHour += (wArea * gFactor * maskFactor * shutterFactor * (iSolar / 12));
-                });
-            }
+            // --- B. TRAJECTOIRE RÉELLE IN SITU (ANCRÉE SUR CAPTEURS TA, TM & PYRANOMÈTRE) ---
+            const isPastOrCurrent = (hSlot <= currentHour);
+            const effectiveSunnyReal = isPastOrCurrent ? (slot.isSunny || (hSlot === currentHour && isSunnyInstant)) : slot.isSunny;
+            const effectiveSunMod = (hSlot === currentHour && isSunnyInstant)
+                ? sunModulation
+                : (isPastOrCurrent && isSunnyInstant ? Math.max(sinSun, sunModulation * 0.85) : sinSun);
+
+            const solReal = calculateWindowSolarGainW(zoneConfig, effectiveSunnyReal && effectiveSunMod > 0, effectiveSunMod);
+            const tMassEqReal = (hCi * ta + hOpaque * tExtHour + solReal.massW + intHour.radiativeMassW) / Math.max(1, hCi + hOpaque);
+            simMassReal = (hSlot === currentHour)
+                ? tMassNow
+                : (tMassEqReal + (simMassReal - tMassEqReal) * Math.exp(-1.0 / tauHours));
+
+            const depHour = (hRapide * Math.max(0, ta - tExtHour)) / 1000;
+            const gainsCondHour = (hRapide * Math.max(0, tExtHour - ta)) / 1000;
+            const gainsSolHour = solReal.totalW / 1000;
+            const wallFluxRealKw = (hCi * (simMassReal - ta)) / 1000;
 
             deperditionskWh += depHour;
             gainsConductionkWh += gainsCondHour;
             gainsSolaireskWh += gainsSolHour;
 
-            const netHour = (gainsCondHour + gainsSolHour) - depHour;
-            runningNet += netHour;
-            cumulativeNetHours.push(parseFloat(runningNet.toFixed(3)));
-            
-            if (slot.hour >= sunriseH && slot.hour < sunsetH) {
+            const netHour = (gainsCondHour + gainsSolHour + wallFluxRealKw) - depHour;
+            runningRealNet += netHour;
+            cumulativeNetHours.push(parseFloat(runningRealNet.toFixed(3)));
+
+            if (hSlot >= sunriseH && hSlot < sunsetH) {
                 bilanDiurnekWh += netHour;
             } else {
                 bilanNocturnekWh += netHour;
             }
 
-            // Progression temporelle au cours de la journée
-            if (slot.hour < currentHour) {
+            if (hSlot < currentHour) {
                 bilanPasseKwh += netHour;
             } else {
                 bilanFuturKwh += netHour;
@@ -1545,27 +1822,38 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
     } else {
         deperditionskWh = depKw * 24;
         gainsConductionkWh = gainsConductionKw * 24;
-        gainsSolaireskWh = gainsSolairesKw * 24;
-        bilanDiurnekWh = (gainsConductionKw + gainsSolairesKw - depKw) * 12;
-        bilanNocturnekWh = (gainsConductionKw - depKw) * 12;
+        gainsSolaireskWh = gainsSolairesKw * 10;
+        bilanDiurnekWh = (gainsConductionKw + gainsSolairesKw + fluxWallKw - depKw) * 12;
+        bilanNocturnekWh = (gainsConductionKw + fluxWallKw - depKw) * 12;
 
         const fractionPassee = Math.min(24, Math.max(0, currentHour)) / 24;
-        const totalNetJour = (gainsConductionKw + gainsSolairesKw - depKw) * 24;
+        const totalNetJour = bilanDiurnekWh + bilanNocturnekWh;
         bilanPasseKwh = totalNetJour * fractionPassee;
         bilanFuturKwh = totalNetJour * (1 - fractionPassee);
         for (let h = 1; h <= 24; h++) {
-            cumulativeNetHours.push(parseFloat(((totalNetJour / 24) * h).toFixed(3)));
+            const valH = parseFloat(((totalNetJour / 24) * h).toFixed(3));
+            cumulativeNetHours.push(valH);
+            theoCumulativeHours.push(valH);
         }
     }
 
     const gainsTotauxkWh = gainsSolaireskWh + gainsConductionkWh;
-    const bilanNetkWh = gainsTotauxkWh - deperditionskWh;
+    const bilanNetkWh = bilanPasseKwh + bilanFuturKwh;
 
     return {
         hTotalWPerK: parseFloat(hTotal.toFixed(1)),
+        hRapideWPerK: parseFloat(hRapide.toFixed(1)),
+        hOpaqueWPerK: parseFloat(hOpaque.toFixed(1)),
+        hCiWPerK: parseFloat(hCi.toFixed(1)),
         depKw: parseFloat(depKw.toFixed(2)),
+        depOpaqueMassKw: parseFloat(depOpaqueMassKw.toFixed(2)),
         gainsConductionKw: parseFloat(gainsConductionKw.toFixed(2)),
         gainsSolairesKw: parseFloat(gainsSolairesKw.toFixed(2)),
+        gainsSolairesAirKw: parseFloat(gainsSolairesAirKw.toFixed(2)),
+        gainsSolairesMasseKw: parseFloat(gainsSolairesMasseKw.toFixed(2)),
+        gainsInternesKw: parseFloat(gainsInternesKw.toFixed(2)),
+        gainsInternesAirKw: parseFloat(gainsInternesAirKw.toFixed(2)),
+        fluxWallKw: parseFloat(fluxWallKw.toFixed(2)),
         puissanceNetteKw: parseFloat(puissanceNetteKw.toFixed(2)),
         deperditionskWh: parseFloat(deperditionskWh.toFixed(2)),
         gainsConductionkWh: parseFloat(gainsConductionkWh.toFixed(2)),
@@ -1577,76 +1865,61 @@ function calculateDailyThermalBalance(zoneConfig, ta) {
         bilanDiurnekWh: parseFloat(bilanDiurnekWh.toFixed(2)),
         bilanNocturnekWh: parseFloat(bilanNocturnekWh.toFixed(2)),
         cumulativeNetHours,
+        theoCumulativeHours,
         currentHour
     };
 }
 
 // ============================================================
-// MODÈLE D'INERTIE ET RÉSERVE THERMIQUE AVANCÉ (BEM & RATTRAPAGE)
+// MODÈLE D'INERTIE ET RÉSERVE THERMIQUE AVANCÉ (2R2C & RATTRAPAGE)
 // ============================================================
 
 function calculateDynamicTau(zoneConfig) {
     if (!zoneConfig) return 20.0;
-
-    // Capacité thermique surfacique efficace Cm (Wh / (m²·K)) selon ISO 13790
-    const wallMat = zoneConfig.wallMat || 'cinderblock';
-    const ins = zoneConfig.insulation || 'iti_recent';
-    const floorMat = zoneConfig.floorMat || 'lourd';
-    const ceilingMat = zoneConfig.ceilingMat || 'leger';
-
-    let cmPerM2 = 45; // Base inertie moyenne (parpaing + plâtre intérieur)
-
-    // Impact matériau des murs
-    if (['concrete', 'stone'].includes(wallMat)) {
-        cmPerM2 += 35; // Forte masse minérale
-    } else if (wallMat === 'wood' || wallMat === 'brique_creuse') {
-        cmPerM2 -= 15; // Inertie plus faible
-    }
-
-    // Impact position de l'isolation (l'ITE permet de mobiliser toute la masse des murs)
-    if (ins.startsWith('ite')) {
-        cmPerM2 += 30; // Murs lourds inclus dans le volume chauffé
-    } else if (ins.startsWith('iti')) {
-        cmPerM2 -= 15; // L'isolation intérieure coupe l'inertie du mur porteur
-    }
-
-    if (floorMat === 'lourd') cmPerM2 += 15; // Dalle béton
-    if (ceilingMat === 'lourd') cmPerM2 += 10; // Dalle / plafond béton
-
-    // Estimation de la résistance thermique moyenne
-    let rMoyen = 2.2;
-    if (ins.includes('recent') || ins.includes('heavy')) rMoyen = 3.6;
-    else if (ins.includes('old')) rMoyen = 1.8;
-    else if (ins === 'none') rMoyen = 0.6;
-
-    // Constante de temps tau = R * C (heures)
-    const tauEstime = (cmPerM2 * rMoyen) / 4.0;
-    return Math.max(8.0, Math.min(72.0, parseFloat(tauEstime.toFixed(1))));
+    return calculateZone2R2CParams(zoneConfig).tauHours;
 }
 
-function calculateEquilibriumTstruct(zoneConfig, tOp, tExt24h) {
-    if (!zoneConfig) return tOp;
+function calculateEquilibriumTstruct(zoneConfig, tAir, tExt24h, extraMassPowerW = null) {
+    if (!zoneConfig) return tAir;
 
-    const ins = zoneConfig.insulation || 'iti_recent';
-    // Chute thermique moyenne des parois intérieures (doublages, cloisons, dalles)
-    // R_surf / R_total = (1/h_i) / (1/h_i + R_isol + R_paroi + 1/h_e)
-    // En ITI moderne : R_total ~ 3.5 => DeltaT ~ (0.13 / 3.5) * (tOp - tExt24h) ~ 0.037 * DeltaT
-    let factorDelta = 0.035;
-    if (ins === 'iti_recent' || ins === 'ite_heavy') factorDelta = 0.035;
-    else if (ins === 'iti_old' || ins === 'ite_old') factorDelta = 0.075;
-    else factorDelta = 0.18; // Non isolé
+    const params = calculateZone2R2CParams(zoneConfig);
+    const { hCi, hOpaque } = params;
+    if (hCi + hOpaque <= 0) return tAir;
 
-    const tEquilibrium = tOp - factorDelta * (tOp - tExt24h);
+    // Apports radiatifs moyens vers la masse sur 24h (apports internes radiatifs + fond solaire diurne)
+    let avgMassPowerW = extraMassPowerW;
+    if (avgMassPowerW === null || avgMassPowerW === undefined || isNaN(avgMassPowerW)) {
+        const intGains = calculatePassiveInternalGainsW(zoneConfig, 14, 2);
+        const effOutdoor = (typeof getEffectiveOutdoorAir === 'function') ? getEffectiveOutdoorAir() : { hasDiffuseSun: false, sunFactor: 0 };
+        const solInstant = calculateWindowSolarGainW(zoneConfig, effOutdoor.hasDiffuseSun, effOutdoor.sunFactor * 0.35);
+        avgMassPowerW = intGains.radiativeMassW + solInstant.massW;
+    }
+
+    // Équilibre stationnaire exact du nœud Masse 2R2C : H_ci*(Ta - Tm) + H_op*(Text - Tm) + Phi_masse = 0
+    const tEquilibrium = (hCi * tAir + hOpaque * tExt24h + avgMassPowerW) / (hCi + hOpaque);
     return parseFloat(tEquilibrium.toFixed(2));
 }
 
 function updateStructureTemperature(nomPiece, currentTa) {
     const now = Date.now();
     const zoneConfig = getZoneConfigByName(nomPiece);
-    const tMr = calculateMeanRadiantTemp(zoneConfig, currentTa);
-    const currentTop = (currentTa + tMr) / 2;
+    const params = calculateZone2R2CParams(zoneConfig);
+    const { hCi, hOpaque, tauHours: tau } = params;
+
+    const effOutdoor = (typeof getEffectiveOutdoorAir === 'function') ? getEffectiveOutdoorAir() : { tAir: outdoorTemp, hasDiffuseSun: false, sunFactor: 0 };
+    const tExtNow = effOutdoor.tAir ?? outdoorTemp;
     const tExt24h = getDailyOutdoorTemp();
-    const tau = calculateDynamicTau(zoneConfig);
+
+    // Calcul de la puissance instantanée absorbée directement par la masse (82% du solaire + 30% apports internes)
+    const nowDate = new Date(now);
+    const solNow = calculateWindowSolarGainW(zoneConfig, effOutdoor.hasDiffuseSun, effOutdoor.sunFactor);
+    const intNow = calculatePassiveInternalGainsW(zoneConfig, nowDate.getHours(), nowDate.getDay());
+    const phiMassNowW = solNow.massW + intNow.radiativeMassW;
+
+    // Température asymptotique instantanée du nœud Masse dans le schéma 2R2C
+    const currentTargetTm = (hCi + hOpaque > 0)
+        ? ((hCi * currentTa + hOpaque * tExtNow + phiMassNowW) / (hCi + hOpaque))
+        : currentTa;
 
     if (!DONNEES_HABITAT[nomPiece]) {
         DONNEES_HABITAT[nomPiece] = {};
@@ -1669,11 +1942,11 @@ function updateStructureTemperature(nomPiece, currentTa) {
         }
     }
 
-    // Si pas de données, ou données aberrantes en cache (écart > 2.5°C avec l'ambiance) : réinitialiser à l'équilibre physique réaliste
-    if (lastTstruct === undefined || isNaN(lastTstruct) || Math.abs(lastTstruct - currentTop) > 2.5 || !lastTimestamp) {
-        const initialTstruct = calculateEquilibriumTstruct(zoneConfig, currentTop, tExt24h);
+    // Si pas de données, ou données aberrantes en cache (écart > 2.5°C avec l'ambiance) : réinitialiser à l'équilibre 2R2C réaliste
+    if (lastTstruct === undefined || isNaN(lastTstruct) || Math.abs(lastTstruct - currentTa) > 2.5 || !lastTimestamp) {
+        const initialTstruct = calculateEquilibriumTstruct(zoneConfig, currentTa, tExt24h);
         roomData.tStruct = parseFloat(initialTstruct.toFixed(2));
-        roomData.lastTop = parseFloat(currentTop.toFixed(2));
+        roomData.lastTop = parseFloat(currentTargetTm.toFixed(2));
         roomData.lastTimestamp = now;
         try {
             localStorage.setItem(`SOLSTICE_TSTRUCT_${nomPiece}`, JSON.stringify({
@@ -1689,32 +1962,32 @@ function updateStructureTemperature(nomPiece, currentTa) {
     if (dtHours < 0.016) return roomData.tStruct;
 
     let newTstruct = lastTstruct;
-    const prevTop = lastTop !== undefined ? lastTop : currentTop;
+    const prevTargetTm = lastTop !== undefined ? lastTop : currentTargetTm;
 
     if (dtHours > 24) {
-        newTstruct = calculateEquilibriumTstruct(zoneConfig, currentTop, tExt24h);
+        newTstruct = calculateEquilibriumTstruct(zoneConfig, currentTa, tExt24h);
     } else if (dtHours > 2) {
         const steps = Math.floor(dtHours);
         const alphaStep = 1 - Math.exp(-1 / tau);
-        const tTopStep = (currentTop - prevTop) / steps;
+        const tTargetStep = (currentTargetTm - prevTargetTm) / steps;
 
         for (let i = 1; i <= steps; i++) {
-            const interpolatedTop = prevTop + (tTopStep * i);
-            newTstruct = newTstruct + alphaStep * (interpolatedTop - newTstruct);
+            const interpolatedTarget = prevTargetTm + (tTargetStep * i);
+            newTstruct = newTstruct + alphaStep * (interpolatedTarget - newTstruct);
         }
 
         const remainder = dtHours - steps;
         if (remainder > 0.01) {
             const alphaRem = 1 - Math.exp(-remainder / tau);
-            newTstruct = newTstruct + alphaRem * (currentTop - newTstruct);
+            newTstruct = newTstruct + alphaRem * (currentTargetTm - newTstruct);
         }
     } else {
         const alpha = 1 - Math.exp(-dtHours / tau);
-        newTstruct = lastTstruct + alpha * (currentTop - lastTstruct);
+        newTstruct = lastTstruct + alpha * (currentTargetTm - lastTstruct);
     }
 
     roomData.tStruct = parseFloat(newTstruct.toFixed(2));
-    roomData.lastTop = parseFloat(currentTop.toFixed(2));
+    roomData.lastTop = parseFloat(currentTargetTm.toFixed(2));
     roomData.lastTimestamp = now;
     try {
         localStorage.setItem(`SOLSTICE_TSTRUCT_${nomPiece}`, JSON.stringify({
@@ -1729,18 +2002,21 @@ function updateStructureTemperature(nomPiece, currentTa) {
 
 function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel = 18.0, options = {}) {
     const deltaFlux = tStruct - tAir;
-    // Conductance volumique surfacique d'échange convectif & radiatif intérieur h_i * S_parois_actives / V
-    // En résidentiel standard : h_i ~ 7.7 W/(m²K), ratio S_parois_actives/V ~ 1.1 m²/m³ => ~ 8.5 W/(K·m³)
-    const fluxPowerKw = (totalVolumeM3 * 8.5 * deltaFlux) / 1000;
+    // Couplage purement convectif H_ci entre le nœud Masse (Tm) et le nœud Air (Ta)
+    // En 2R2C : h_ci ~ 2.5 à 2.8 W/(m²K) (sans le rayonnement inter-parois h_ri = 5.2 W/m²K) => ~ 3.0 W/(K·m³)
+    const hCiEffectiveWPerK = (options.hCiWPerK && options.hCiWPerK > 0)
+        ? options.hCiWPerK
+        : (totalVolumeM3 * 3.0);
+    const fluxPowerKw = (hCiEffectiveWPerK * deltaFlux) / 1000;
     const absPowerKw = Math.abs(fluxPowerKw).toFixed(2);
 
     let fluxStatusText = "";
     let fluxColor = "#4ADE80";
 
-    if (deltaFlux > 0.3) {
+    if (deltaFlux > 0.25) {
         fluxStatusText = `🔥 Restitution (+${absPowerKw} kW)`;
         fluxColor = "#FDBA74";
-    } else if (deltaFlux < -0.3) {
+    } else if (deltaFlux < -0.25) {
         fluxStatusText = `❄️ Absorption (-${absPowerKw} kW)`;
         fluxColor = "#38BDF8";
     } else {
@@ -1748,16 +2024,13 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
         fluxColor = "#4ADE80";
     }
 
-
-    // --- SIMULATION DYNAMIQUE PROSPECTIVE DE L'AUTONOMIE (T_STRUCT -> 19°C) ---
-    // Projection heure par heure sur la météo réelle des 48 prochaines heures (Météo-France / One Call)
+    // --- SIMULATION DYNAMIQUE PROSPECTIVE 2R2C DE L'AUTONOMIE (T_STRUCT -> 19°C) ---
     const tCible = 19.0;
     const tExtMoy = (options.tExt !== undefined) ? options.tExt : getDailyOutdoorTemp();
     const hTotalWPerK = (options.hTotalWPerK && options.hTotalWPerK > 0)
         ? options.hTotalWPerK
         : (totalVolumeM3 * 0.7);
 
-    // 1. Récupération de la chronique météo prévisionnelle (48h futures)
     let futureForecast = (Array.isArray(window.futureHourlyForecast) && window.futureHourlyForecast.length >= 12)
         ? window.futureHourlyForecast
         : null;
@@ -1769,16 +2042,15 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
         futureForecast = generateSyntheticFutureForecast(curT, curRh, isSunny);
     }
 
-    // 2. Puissance solaire crête globale estimée pour le logement (kW)
     const peakSolarKw = (options.gainsSolairesKw !== undefined && options.gainsSolairesKw > 0)
         ? options.gainsSolairesKw
         : (totalVolumeM3 * 0.004);
 
-    // Apports internes moyens constants (occupants + équipements) ~ 2 W/m²
     const surfaceHab = totalVolumeM3 / 2.5;
-    const pInterneW = surfaceHab * 2.0;
+    const pInterneW = (options.gainsInternesKw !== undefined && options.gainsInternesKw > 0)
+        ? (options.gainsInternesKw * 1000)
+        : (surfaceHab * 2.2);
 
-    // 3. Boucle de simulation dynamique pas-à-pas (Heure par heure sur les prochaines 48h)
     let simT = tStruct;
     let hoursTo19 = null;
     let targetMoment = null;
@@ -1795,7 +2067,6 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
             const tExtSlot = (slot && slot.temp !== undefined) ? slot.temp : 10;
             minNightTemp = Math.min(minNightTemp, tExtSlot);
 
-            // Gains solaires dynamiques de l'heure k
             let solarW = 0;
             if (slot.isSunny) {
                 const h = slot.hour;
@@ -1803,13 +2074,12 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
                 solarW = peakSolarKw * 1000 * sunFactor;
             }
 
-            const totalGainsW = solarW + pInterneW;
+            // En régime passif 2R2C, 82% du solaire + apports internes soutiennent l'équilibre de la masse
+            const totalGainsW = (solarW * 0.85) + pInterneW;
             const tEquilibreSlot = tExtSlot + (totalGainsW / Math.max(10, hTotalWPerK));
 
-            // DÃ©charge exponentielle sur le pas de temps d'1 heure
             const tNext = tEquilibreSlot + (simT - tEquilibreSlot) * Math.exp(-1.0 / tauSim);
 
-            // DÃ©tection du franchissement du seuil cible de 19Â°C
             if (simT > tCible && tNext <= tCible && hoursTo19 === null) {
                 const frac = (simT - tCible) / Math.max(0.01, simT - tNext);
                 hoursTo19 = k + frac;
@@ -1822,18 +2092,16 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
         }
     }
 
-    // 4. Formatage et verbalisation pédagogique de l'indicateur
     let autonomyText = '';
     let autonomyDetail = '';
 
     if (tStruct <= tCible) {
         autonomyText = `Seuil 19°C atteint (${tStruct.toFixed(1)}°C)`;
-        autonomyDetail = `Température moyenne des parois à ${tStruct.toFixed(1)}°C (seuil de confort de base fixé à 19.0°C).`;
+        autonomyDetail = `Température moyenne de la masse des parois à ${tStruct.toFixed(1)}°C (seuil de confort de base fixé à 19.0°C).`;
         hoursTo19 = 0;
     } else if (hoursTo19 === null) {
-        // Aucune chute sous 19°C constatée sur les 48h de prévision !
         autonomyText = '> 48 h (préservée)';
-        autonomyDetail = `Simulation météo 48h : grâce aux apports solaires et à la douceur extérieure, vos parois restent au-dessus de 19°C (minimum simulé : ${minTReached.toFixed(1)}°C).`;
+        autonomyDetail = `Simulation 2R2C 48h : grâce aux apports solaires stockés dans la masse et à la douceur extérieure, vos parois restent au-dessus de 19°C (minimum simulé : ${minTReached.toFixed(1)}°C).`;
         hoursTo19 = 48;
     } else {
         const hVal = parseFloat(hoursTo19.toFixed(1));
@@ -1856,10 +2124,9 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
             autonomyText = `~${days} j (~${Math.round(hVal)} h)`;
         }
 
-        autonomyDetail = `Simulation météo prospective : avec le refroidissement nocturne (${minNightTemp.toFixed(1)}°C dehors), vos parois franchiront 19°C ${momentStr || `dans ~${hVal}h`}.`;
+        autonomyDetail = `Simulation 2R2C prospective : avec le refroidissement nocturne (${minNightTemp.toFixed(1)}°C dehors), la masse de vos parois franchira 19°C ${momentStr || `dans ~${hVal}h`}.`;
     }
 
-    // --- ANALYSE FIABILISÉE DES CONSEILS D'INERTIE ---
     const rawConfig = localStorage.getItem('HOUSE_CONFIG');
     const houseConfig = rawConfig ? JSON.parse(rawConfig) : {};
     
@@ -1870,7 +2137,7 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
                     || 'long_term';
 
     let tMaxPrevue = outdoorTemp;
-    let tMinPrevue = outdoorTemp - 8.0; // Fallback cohérent si prévisions indisponibles
+    let tMinPrevue = outdoorTemp - 8.0;
 
     if (Array.isArray(window.hourlyExtForecast) && window.hourlyExtForecast.length > 0) {
         const tempsMeteo = window.hourlyExtForecast.map(s => s.temp);
@@ -1878,12 +2145,8 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
         tMinPrevue = Math.min(...tempsMeteo);
     }
 
-    // Conditions strictes de décharge :
-    // 1. Surchauffe avérée (parois >= 24.0°C ou air >= 24.0°C)
     const surchauffeInterieure = (tStruct >= 24.0 || tAir >= 24.0);
-    // 2. Chaleur extérieure durable (moyenne 24h >= 20°C et nuit >= 17°C)
     const vraieSurchauffeExterieure = (tExtMoy >= 20.0 && tMinPrevue >= 17.0);
-    // 3. Présence de nuits fraîches ou d'intersaison
     const nuitsFraichesOuIntersaison = (tMinPrevue < 16.0 || tExtMoy < 19.0 || isHeatingSeasonActive());
 
     let actionText = "";
@@ -1926,7 +2189,7 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
 }
 
 // ============================================================
-// INDICATEURS GLOBAUX DE L'HABITAT (PONDÉRATION VOLUMIQUE)
+// INDICATEURS GLOBAUX DE L'HABITAT (PONDÉRATION VOLUMIQUE 2R2C)
 // ============================================================
 function calculateGlobalHabitatMetrics() {
     let totalVolume = 0;
@@ -1939,8 +2202,13 @@ function calculateGlobalHabitatMetrics() {
     let weightedTau = 0;
 
     let totalDeperditionsKw = 0;
+    let totalDepOpaqueMassKw = 0;
     let totalGainsConductionKw = 0;
     let totalGainsSolairesKw = 0;
+    let totalGainsSolairesAirKw = 0;
+    let totalGainsSolairesMasseKw = 0;
+    let totalGainsInternesKw = 0;
+    let totalFluxWallKw = 0;
     let totalPuissanceNetteKw = 0;
     let totalBilanNetKwh = 0;
     let totalBilanPasseKwh = 0;
@@ -1949,13 +2217,17 @@ function calculateGlobalHabitatMetrics() {
     let totalBilanDiurnekWh = 0;
     let totalBilanNocturnekWh = 0;
     let totalHTotalWPerK = 0;
+    let totalHRapideWPerK = 0;
+    let totalHOpaqueWPerK = 0;
+    let totalHCiWPerK = 0;
     const totalCumulativeHours = new Array(24).fill(0);
+    const totalTheoCumulativeHours = new Array(24).fill(0);
 
     for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
         if (nomPiece === '__ENV__' || nomPiece === '__BUFFER_TOGGLE__') continue;
         if (!data || isNaN(data.ta) || isNaN(data.rh)) continue;
 
-        const zoneConfig = getZoneConfigByName(nomPiece) || { area: 15, height: 2.5 };
+        const zoneConfig = getZoneConfigByName(nomPiece) || { name: nomPiece, area: 15, height: 2.5 };
         if (isOutdoorZone(nomPiece, zoneConfig)) continue;
         if (!includeBufferZones && isBufferZone(nomPiece, zoneConfig)) continue;
 
@@ -1964,16 +2236,17 @@ function calculateGlobalHabitatMetrics() {
         const volume = area * height;
 
         const tauPiece = calculateDynamicTau(zoneConfig);
+        // 1. Mise à jour du nœud Masse 2R2C (Tm) en premier pour nourrir Tmr (PMV) et le bilan thermique
+        const tStruct = updateStructureTemperature(nomPiece, data.ta);
 
         const ah = calculateAbsoluteHumidity(data.ta, data.rh);
         const vel = calculateAirVelocity(zoneConfig, nomPiece);
-        const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
+        const tr = calculateMeanRadiantTemp(zoneConfig, data.ta, tStruct);
         const { met, totalClo } = getBaseCloAndMet(zoneConfig);
         const pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
         
         const drying = calculateDryingPotential(data.ta, data.rh, vel);
-        const energy = calculateDailyThermalBalance(zoneConfig, data.ta);
-        const tStruct = updateStructureTemperature(nomPiece, data.ta);
+        const energy = calculateDailyThermalBalance(zoneConfig, data.ta, tStruct);
 
         totalVolume += volume;
         weightedTau += tauPiece * volume;
@@ -1985,8 +2258,13 @@ function calculateGlobalHabitatMetrics() {
         weightedDryingIndex += drying.dryingIndex * volume;
 
         totalDeperditionsKw += energy.depKw;
+        totalDepOpaqueMassKw += (energy.depOpaqueMassKw || 0);
         totalGainsConductionKw += energy.gainsConductionKw;
         totalGainsSolairesKw += energy.gainsSolairesKw;
+        totalGainsSolairesAirKw += (energy.gainsSolairesAirKw || 0);
+        totalGainsSolairesMasseKw += (energy.gainsSolairesMasseKw || 0);
+        totalGainsInternesKw += (energy.gainsInternesKw || 0);
+        totalFluxWallKw += (energy.fluxWallKw || 0);
         totalPuissanceNetteKw += energy.puissanceNetteKw;
         totalBilanNetKwh += energy.bilanNetkWh;
         totalBilanPasseKwh += energy.bilanPasseKwh;
@@ -1997,10 +2275,18 @@ function calculateGlobalHabitatMetrics() {
                 totalCumulativeHours[h] += (energy.cumulativeNetHours[h] || 0);
             }
         }
+        if (Array.isArray(energy.theoCumulativeHours)) {
+            for (let h = 0; h < 24; h++) {
+                totalTheoCumulativeHours[h] += (energy.theoCumulativeHours[h] || 0);
+            }
+        }
 
         totalBilanDiurnekWh += energy.bilanDiurnekWh;
         totalBilanNocturnekWh += energy.bilanNocturnekWh;
         totalHTotalWPerK += energy.hTotalWPerK;
+        totalHRapideWPerK += (energy.hRapideWPerK || 0);
+        totalHOpaqueWPerK += (energy.hOpaqueWPerK || 0);
+        totalHCiWPerK += (energy.hCiWPerK || 0);
     }
 
     if (totalVolume === 0) return null;
@@ -2025,8 +2311,13 @@ function calculateGlobalHabitatMetrics() {
         indoorDryingScore10: indoorDryingScore10,
         outdoorDryingScore10: dryingOutdoor.score10,
         totalDeperditionsKw: parseFloat(totalDeperditionsKw.toFixed(2)),
+        totalDepOpaqueMassKw: parseFloat(totalDepOpaqueMassKw.toFixed(2)),
         totalGainsConductionKw: parseFloat(totalGainsConductionKw.toFixed(2)),
         totalGainsSolairesKw: parseFloat(totalGainsSolairesKw.toFixed(2)),
+        totalGainsSolairesAirKw: parseFloat(totalGainsSolairesAirKw.toFixed(2)),
+        totalGainsSolairesMasseKw: parseFloat(totalGainsSolairesMasseKw.toFixed(2)),
+        totalGainsInternesKw: parseFloat(totalGainsInternesKw.toFixed(2)),
+        totalFluxWallKw: parseFloat(totalFluxWallKw.toFixed(2)),
         totalPuissanceNetteKw: parseFloat(totalPuissanceNetteKw.toFixed(2)),
         totalBilanNetKwh: parseFloat(totalBilanNetKwh.toFixed(2)),
         totalBilanPasseKwh: parseFloat(totalBilanPasseKwh.toFixed(2)),
@@ -2034,7 +2325,11 @@ function calculateGlobalHabitatMetrics() {
         totalBilanDiurnekWh: parseFloat(totalBilanDiurnekWh.toFixed(2)),
         totalBilanNocturnekWh: parseFloat(totalBilanNocturnekWh.toFixed(2)),
         totalCumulativeHours: totalCumulativeHours.map(v => parseFloat(v.toFixed(2))),
+        totalTheoCumulativeHours: totalTheoCumulativeHours.map(v => parseFloat(v.toFixed(2))),
         totalHTotalWPerK: parseFloat(totalHTotalWPerK.toFixed(1)),
+        totalHRapideWPerK: parseFloat(totalHRapideWPerK.toFixed(1)),
+        totalHOpaqueWPerK: parseFloat(totalHOpaqueWPerK.toFixed(1)),
+        totalHCiWPerK: parseFloat(totalHCiWPerK.toFixed(1)),
         totalVolumeM3: parseFloat(totalVolume.toFixed(1))
     };
 }
@@ -2123,13 +2418,13 @@ function mettreAJourTuile(nomPiece) {
 
     if (!data) return;
 
+    const tStruct = updateStructureTemperature(nomPiece, data.ta);
     const vel = calculateAirVelocity(zoneConfig, nomPiece);
-    const tr = calculateMeanRadiantTemp(zoneConfig, data.ta);
+    const tr = calculateMeanRadiantTemp(zoneConfig, data.ta, tStruct);
     const { met, totalClo } = getBaseCloAndMet(zoneConfig);
 
     const drying = calculateDryingPotential(data.ta, data.rh, vel);
-    const energyBalance = calculateDailyThermalBalance(zoneConfig, data.ta);
-    const tStruct = updateStructureTemperature(nomPiece, data.ta);
+    const energyBalance = calculateDailyThermalBalance(zoneConfig, data.ta, tStruct);
     let pmv = calculatePMV(data.ta, tr, vel, data.rh, met, totalClo);
 
     if (dryingEl) {
@@ -2149,12 +2444,16 @@ function mettreAJourTuile(nomPiece) {
         const prefix = netVal > 0 ? "+" : "";
         energyEl.textContent = `${prefix}${netVal.toFixed(2)} kWh/j`;
         energyEl.style.color = netVal >= 0 ? "#10B981" : "#EF4444";
-        energyEl.title = `Bilan cumulé (${energyBalance.currentHour}h) : ${energyBalance.bilanPasseKwh > 0 ? '+' : ''}${energyBalance.bilanPasseKwh} kWh | Flux direct : ${energyBalance.puissanceNetteKw > 0 ? '+' : ''}${energyBalance.puissanceNetteKw} kW`;
+        energyEl.title = `Bilan 2R2C cumulé (${energyBalance.currentHour}h) : ${energyBalance.bilanPasseKwh > 0 ? '+' : ''}${energyBalance.bilanPasseKwh} kWh | Flux net air : ${energyBalance.puissanceNetteKw > 0 ? '+' : ''}${energyBalance.puissanceNetteKw} kW (Solaire: +${energyBalance.gainsSolairesKw} kW, Murs: ${energyBalance.fluxWallKw > 0 ? '+' : ''}${energyBalance.fluxWallKw} kW, Pertes vitres/air: -${energyBalance.depKw} kW)`;
     }
 
-    if (tStructEl) tStructEl.textContent = tStruct.toFixed(1) + " °C";
+    if (tStructEl) {
+        tStructEl.textContent = tStruct.toFixed(1) + " °C";
+        tStructEl.title = `Nœud Masse 2R2C : ${tStruct.toFixed(1)} °C | T° Radiante Moyenne (Tmr) : ${tr.toFixed(1)} °C | Échange convectif Murs↔Air : ${energyBalance.fluxWallKw > 0 ? '+' : ''}${energyBalance.fluxWallKw} kW`;
+    }
 
     if (pmvBadge) {
+        pmvBadge.title = `PMV Fanger ISO 7730 : Air=${data.ta.toFixed(1)}°C, Tmr(2R2C)=${tr.toFixed(1)}°C, HR=${data.rh}%, v=${vel.toFixed(2)}m/s, Met=${met}, Clo=${totalClo.toFixed(2)}`;
         pmvBadge.textContent = (pmv > 0 ? "+" : "") + pmv.toFixed(2);
         if (pmv < -0.75) { 
             pmvBadge.style.backgroundColor = "#E0F2FE"; pmvBadge.style.color = "#0369A1";
@@ -2327,7 +2626,7 @@ function actualiserCockpitGlobal() {
     }
 
     // ============================================================
-    // 2. BATTERIE DES MURS & AUTONOMIE
+    // 2. BATTERIE DES MURS & AUTONOMIE (MODÈLE 2R2C)
     // ============================================================
     const globalReserve = calculateStructureReserve(
         metrics.avgTStruct, 
@@ -2336,7 +2635,9 @@ function actualiserCockpitGlobal() {
         metrics.avgTau,
         {
             hTotalWPerK: metrics.totalHTotalWPerK,
+            hCiWPerK: metrics.totalHCiWPerK,
             gainsSolairesKw: metrics.totalGainsSolairesKw,
+            gainsInternesKw: metrics.totalGainsInternesKw,
             bilanNetKwh: metrics.totalBilanNetKwh,
             tExt: getDailyOutdoorTemp()
         }
@@ -2447,25 +2748,35 @@ function actualiserCockpitGlobal() {
     }
 
     // ============================================================
-    // 4. FLUX THERMIQUES LASER COURT (Fenêtre & Mur - R+1, y=270)
+    // 4. FLUX THERMIQUES LASER COURT (Modèle 2R2C - Dénominateur commun : Air Intérieur Ta)
     // ============================================================
-    // 4.1 Apports Solaires direct (Badge sous l'astre céleste)
+    // 4.1 Apports Solaires via les vitrages (avec répartition Air diatherme / Masse tache solaire)
     const solGainKw = metrics.totalGainsSolairesKw || 0;
+    const solAirKw = metrics.totalGainsSolairesAirKw || 0;
+    const solMasseKw = metrics.totalGainsSolairesMasseKw || 0;
+    const intGainKw = metrics.totalGainsInternesKw || 0;
+    const solarTooltip = `☀️ Apports Solaires totaux vitrages : +${solGainKw.toFixed(2)} kW\n• Convection immédiate vers l'air : +${solAirKw.toFixed(2)} kW\n• Rayonnement absorbé par la masse (dalles/murs) : +${solMasseKw.toFixed(2)} kW\n• Apports internes passifs (occupants/équipements) : +${intGainKw.toFixed(2)} kW`;
+
     const txtFluxSolarVal = document.getElementById('txt-flux-solar-val');
     if (txtFluxSolarVal) {
         txtFluxSolarVal.textContent = solGainKw > 0 ? `+${solGainKw.toFixed(2)} kW` : `0.00 kW`;
         txtFluxSolarVal.className = `font-black ${solGainKw > 0 ? 'text-amber-400' : 'text-slate-400'}`;
+        if (txtFluxSolarVal.parentElement) txtFluxSolarVal.parentElement.title = solarTooltip;
     }
 
-    // 4.2 Déperditions Enveloppe & Ventilation (Origine sur la fenêtre R+1, x=310, y=270)
+    // 4.2 Flux Direct Rapide Air <-> Extérieur (Vitrages + Renouvellement d'air, hors murs opaques)
     const depEnveloppeKw = metrics.totalDeperditionsKw || 0;
     const condGainKw = metrics.totalGainsConductionKw || 0;
+    const depOpaqueKw = metrics.totalDepOpaqueMassKw || 0;
+    const lossTooltip = `❄️ Flux direct rapide Air ↔ Extérieur : -${depEnveloppeKw.toFixed(2)} kW\n• Éléments sans inertie (Vitrages + Ventilation/Infiltrations) : H_rapide = ${metrics.totalHRapideWPerK || 0} W/K\n• Déperdition lente des parois opaques (prélevée sur la masse Tm) : -${depOpaqueKw.toFixed(2)} kW (H_op = ${metrics.totalHOpaqueWPerK || 0} W/K)`;
+
     const txtFluxExtTag = document.getElementById('txt-flux-ext-tag');
     const txtFluxExtVal = document.getElementById('txt-flux-ext-val');
     const lineExt = document.getElementById('flux-laser-ext-line');
     const haloExt = document.getElementById('flux-laser-ext-halo');
 
     if (txtFluxExtTag && txtFluxExtVal && lineExt && haloExt) {
+        if (txtFluxExtVal.parentElement) txtFluxExtVal.parentElement.title = lossTooltip;
         if (depEnveloppeKw > 0.05) {
             txtFluxExtTag.textContent = "❄️ Pertes Ext.";
             txtFluxExtVal.textContent = `-${depEnveloppeKw.toFixed(2)} kW`;
@@ -2477,7 +2788,7 @@ function actualiserCockpitGlobal() {
             haloExt.setAttribute('d', "M 310 270 L 190 270");
             haloExt.setAttribute('stroke', "#38BDF8");
         } else if (condGainKw > 0.05) {
-            txtFluxExtTag.textContent = "🌡️ Conduction Ext.";
+            txtFluxExtTag.textContent = "🌡️ Apport Ext.";
             txtFluxExtVal.textContent = `+${condGainKw.toFixed(2)} kW`;
             txtFluxExtVal.style.color = "#F59E0B";
             lineExt.setAttribute('d', "M 190 270 L 310 270");
@@ -2499,15 +2810,18 @@ function actualiserCockpitGlobal() {
         }
     }
 
-    // 4.3 Flux Murs (Batterie thermique) - Origine sur le mur droit (x=906, y=270)
-    const fluxWallKw = globalReserve.fluxPowerKw || 0;
+    // 4.3 Flux Convectif Murs <-> Air (Nœud Masse Tm <-> Nœud Air Ta, avec h_ci convectif pur)
+    const fluxWallKw = (metrics.totalFluxWallKw !== undefined) ? metrics.totalFluxWallKw : (globalReserve.fluxPowerKw || 0);
+    const wallTooltip = `🧱 Échange convectif Masse ↔ Air : ${fluxWallKw > 0 ? '+' : ''}${fluxWallKw.toFixed(2)} kW\n• Température Masse (Tm) : ${metrics.avgTStruct.toFixed(1)} °C vs Air (Ta) : ${metrics.avgTemp.toFixed(1)} °C\n• Couplage convectif pur H_ci = ${metrics.totalHCiWPerK || 0} W/K (h_ci ~ 2.5-2.8 W/m²K)`;
+
     const txtFluxWallTag = document.getElementById('txt-flux-wall-tag');
     const txtFluxWallVal = document.getElementById('txt-flux-wall-val');
     const lineWall = document.getElementById('flux-laser-wall-line');
     const haloWall = document.getElementById('flux-laser-wall-halo');
 
     if (txtFluxWallTag && txtFluxWallVal && lineWall && haloWall) {
-        if (fluxWallKw > 0.15) {
+        if (txtFluxWallVal.parentElement) txtFluxWallVal.parentElement.title = wallTooltip;
+        if (fluxWallKw > 0.10) {
             txtFluxWallTag.textContent = "🔥 Restitution";
             txtFluxWallVal.textContent = `+${fluxWallKw.toFixed(2)} kW`;
             txtFluxWallVal.style.color = "#F59E0B";
@@ -2517,7 +2831,7 @@ function actualiserCockpitGlobal() {
             lineWall.setAttribute('marker-end', "url(#mk-laser-orange)");
             haloWall.setAttribute('d', "M 906 270 L 785 270");
             haloWall.setAttribute('stroke', "#F59E0B");
-        } else if (fluxWallKw < -0.15) {
+        } else if (fluxWallKw < -0.10) {
             txtFluxWallTag.textContent = "🧱 Absorption Murs";
             txtFluxWallVal.textContent = `${fluxWallKw.toFixed(2)} kW`;
             txtFluxWallVal.style.color = "#38BDF8";
@@ -2548,13 +2862,14 @@ function actualiserCockpitGlobal() {
     });
 
     // ============================================================
-    // 5. BILAN PROGRESSIF ET TRAJECTOIRE ÉNERGÉTIQUE
+    // 5. BILAN PROGRESSIF ET TRAJECTOIRE ÉNERGÉTIQUE (MODÈLE 2R2C)
     // ============================================================
     // Décomposition des 3 flux élémentaires dans la carte Balance
     const txtFluxSolarDetail = document.getElementById('txt-flux-solar-detail');
     if (txtFluxSolarDetail) {
         txtFluxSolarDetail.textContent = solGainKw > 0 ? `+${solGainKw.toFixed(2)} kW` : `0.00 kW`;
         txtFluxSolarDetail.className = `text-xs sm:text-sm font-black ${solGainKw > 0 ? 'text-amber-400' : 'text-slate-400'}`;
+        if (txtFluxSolarDetail.parentElement) txtFluxSolarDetail.parentElement.title = solarTooltip;
     }
 
     const txtFluxWallDetail = document.getElementById('txt-flux-wall-detail');
@@ -2562,15 +2877,17 @@ function actualiserCockpitGlobal() {
         const signWall = fluxWallKw > 0 ? '+' : '';
         txtFluxWallDetail.textContent = `${signWall}${fluxWallKw.toFixed(2)} kW`;
         txtFluxWallDetail.className = `text-xs sm:text-sm font-black ${fluxWallKw > 0.05 ? 'text-amber-400' : (fluxWallKw < -0.05 ? 'text-sky-400' : 'text-slate-300')}`;
+        if (txtFluxWallDetail.parentElement) txtFluxWallDetail.parentElement.title = wallTooltip;
     }
 
     const txtFluxLossDetail = document.getElementById('txt-flux-loss-detail');
     if (txtFluxLossDetail) {
         txtFluxLossDetail.textContent = `-${depEnveloppeKw.toFixed(2)} kW`;
         txtFluxLossDetail.className = `text-xs sm:text-sm font-black ${depEnveloppeKw > 0 ? 'text-sky-400' : 'text-slate-400'}`;
+        if (txtFluxLossDetail.parentElement) txtFluxLossDetail.parentElement.title = lossTooltip;
     }
 
-    // Solde Net Instantané unifié : Solde = Solaire + Conduction - Pertes + Murs
+    // Solde Net Instantané unifié autour de Ta : Solde = Solaire + Conduction - PertesDirectes + Murs
     const soldeNetReel = solGainKw + condGainKw - depEnveloppeKw + fluxWallKw;
     const valPasse = metrics.totalBilanPasseKwh || 0;
     const valFlux = soldeNetReel;
@@ -2621,7 +2938,7 @@ function actualiserCockpitGlobal() {
         needle.style.left = `${gainPct}%`;
     }
 
-    // Mise à jour de la Trajectoire Énergétique Graphique (SVG Double Courbe : Théorique stable vs Réel in situ)
+    // Mise à jour de la Trajectoire Énergétique Graphique (SVG Double Courbe : Théorique 2R2C stable vs Réel in situ)
     const elBarPassed = document.getElementById('chart-bar-passed');
     const elTxtPassed = document.getElementById('chart-txt-passed');
     const elDotPassed = document.getElementById('chart-dot-passed');
@@ -2666,9 +2983,8 @@ function actualiserCockpitGlobal() {
         }
         if (elDotFinal) elDotFinal.setAttribute('cy', dotYFin);
 
-        // 3. Trajectoire Théorique Prévisionnelle (24h de référence stable)
-        const currentH = new Date().getHours();
-        const theoCumulArr = metrics.totalCumulativeHours || [];
+        // 3. Trajectoire Théorique Prévisionnelle (24h de référence stable à T_ref = 20°C)
+        const theoCumulArr = metrics.totalTheoCumulativeHours || metrics.totalCumulativeHours || [];
         const valTheoPasse = (theoCumulArr.length === 24 && currentH > 0) ? theoCumulArr[currentH - 1] : (metrics.totalBilanPasseKwh || valPasse);
         const valTheoFinal = (theoCumulArr.length === 24) ? theoCumulArr[23] : (metrics.totalBilanNetKwh || valFinal);
 
