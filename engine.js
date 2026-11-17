@@ -2240,6 +2240,8 @@ function calculateGlobalHabitatMetrics() {
     let totalHCiWPerK = 0;
     const totalCumulativeHours = new Array(24).fill(0);
     const totalTheoCumulativeHours = new Array(24).fill(0);
+    const roomSnapshots = [];
+    const sunnyRoomsNow = [];
 
     for (const [nomPiece, data] of Object.entries(DONNEES_HABITAT)) {
         if (nomPiece === '__ENV__' || nomPiece === '__BUFFER_TOGGLE__') continue;
@@ -2265,6 +2267,31 @@ function calculateGlobalHabitatMetrics() {
         
         const drying = calculateDryingPotential(data.ta, data.rh, vel);
         const energy = calculateDailyThermalBalance(zoneConfig, data.ta, tStruct);
+
+        const orientations = Array.isArray(zoneConfig.windows)
+            ? [...new Set(zoneConfig.windows.map(w => (w.orientation || 'S').toUpperCase()))]
+            : [];
+
+        roomSnapshots.push({
+            name: nomPiece,
+            ta: parseFloat(data.ta.toFixed(1)),
+            rh: Math.round(data.rh),
+            tStruct: parseFloat(tStruct.toFixed(1)),
+            pmv: parseFloat(pmv.toFixed(2)),
+            absPmv: Math.abs(pmv),
+            dryingScore10: parseFloat(drying.score10),
+            dryingIndex: drying.dryingIndex,
+            solarKw: energy.gainsSolairesKw || 0,
+            orientations
+        });
+
+        if ((energy.gainsSolairesKw || 0) >= 0.04) {
+            sunnyRoomsNow.push({
+                name: nomPiece,
+                solarKw: energy.gainsSolairesKw,
+                orientations: orientations.length > 0 ? orientations.join('/') : 'Sud/Ouest'
+            });
+        }
 
         totalVolume += volume;
         weightedTau += tauPiece * volume;
@@ -2320,6 +2347,19 @@ function calculateGlobalHabitatMetrics() {
     const avgDryingIndoorIndex = weightedDryingIndex / totalVolume;
     const indoorDryingScore10 = (Math.min(100, Math.max(0, Math.round((avgDryingIndoorIndex / 1.8) * 100))) / 10).toFixed(1);
 
+    // Classement des pièces selon le PMV (distance à la neutralité thermique PMV = 0.00) et le potentiel de séchage
+    let bestComfortRoom = null;
+    let worstComfortRoom = null;
+    let bestDryingRoom = null;
+    if (roomSnapshots.length > 0) {
+        const sortedByComfort = [...roomSnapshots].sort((a, b) => a.absPmv - b.absPmv);
+        bestComfortRoom = sortedByComfort[0];
+        worstComfortRoom = sortedByComfort[sortedByComfort.length - 1];
+
+        const sortedByDrying = [...roomSnapshots].sort((a, b) => b.dryingIndex - a.dryingIndex);
+        bestDryingRoom = sortedByDrying[0];
+    }
+
     return {
         avgTemp: parseFloat((weightedTemp / totalVolume).toFixed(1)),
         avgRH: parseFloat((weightedRH / totalVolume).toFixed(0)),
@@ -2329,6 +2369,11 @@ function calculateGlobalHabitatMetrics() {
         avgTau: parseFloat(avgTau.toFixed(1)),
         indoorDryingScore10: indoorDryingScore10,
         outdoorDryingScore10: dryingOutdoor.score10,
+        bestComfortRoom,
+        worstComfortRoom,
+        bestDryingRoom,
+        sunnyRoomsNow,
+        roomSnapshots,
         totalDeperditionsKw: parseFloat(totalDeperditionsKw.toFixed(2)),
         totalDepOpaqueMassKw: parseFloat(totalDepOpaqueMassKw.toFixed(2)),
         totalGainsOpaqueMassKw: parseFloat(totalGainsOpaqueMassKw.toFixed(2)),
@@ -3094,7 +3139,59 @@ function actualiserCockpitGlobal() {
         needle.style.left = `${gainPct}%`;
     }
 
-    // Mise à jour de la Trajectoire Énergétique Graphique (SVG Double Courbe : Théorique 2R2C stable vs Réel in situ)
+    // ============================================================
+    // 5.2 TRAJECTOIRE ÉNERGÉTIQUE 24H, EFFORT DE CHAUFFE & RÉVEIL 07H (2R2C)
+    // ============================================================
+    // Simulation prospective 2R2C jusqu'au prochain réveil à 07h00 (en régime passif sans chauffage)
+    const hoursTo07h = currentH < 7 ? (7 - currentH) : (24 - currentH + 7);
+    let wakeupForecastArr = (Array.isArray(window.futureHourlyForecast) && window.futureHourlyForecast.length >= hoursTo07h)
+        ? window.futureHourlyForecast
+        : generateSyntheticFutureForecast(extTemp, extRh, isSunny);
+
+    let simTMass07 = metrics.avgTStruct;
+    let simTAir07 = metrics.avgTemp;
+    let bilanMinuit07hKwh = 0;
+    let minExtNight07 = extTemp;
+
+    const hRapide07 = Math.max(15, metrics.totalHRapideWPerK || (totalVolM3 * 0.35));
+    const hOpaque07 = Math.max(15, metrics.totalHOpaqueWPerK || (totalVolM3 * 0.35));
+    const hCi07 = Math.max(80, metrics.totalHCiWPerK || (totalVolM3 * 3.0));
+    const cMassWh07 = Math.max(800, totalVolM3 * 22);
+    const pIntNightW = (totalVolM3 / 2.5) * 1.6;
+
+    for (let s = 0; s < hoursTo07h; s++) {
+        const slot = wakeupForecastArr[s];
+        const tExtSlot = (slot && slot.temp !== undefined) ? slot.temp : (extTemp - 2.0);
+        const slotHour = (slot && slot.hour !== undefined) ? slot.hour : ((currentH + s + 1) % 24);
+        minExtNight07 = Math.min(minExtNight07, tExtSlot);
+
+        let solarStepW = 0;
+        if (slot && slot.isSunny && slotHour >= sunriseH && slotHour < sunsetH) {
+            const sunFactor = Math.max(0, Math.sin(((slotHour - 7) / 12) * Math.PI));
+            solarStepW = (solGainKw > 0 ? solGainKw * 1000 : totalVolM3 * 3.5) * sunFactor;
+        }
+
+        // Équilibre convectif horaire du nœud Air (Ta) couplé à la masse (Tm) et aux vitres/VMC (Text)
+        const tAirTarget = (hCi07 * simTMass07 + hRapide07 * tExtSlot + pIntNightW * 0.55 + solarStepW * 0.20) / (hCi07 + hRapide07);
+        simTAir07 = simTAir07 + (tAirTarget - simTAir07) * 0.78;
+
+        // Évolution dynamique du nœud Masse (Tm) sur 1h
+        const qMassW = hOpaque07 * (tExtSlot - simTMass07) + hCi07 * (simTAir07 - simTMass07) + pIntNightW * 0.45 + solarStepW * 0.80;
+        simTMass07 = simTMass07 + (qMassW / cMassWh07);
+
+        // Cumul énergétique passif entre Minuit (00h) et 07h00 pour le 4e jalon du graphique
+        if (slotHour >= 0 && slotHour < 7) {
+            const netStepKw = (solarStepW + pIntNightW - hRapide07 * (simTAir07 - tExtSlot) - hOpaque07 * (simTMass07 - tExtSlot)) / 1000;
+            bilanMinuit07hKwh += netStepKw;
+        }
+    }
+
+    const wakeupAirTemp = simTAir07;
+    const wakeupWallTemp = simTMass07;
+    const deltaWakeupAir = wakeupAirTemp - metrics.avgTemp;
+    const valWakeupKwh = valFinal + bilanMinuit07hKwh;
+
+    // Mise à jour de la Trajectoire Énergétique Graphique (SVG : 00h x=48 -> Maintenant x=168 -> Minuit x=300 -> Réveil 07h x=418)
     const elBarPassed = document.getElementById('chart-bar-passed');
     const elTxtPassed = document.getElementById('chart-txt-passed');
     const elDotPassed = document.getElementById('chart-dot-passed');
@@ -3102,17 +3199,22 @@ function actualiserCockpitGlobal() {
     const elTxtFinal = document.getElementById('chart-txt-final');
     const elDotFinal = document.getElementById('chart-dot-final');
     const elDotTheo = document.getElementById('chart-dot-theo');
+    const elBarWakeup = document.getElementById('chart-bar-wakeup');
+    const elTxtWakeupTemp = document.getElementById('chart-txt-wakeup-temp');
+    const elTxtWakeupWall = document.getElementById('chart-txt-wakeup-wall');
+    const elDotWakeup = document.getElementById('chart-dot-wakeup');
     const elTrendCurve = document.getElementById('chart-trend-curve');
     const elProjCurve = document.getElementById('chart-proj-curve');
     const elTheoCurve = document.getElementById('chart-theo-curve');
+    const elWakeupCurve = document.getElementById('chart-wakeup-curve');
     const txtTheoLandingLegend = document.getElementById('txt-theo-landing-legend');
 
     if (elBarPassed && elBarFinal) {
         const zeroY = 70;
-        const scaleKwh = 2.8;
+        const scaleKwh = 2.6;
 
-        // 1. Point Réel Passé / Cumul à Maintenant (kWh)
-        const hP = Math.min(46, Math.max(6, Math.round(Math.abs(valPasse) * scaleKwh)));
+        // 1. Point Réel Passé / Cumul à Maintenant (x = 168)
+        const hP = Math.min(44, Math.max(6, Math.round(Math.abs(valPasse) * scaleKwh)));
         const yP = valPasse >= 0 ? (zeroY - hP) : zeroY;
         const dotYP = valPasse >= 0 ? (zeroY - hP) : (zeroY + hP);
 
@@ -3121,12 +3223,12 @@ function actualiserCockpitGlobal() {
         if (elTxtPassed) {
             const signP = valPasse > 0 ? '+' : '';
             elTxtPassed.textContent = `${signP}${valPasse.toFixed(1)} kWh`;
-            elTxtPassed.setAttribute('y', Math.max(16, yP - 5));
+            elTxtPassed.setAttribute('y', Math.max(15, yP - 5));
         }
         if (elDotPassed) elDotPassed.setAttribute('cy', dotYP);
 
-        // 2. Point Atterrissage Projeté / 24h Minuit (kWh)
-        const hFin = Math.min(46, Math.max(6, Math.round(Math.abs(valFinal) * scaleKwh)));
+        // 2. Point Atterrissage Projeté / 24h Minuit (x = 300)
+        const hFin = Math.min(44, Math.max(6, Math.round(Math.abs(valFinal) * scaleKwh)));
         const yFin = valFinal >= 0 ? (zeroY - hFin) : zeroY;
         const dotYFin = valFinal >= 0 ? (zeroY - hFin) : (zeroY + hFin);
 
@@ -3135,18 +3237,43 @@ function actualiserCockpitGlobal() {
         if (elTxtFinal) {
             const signFin = valFinal > 0 ? '+' : '';
             elTxtFinal.textContent = `${signFin}${valFinal.toFixed(1)} kWh`;
-            elTxtFinal.setAttribute('y', Math.max(16, yFin - 5));
+            elTxtFinal.setAttribute('y', Math.max(15, yFin - 5));
         }
         if (elDotFinal) elDotFinal.setAttribute('cy', dotYFin);
 
-        // 3. Trajectoire Théorique Prévisionnelle (24h de référence stable à T_ref = 20°C)
+        // 3. Point Réveil Thermique à 07h00 (x = 418)
+        const hWake = Math.min(44, Math.max(6, Math.round(Math.abs(valWakeupKwh) * scaleKwh)));
+        const yWake = valWakeupKwh >= 0 ? (zeroY - hWake) : zeroY;
+        const dotYWake = valWakeupKwh >= 0 ? (zeroY - hWake) : (zeroY + hWake);
+
+        if (elBarWakeup) {
+            elBarWakeup.setAttribute('y', yWake);
+            elBarWakeup.setAttribute('height', hWake);
+        }
+        if (elTxtWakeupTemp) {
+            elTxtWakeupTemp.textContent = `~${wakeupAirTemp.toFixed(1)} °C`;
+            elTxtWakeupTemp.setAttribute('y', Math.max(14, yWake - 13));
+        }
+        if (elTxtWakeupWall) {
+            elTxtWakeupWall.textContent = `Murs ${wakeupWallTemp.toFixed(1)}°C`;
+            elTxtWakeupWall.setAttribute('y', Math.max(24, yWake - 3));
+        }
+        if (elDotWakeup) {
+            elDotWakeup.setAttribute('cy', dotYWake);
+            elDotWakeup.setAttribute('title', `Simulation 2R2C à 07h00 (sans chauffer) : Air ~${wakeupAirTemp.toFixed(1)}°C | Murs ~${wakeupWallTemp.toFixed(1)}°C | Bilan nuit (00h→07h) : ${bilanMinuit07hKwh >= 0 ? '+' : ''}${bilanMinuit07hKwh.toFixed(1)} kWh`);
+        }
+        if (elBarWakeup && elBarWakeup.parentElement) {
+            elBarWakeup.parentElement.setAttribute('title', `Réveil thermique à 07h00 sans chauffage : Air ~${wakeupAirTemp.toFixed(1)}°C (${deltaWakeupAir >= 0 ? '+' : ''}${deltaWakeupAir.toFixed(1)}°C) | Murs ~${wakeupWallTemp.toFixed(1)}°C (T° ext min prévue : ${minExtNight07.toFixed(1)}°C)`);
+        }
+
+        // 4. Trajectoire Théorique Prévisionnelle (24h de référence stable à T_ref = 20°C)
         const theoCumulArr = metrics.totalTheoCumulativeHours || metrics.totalCumulativeHours || [];
         const valTheoPasse = (theoCumulArr.length === 24 && currentH > 0) ? theoCumulArr[currentH - 1] : (metrics.totalBilanPasseKwh || valPasse);
         const valTheoFinal = (theoCumulArr.length === 24) ? theoCumulArr[23] : (metrics.totalBilanNetKwh || valFinal);
 
-        const hTheoP = Math.min(46, Math.max(4, Math.round(Math.abs(valTheoPasse) * scaleKwh)));
+        const hTheoP = Math.min(44, Math.max(4, Math.round(Math.abs(valTheoPasse) * scaleKwh)));
         const dotYTheoP = valTheoPasse >= 0 ? (zeroY - hTheoP) : (zeroY + hTheoP);
-        const hTheoFin = Math.min(46, Math.max(4, Math.round(Math.abs(valTheoFinal) * scaleKwh)));
+        const hTheoFin = Math.min(44, Math.max(4, Math.round(Math.abs(valTheoFinal) * scaleKwh)));
         const dotYTheoFin = valTheoFinal >= 0 ? (zeroY - hTheoFin) : (zeroY + hTheoFin);
 
         if (elDotTheo) {
@@ -3155,21 +3282,26 @@ function actualiserCockpitGlobal() {
             elDotTheo.setAttribute('title', `Prévision théorique initiale : ${signTheoFin}${valTheoFinal.toFixed(1)} kWh à minuit`);
         }
 
-        // Tracé de la courbe théorique 24h (pointillés bleu-gris de 00h à Minuit)
+        // Tracé de la courbe théorique 24h (pointillés bleu-gris de 00h x=48 à Minuit x=300)
         if (elTheoCurve) {
-            elTheoCurve.setAttribute('d', `M 55 ${zeroY} C 115 ${zeroY}, 135 ${dotYTheoP}, 190 ${dotYTheoP} C 255 ${dotYTheoP}, 305 ${dotYTheoFin}, 370 ${dotYTheoFin}`);
+            elTheoCurve.setAttribute('d', `M 48 ${zeroY} C 98 ${zeroY}, 120 ${dotYTheoP}, 168 ${dotYTheoP} C 220 ${dotYTheoP}, 255 ${dotYTheoFin}, 300 ${dotYTheoFin}`);
         }
 
-        // 4. Tracé du Réel in situ (trait plein orange de 00h à Maintenant x=190)
+        // Tracé du Réel in situ (trait plein orange de 00h x=48 à Maintenant x=168)
         if (elTrendCurve) {
-            elTrendCurve.setAttribute('d', `M 55 ${zeroY} C 115 ${zeroY}, 135 ${dotYP}, 190 ${dotYP}`);
+            elTrendCurve.setAttribute('d', `M 48 ${zeroY} C 98 ${zeroY}, 120 ${dotYP}, 168 ${dotYP}`);
             elTrendCurve.setAttribute('stroke', '#F59E0B');
         }
 
-        // 5. Tracé du Prolongement Projeté (tirets orange de Maintenant x=190 à Minuit x=370)
+        // Tracé du Prolongement Projeté (tirets orange de Maintenant x=168 à Minuit x=300)
         if (elProjCurve) {
-            elProjCurve.setAttribute('d', `M 190 ${dotYP} C 255 ${dotYP}, 305 ${dotYFin}, 370 ${dotYFin}`);
+            elProjCurve.setAttribute('d', `M 168 ${dotYP} C 220 ${dotYP}, 255 ${dotYFin}, 300 ${dotYFin}`);
             elProjCurve.setAttribute('stroke', '#F59E0B');
+        }
+
+        // Tracé de la Dérive Nocturne (pointillés violets de Minuit x=300 à Réveil 07h x=418)
+        if (elWakeupCurve) {
+            elWakeupCurve.setAttribute('d', `M 300 ${dotYFin} C 345 ${dotYFin}, 375 ${dotYWake}, 418 ${dotYWake}`);
         }
 
         if (elTxtPassed && elTxtPassed.parentElement) {
@@ -3181,8 +3313,45 @@ function actualiserCockpitGlobal() {
 
         if (txtTheoLandingLegend) {
             const signTheo = valTheoFinal > 0 ? '+' : '';
-            txtTheoLandingLegend.textContent = `Prévision théorique (${signTheo}${valTheoFinal.toFixed(1)} kWh)`;
+            txtTheoLandingLegend.textContent = `Théorique (${signTheo}${valTheoFinal.toFixed(1)} kWh)`;
         }
+    }
+
+    // Encadrés sous le graphique : Effort de chauffe requis (24h) & Réveil demain 07h
+    const boxHeatingEffort = document.getElementById('box-heating-effort');
+    const txtHeatingEffortTitle = document.getElementById('txt-heating-effort-title');
+    const txtHeatingEffortVal = document.getElementById('txt-heating-effort-val');
+    const txtHeatingEffortDesc = document.getElementById('txt-heating-effort-desc');
+
+    if (boxHeatingEffort && txtHeatingEffortTitle && txtHeatingEffortVal && txtHeatingEffortDesc) {
+        if (valFinal < -0.15) {
+            const effortKwh = Math.abs(valFinal).toFixed(1);
+            boxHeatingEffort.className = "rounded-lg bg-amber-950/30 border border-amber-500/30 px-2.5 py-1.5";
+            txtHeatingEffortTitle.textContent = "🔥 Effort de chauffe requis (24h)";
+            txtHeatingEffortTitle.className = "text-[10px] font-bold text-amber-200";
+            txtHeatingEffortVal.textContent = `~${effortKwh} kWh`;
+            txtHeatingEffortVal.className = "text-xs font-black text-amber-400";
+            txtHeatingEffortDesc.textContent = `Énergie à fournir par votre chauffage sur la journée pour compenser les pertes et maintenir ${metrics.avgTemp.toFixed(1)}°C.`;
+            boxHeatingEffort.title = `Bilan passif sur 24h : ${valFinal.toFixed(2)} kWh. Sans apport de chauffage de ~${effortKwh} kWh, la maison puiserait cette énergie dans sa réserve.`;
+        } else {
+            boxHeatingEffort.className = "rounded-lg bg-emerald-950/30 border border-emerald-500/30 px-2.5 py-1.5";
+            txtHeatingEffortTitle.textContent = "☀️ Autonomie passive (24h)";
+            txtHeatingEffortTitle.className = "text-[10px] font-bold text-emerald-200";
+            txtHeatingEffortVal.textContent = `0 kWh requis (+${valFinal.toFixed(1)} kWh)`;
+            txtHeatingEffortVal.className = "text-xs font-black text-emerald-400";
+            txtHeatingEffortDesc.textContent = `Le soleil et l'inertie de vos murs couvrent 100% des pertes thermiques de la journée.`;
+            boxHeatingEffort.title = `Excédent thermique naturel de +${valFinal.toFixed(2)} kWh stocké dans vos parois lourdes.`;
+        }
+    }
+
+    const boxWakeupForecast = document.getElementById('box-wakeup-forecast');
+    const txtWakeupSummaryVal = document.getElementById('txt-wakeup-summary-val');
+    const txtWakeupSummaryDesc = document.getElementById('txt-wakeup-summary-desc');
+    if (boxWakeupForecast && txtWakeupSummaryVal && txtWakeupSummaryDesc) {
+        const signDeltaWake = deltaWakeupAir >= 0 ? '+' : '';
+        txtWakeupSummaryVal.textContent = `Air ~${wakeupAirTemp.toFixed(1)}°C · Murs ~${wakeupWallTemp.toFixed(1)}°C`;
+        txtWakeupSummaryDesc.textContent = `Dérive passive d'ici 07h : ${signDeltaWake}${deltaWakeupAir.toFixed(1)}°C (nuit à ${minExtNight07.toFixed(1)}°C dehors, amortie par vos murs).`;
+        boxWakeupForecast.title = `Simulation 2R2C sur ${hoursTo07h}h sans chauffage actif : l'air passera de ${metrics.avgTemp.toFixed(1)}°C à ~${wakeupAirTemp.toFixed(1)}°C et la masse des murs à ~${wakeupWallTemp.toFixed(1)}°C.`;
     }
 
     const radiatorGroup = document.getElementById('radiator-heating-group');
@@ -3198,16 +3367,153 @@ function actualiserCockpitGlobal() {
     }
 
     // ============================================================
-    // 6. SYNTHÈSE EN MOTS SIMPLES (Dynamique et humaine, en °C/h + W au survol)
+    // 6. SYNTHÈSE EN MOTS SIMPLES, FOCUS PIÈCES (PMV) & 3 ACTIONS PRIORITAIRES
     // ============================================================
+    // 6.1 Focus Pièces extrêmes selon le PMV (distance à la neutralité PMV = 0.00)
+    const badgeBestRoom = document.getElementById('badge-best-room');
+    const badgeWorstRoom = document.getElementById('badge-worst-room');
+    if (badgeBestRoom && metrics.bestComfortRoom) {
+        const b = metrics.bestComfortRoom;
+        const bSign = b.pmv > 0 ? '+' : '';
+        badgeBestRoom.textContent = `🏆 Top confort : ${b.name} (PMV ${bSign}${b.pmv.toFixed(2)} · ${b.ta.toFixed(1)}°C)`;
+        badgeBestRoom.title = `Pièce la plus proche du confort neutre (PMV 0.00) : ${b.name} — Air ${b.ta.toFixed(1)}°C, Murs ${b.tStruct.toFixed(1)}°C, HR ${b.rh}%`;
+    }
+    if (badgeWorstRoom && metrics.worstComfortRoom) {
+        const w = metrics.worstComfortRoom;
+        if (metrics.bestComfortRoom && w.name === metrics.bestComfortRoom.name) {
+            badgeWorstRoom.style.display = 'none';
+        } else {
+            badgeWorstRoom.style.display = 'inline-block';
+            const wSign = w.pmv > 0 ? '+' : '';
+            const reasonTag = w.pmv < -0.5 ? 'fraîche' : (w.pmv > 0.5 ? 'chaude' : 'écart PMV');
+            badgeWorstRoom.textContent = `⚠️ Point d'attention : ${w.name} (PMV ${wSign}${w.pmv.toFixed(2)} · ${w.ta.toFixed(1)}°C)`;
+            badgeWorstRoom.title = `Pièce la plus éloignée de la neutralité thermique (${reasonTag}) : ${w.name} — Air ${w.ta.toFixed(1)}°C, Murs ${w.tStruct.toFixed(1)}°C, HR ${w.rh}%`;
+        }
+    }
+
+    // 6.2 Les 3 Repères d'Action Immédiate (Volets, Lessive, Habillement)
+    const isHeatingOn = typeof isHeatingSeasonActive === 'function' ? isHeatingSeasonActive() : false;
+    const isColdOrHeatingSeason = isHeatingOn || outdoorTemp < 18.5;
+    const isWarmSeason = !isHeatingOn && outdoorTemp >= 22.0;
+
+    // Action 1 : Volets & Vitrages (selon l'heure exacte et les pièces exposées au soleil)
+    const badgeShutters = document.getElementById('badge-prio-shutters');
+    const titleShutters = document.getElementById('txt-prio-shutters-title');
+    const descShutters = document.getElementById('txt-prio-shutters-desc');
+    const icoShutters = document.getElementById('ico-prio-shutters');
+    if (titleShutters && descShutters && badgeShutters) {
+        const sunnyRooms = metrics.sunnyRoomsNow || [];
+        const sunnyNames = sunnyRooms.slice(0, 3).map(r => r.name).join(', ');
+        const sunnyOrient = [...new Set(sunnyRooms.map(r => r.orientations))].join(' / ') || (currentH < 13 ? 'Est / Sud' : 'Sud / Ouest');
+
+        if (isNight) {
+            if (isColdOrHeatingSeason || metrics.avgTemp < 21.5) {
+                if (icoShutters) icoShutters.textContent = "🌙";
+                badgeShutters.textContent = `Nuit (${sunsetH}h→${sunriseH}h)`;
+                badgeShutters.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-200 border border-indigo-500/40";
+                titleShutters.textContent = "Fermez tous les volets pour la nuit";
+                descShutters.textContent = `Le soleil est couché : fermer les volets de toutes les pièces réduit d'environ 25% les pertes rapides par les vitrages jusqu'à ${sunriseH}h.`;
+            } else {
+                if (icoShutters) icoShutters.textContent = "🌙";
+                badgeShutters.textContent = "Fraîcheur nuit";
+                badgeShutters.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950 text-sky-200 border border-sky-500/40";
+                titleShutters.textContent = "Aérez / entrouvrez sur les pièces chaudes";
+                descShutters.textContent = `Profitez des ${extTemp.toFixed(1)}°C extérieurs nocturnes pour décharger la chaleur accumulée dans les chambres et le séjour.`;
+            }
+        } else if (solGainKw >= 0.06) {
+            if (metrics.avgTemp >= 23.5 || isWarmSeason) {
+                if (icoShutters) icoShutters.textContent = "🛡️";
+                badgeShutters.textContent = `Soleil (${sunnyOrient})`;
+                badgeShutters.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950 text-amber-200 border border-amber-500/40";
+                titleShutters.textContent = `Occultez côté ${sunnyOrient}${sunnyNames ? ` (${sunnyNames})` : ''}`;
+                descShutters.textContent = `Bloquez les +${solWatts} W solaires sur les vitrages exposés maintenant pour éviter la surchauffe (laissez ouvert au Nord).`;
+            } else {
+                if (icoShutters) icoShutters.textContent = "☀️";
+                badgeShutters.textContent = `+${solRate.toFixed(2)} °C/h gratuits`;
+                badgeShutters.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950 text-amber-200 border border-amber-500/40";
+                titleShutters.textContent = `Ouvrez grand côté ${sunnyOrient}${sunnyNames ? ` (${sunnyNames})` : ''}`;
+                descShutters.textContent = `Captez les +${solWatts} W solaires gratuits sur ces pièces exposées maintenant, puis fermez tout dès la tombée de la nuit (${sunsetH}h).`;
+            }
+        } else {
+            if (icoShutters) icoShutters.textContent = "☁️";
+            badgeShutters.textContent = `Fermeture à ${sunsetH}h`;
+            badgeShutters.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-600/40";
+            titleShutters.textContent = `Ouverts pour la clarté · Fermez dès ${sunsetH}h`;
+            descShutters.textContent = `Ciel peu porteur en calories solaires directes : gardez la lumière naturelle en journée et isolez toutes les fenêtres dès ${sunsetH}h.`;
+        }
+    }
+
+    // Action 2 : Lessive (Comparaison séchage Extérieur vs Intérieur + meilleure pièce)
+    const badgeLaundry = document.getElementById('badge-prio-laundry');
+    const titleLaundry = document.getElementById('txt-prio-laundry-title');
+    const descLaundry = document.getElementById('txt-prio-laundry-desc');
+    const icoLaundry = document.getElementById('ico-prio-laundry');
+    if (titleLaundry && descLaundry && badgeLaundry) {
+        const extScore = parseFloat(metrics.outdoorDryingScore10) || 0;
+        const inScore = parseFloat(metrics.indoorDryingScore10) || 0;
+        const isRainingOrSnowing = (sunshineStatus || '').toLowerCase().includes('rain') || (sunshineStatus || '').toLowerCase().includes('snow') || (sunshineStatus || '').toLowerCase().includes('drizzle');
+        const bestDryRoom = metrics.bestDryingRoom;
+        const bestRoomStr = bestDryRoom ? `${bestDryRoom.name} (${bestDryRoom.dryingScore10.toFixed(1)}/10)` : `intérieur (${inScore.toFixed(1)}/10)`;
+
+        if (!isRainingOrSnowing && !isNight && extScore >= 5.5 && extScore >= inScore) {
+            if (icoLaundry) icoLaundry.textContent = "🌤️";
+            badgeLaundry.textContent = `Dehors ${extScore.toFixed(1)}/10`;
+            badgeLaundry.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-200 border border-emerald-500/40";
+            titleLaundry.textContent = "Étendez votre lessive Dehors";
+            descLaundry.textContent = `Pouvoir séchant extérieur supérieur (${extScore.toFixed(1)}/10 vs ${inScore.toFixed(1)}/10 dedans) sans humidifier l'air de la maison.`;
+        } else {
+            if (icoLaundry) icoLaundry.textContent = "🏠";
+            badgeLaundry.textContent = `Dedans ${inScore.toFixed(1)}/10`;
+            badgeLaundry.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950 text-sky-200 border border-sky-500/40";
+            titleLaundry.textContent = `Étendez Dedans : privilégiez ${bestDryRoom ? bestDryRoom.name : "l'intérieur"}`;
+            const whyNoExt = isRainingOrSnowing ? "temps humide/pluvieux dehors" : (isNight ? `nuit fraîche (${extScore.toFixed(1)}/10 dehors)` : `extérieur peu séchant (${extScore.toFixed(1)}/10, HR ${extRh.toFixed(0)}%)`);
+            descLaundry.textContent = `Avec ${whyNoExt}, étendez dans ${bestRoomStr} et aérez 5 min si l'humidité dépasse 60%.`;
+        }
+    }
+
+    // Action 3 : Habillement & Confort PMV (ajustement Clo exact pour atteindre PMV ~ 0.00)
+    const badgeClothing = document.getElementById('badge-prio-clothing');
+    const titleClothing = document.getElementById('txt-prio-clothing-title');
+    const descClothing = document.getElementById('txt-prio-clothing-desc');
+    const icoClothing = document.getElementById('ico-prio-clothing');
+    if (titleClothing && descClothing && badgeClothing) {
+        const { totalClo: curClo } = getBaseCloAndMet({ name: 'Salon', usages: ['living'] });
+        if (metrics.avgPMV < -0.20) {
+            const deltaCloNeeded = Math.min(1.0, Math.max(0.15, Math.round((Math.abs(metrics.avgPMV) * 0.55) * 20) / 20));
+            const targetClo = (curClo + deltaCloNeeded).toFixed(2);
+            let garmentAdvice = "un gilet léger ou des chaussettes chaudes";
+            if (deltaCloNeeded >= 0.45) {
+                garmentAdvice = "un pull chaud / polaire (+ pantalon long)";
+            } else if (deltaCloNeeded >= 0.25) {
+                garmentAdvice = "un pull fin, sweat ou gilet manches longues";
+            }
+            if (icoClothing) icoClothing.textContent = "🧥";
+            badgeClothing.textContent = `Ajoutez +${deltaCloNeeded.toFixed(2)} Clo`;
+            badgeClothing.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950 text-sky-200 border border-sky-500/40";
+            titleClothing.textContent = `Ajoutez ${garmentAdvice}`;
+            descClothing.textContent = `Passer de ${curClo.toFixed(2)} à ~${targetClo} Clo efface le ressenti frais (PMV ${metrics.avgPMV.toFixed(2)} → ~0.00) sans surconsommer de chauffage.`;
+        } else if (metrics.avgPMV > 0.25) {
+            const deltaCloRemove = Math.min(0.6, Math.max(0.15, Math.round((metrics.avgPMV * 0.50) * 20) / 20));
+            if (icoClothing) icoClothing.textContent = "👕";
+            badgeClothing.textContent = `Allégez -${deltaCloRemove.toFixed(2)} Clo`;
+            badgeClothing.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950 text-amber-200 border border-amber-500/40";
+            titleClothing.textContent = "Allégez votre tenue (t-shirt / manches courtes)";
+            descClothing.textContent = `Réduire de ${deltaCloRemove.toFixed(2)} Clo ramène immédiatement votre ressenti (PMV +${metrics.avgPMV.toFixed(2)}) au confort neutre.`;
+        } else {
+            if (icoClothing) icoClothing.textContent = "✅";
+            badgeClothing.textContent = `Idéal (${curClo.toFixed(2)} Clo)`;
+            badgeClothing.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-200 border border-emerald-500/40";
+            titleClothing.textContent = "Tenue actuelle parfaitement adaptée";
+            descClothing.textContent = `Votre équipement vestimentaire (${curClo.toFixed(2)} Clo) vous place en plein confort thermique (PMV ${signPmv}${metrics.avgPMV.toFixed(2)}).`;
+        }
+    }
+
+    // 6.3 Texte de synthèse narratif
     const txtSummary = document.getElementById('txt-summary');
     if (txtSummary) {
         let synthese = "";
         const tAir = metrics.avgTemp.toFixed(1);
         const tExt = outdoorTemp.toFixed(1);
-        const isHeatingOn = typeof isHeatingSeasonActive === 'function' ? isHeatingSeasonActive() : false;
-        const isColdOrHeatingSeason = isHeatingOn || outdoorTemp < 18.5;
-        const isWarmSeason = !isHeatingOn && outdoorTemp >= 22.0;
         const absWallRateStr = Math.abs(wallRate).toFixed(2);
 
         if (fluxWallKw > 0.08) {
