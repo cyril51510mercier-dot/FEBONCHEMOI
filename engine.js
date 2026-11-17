@@ -2016,23 +2016,26 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
         ? options.hCiWPerK
         : (totalVolumeM3 * 3.0);
     const fluxPowerKw = (hCiEffectiveWPerK * deltaFlux) / 1000;
-    const absPowerKw = Math.abs(fluxPowerKw).toFixed(2);
+    const fluxWatts = Math.round(fluxPowerKw * 1000);
+    const cEffAirKwhPerK = Math.max(0.15, totalVolumeM3 * 0.0035);
+    const fluxRateDegPerH = fluxPowerKw / cEffAirKwhPerK;
+    const absRateStr = Math.abs(fluxRateDegPerH).toFixed(2);
 
     let fluxStatusText = "";
     let fluxColor = "#4ADE80";
 
     if (deltaFlux > 0.25) {
-        fluxStatusText = `🔥 Restitution (+${absPowerKw} kW)`;
+        fluxStatusText = `🔥 Restitution (+${absRateStr} °C/h)`;
         fluxColor = "#FDBA74";
     } else if (deltaFlux < -0.25) {
-        fluxStatusText = `❄️ Absorption (-${absPowerKw} kW)`;
+        fluxStatusText = `❄️ Absorption (-${absRateStr} °C/h)`;
         fluxColor = "#38BDF8";
     } else {
-        fluxStatusText = "⚖️ Équilibre (0 kW)";
+        fluxStatusText = "⚖️ Équilibre (0.00 °C/h)";
         fluxColor = "#4ADE80";
     }
 
-    // --- SIMULATION DYNAMIQUE PROSPECTIVE 2R2C DE L'AUTONOMIE (T_STRUCT -> 19°C) ---
+    // --- SIMULATION DYNAMIQUE PROSPECTIVE 2R2C DE L'AUTONOMIE & DU BOUCLIER D'INERTIE ---
     const tCible = 19.0;
     const tExtMoy = (options.tExt !== undefined) ? options.tExt : getDailyOutdoorTemp();
     const hTotalWPerK = (options.hTotalWPerK && options.hTotalWPerK > 0)
@@ -2060,6 +2063,7 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
         : (surfaceHab * 2.2);
 
     let simT = tStruct;
+    let simT6h = tStruct;
     let hoursTo19 = null;
     let targetMoment = null;
     let minTReached = simT;
@@ -2067,49 +2071,54 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
 
     const tauSim = Math.max(8.0, tauReel);
 
+    for (let k = 0; k < futureForecast.length; k++) {
+        const slot = futureForecast[k];
+        const tExtSlot = (slot && slot.temp !== undefined) ? slot.temp : 10;
+        minNightTemp = Math.min(minNightTemp, tExtSlot);
+
+        let solarW = 0;
+        if (slot.isSunny) {
+            const h = slot.hour;
+            const sunFactor = Math.max(0, Math.sin(((h - 7) / 12) * Math.PI));
+            solarW = peakSolarKw * 1000 * sunFactor;
+        }
+
+        // En régime passif 2R2C, 85% du solaire + apports internes soutiennent l'équilibre de la masse
+        const totalGainsW = (solarW * 0.85) + pInterneW;
+        const tEquilibreSlot = tExtSlot + (totalGainsW / Math.max(10, hTotalWPerK));
+
+        const tNext = tEquilibreSlot + (simT - tEquilibreSlot) * Math.exp(-1.0 / tauSim);
+
+        if (tStruct > tCible && simT > tCible && tNext <= tCible && hoursTo19 === null) {
+            const frac = (simT - tCible) / Math.max(0.01, simT - tNext);
+            hoursTo19 = k + frac;
+            const targetTimestamp = slot.dt ? ((slot.dt + frac * 3600) * 1000) : (Date.now() + hoursTo19 * 3600 * 1000);
+            targetMoment = new Date(targetTimestamp);
+        }
+
+        simT = tNext;
+        if (k === 5) simT6h = simT;
+        minTReached = Math.min(minTReached, simT);
+    }
+
     if (tStruct <= tCible) {
         hoursTo19 = 0;
-    } else {
-        for (let k = 0; k < futureForecast.length; k++) {
-            const slot = futureForecast[k];
-            const tExtSlot = (slot && slot.temp !== undefined) ? slot.temp : 10;
-            minNightTemp = Math.min(minNightTemp, tExtSlot);
-
-            let solarW = 0;
-            if (slot.isSunny) {
-                const h = slot.hour;
-                const sunFactor = Math.max(0, Math.sin(((h - 7) / 12) * Math.PI));
-                solarW = peakSolarKw * 1000 * sunFactor;
-            }
-
-            // En régime passif 2R2C, 82% du solaire + apports internes soutiennent l'équilibre de la masse
-            const totalGainsW = (solarW * 0.85) + pInterneW;
-            const tEquilibreSlot = tExtSlot + (totalGainsW / Math.max(10, hTotalWPerK));
-
-            const tNext = tEquilibreSlot + (simT - tEquilibreSlot) * Math.exp(-1.0 / tauSim);
-
-            if (simT > tCible && tNext <= tCible && hoursTo19 === null) {
-                const frac = (simT - tCible) / Math.max(0.01, simT - tNext);
-                hoursTo19 = k + frac;
-                const targetTimestamp = slot.dt ? ((slot.dt + frac * 3600) * 1000) : (Date.now() + hoursTo19 * 3600 * 1000);
-                targetMoment = new Date(targetTimestamp);
-            }
-
-            simT = tNext;
-            minTReached = Math.min(minTReached, simT);
-        }
     }
 
     let autonomyText = '';
     let autonomyDetail = '';
 
     if (tStruct <= tCible) {
-        autonomyText = `Seuil 19°C atteint (${tStruct.toFixed(1)}°C)`;
-        autonomyDetail = `Température moyenne de la masse des parois à ${tStruct.toFixed(1)}°C (seuil de confort de base fixé à 19.0°C).`;
+        const drift6h = (simT6h - tStruct) / 6.0;
+        const driftSign = drift6h >= 0 ? '+' : '';
+        const shieldPct = Math.min(85, Math.max(15, Math.round(((tStruct - 15.0) / 6.0) * 100)));
+        const shieldPowerW = Math.round(Math.abs(tStruct - tExtMoy) * hTotalWPerK * 0.65);
+        autonomyText = `🛡️ Actif (${driftSign}${drift6h.toFixed(2)} °C/h)`;
+        autonomyDetail = `Bouclier d'inertie actif (τ = ${tauSim.toFixed(0)}h, réserve tampon ~${shieldPct}%) : vos parois lourdes à ${tStruct.toFixed(1)}°C amortissent le froid extérieur et limitent la dérive naturelle à ${driftSign}${drift6h.toFixed(2)} °C/h (effet tampon ~${shieldPowerW} W | Échange convectif Murs↔Air : ${fluxWatts >= 0 ? '+' : ''}${fluxWatts} W).`;
         hoursTo19 = 0;
     } else if (hoursTo19 === null) {
         autonomyText = '> 48 h (préservée)';
-        autonomyDetail = `Simulation 2R2C 48h : grâce aux apports solaires stockés dans la masse et à la douceur extérieure, vos parois restent au-dessus de 19°C (minimum simulé : ${minTReached.toFixed(1)}°C).`;
+        autonomyDetail = `Simulation 2R2C 48h : grâce aux apports solaires stockés dans la masse et à la douceur extérieure, vos parois restent au-dessus de 19°C (minimum simulé : ${minTReached.toFixed(1)}°C | Échange Murs↔Air : ${fluxWatts >= 0 ? '+' : ''}${fluxWatts} W).`;
         hoursTo19 = 48;
     } else {
         const hVal = parseFloat(hoursTo19.toFixed(1));
@@ -2132,7 +2141,7 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
             autonomyText = `~${days} j (~${Math.round(hVal)} h)`;
         }
 
-        autonomyDetail = `Simulation 2R2C prospective : avec le refroidissement nocturne (${minNightTemp.toFixed(1)}°C dehors), la masse de vos parois franchira 19°C ${momentStr || `dans ~${hVal}h`}.`;
+        autonomyDetail = `Simulation 2R2C prospective : avec le refroidissement nocturne (${minNightTemp.toFixed(1)}°C dehors), la masse de vos parois franchira 19°C ${momentStr || `dans ~${hVal}h`} (Échange convectif Murs↔Air actuel : ${fluxWatts >= 0 ? '+' : ''}${fluxWatts} W).`;
     }
 
     const rawConfig = localStorage.getItem('HOUSE_CONFIG');
@@ -2450,17 +2459,22 @@ function mettreAJourTuile(nomPiece) {
         dryingEl.title = `${drying.status} (${drying.scorePercent}%) - VPD: ${drying.vpdkPa} kPa`;
     }
 
+    const roomVolM3 = (parseFloat(zoneConfig.area) || 15) * (parseFloat(zoneConfig.height) || 2.5);
+    const cEffRoomKwhPerK = Math.max(0.05, roomVolM3 * 0.0035);
+    const roomWallRate = (energyBalance.fluxWallKw || 0) / cEffRoomKwhPerK;
+    const roomNetRate = (energyBalance.puissanceNetteKw || 0) / cEffRoomKwhPerK;
+
     if (energyEl) {
         const netVal = energyBalance.bilanNetkWh;
         const prefix = netVal > 0 ? "+" : "";
         energyEl.textContent = `${prefix}${netVal.toFixed(2)} kWh/j`;
         energyEl.style.color = netVal >= 0 ? "#10B981" : "#EF4444";
-        energyEl.title = `Bilan 2R2C cumulé (${energyBalance.currentHour}h) : ${energyBalance.bilanPasseKwh > 0 ? '+' : ''}${energyBalance.bilanPasseKwh} kWh | Flux net air : ${energyBalance.puissanceNetteKw > 0 ? '+' : ''}${energyBalance.puissanceNetteKw} kW (Solaire: +${energyBalance.gainsSolairesKw} kW, Murs: ${energyBalance.fluxWallKw > 0 ? '+' : ''}${energyBalance.fluxWallKw} kW, Pertes vitres/air: -${energyBalance.depKw} kW)`;
+        energyEl.title = `Bilan 2R2C cumulé (${energyBalance.currentHour}h) : ${energyBalance.bilanPasseKwh > 0 ? '+' : ''}${energyBalance.bilanPasseKwh} kWh | Dérive air : ${roomNetRate >= 0 ? '+' : ''}${roomNetRate.toFixed(2)} °C/h (${Math.round((energyBalance.puissanceNetteKw || 0) * 1000)} W | Solaire: +${Math.round((energyBalance.gainsSolairesKw || 0) * 1000)} W, Murs: ${energyBalance.fluxWallKw > 0 ? '+' : ''}${Math.round((energyBalance.fluxWallKw || 0) * 1000)} W, Pertes vitres/air: -${Math.round((energyBalance.depKw || 0) * 1000)} W)`;
     }
 
     if (tStructEl) {
         tStructEl.textContent = tStruct.toFixed(1) + " °C";
-        tStructEl.title = `Nœud Masse 2R2C : ${tStruct.toFixed(1)} °C | T° Radiante Moyenne (Tmr) : ${tr.toFixed(1)} °C | Échange convectif Murs↔Air : ${energyBalance.fluxWallKw > 0 ? '+' : ''}${energyBalance.fluxWallKw} kW`;
+        tStructEl.title = `Nœud Masse 2R2C : ${tStruct.toFixed(1)} °C | T° Radiante Moyenne (Tmr) : ${tr.toFixed(1)} °C | Échange convectif Murs↔Air : ${roomWallRate >= 0 ? '+' : ''}${roomWallRate.toFixed(2)} °C/h (${energyBalance.fluxWallKw > 0 ? '+' : ''}${Math.round((energyBalance.fluxWallKw || 0) * 1000)} W)`;
     }
 
     if (pmvBadge) {
@@ -2665,18 +2679,22 @@ function actualiserCockpitGlobal() {
         txtAutonomyVal.title = globalReserve.autonomyDetail || globalReserve.autonomyText;
     }
     const txtAutonomyValM = document.getElementById('txt-autonomy-val-m');
-    if (txtAutonomyValM) txtAutonomyValM.textContent = globalReserve.autonomyText;
+    if (txtAutonomyValM) {
+        txtAutonomyValM.textContent = globalReserve.autonomyText;
+        txtAutonomyValM.title = globalReserve.autonomyDetail || globalReserve.autonomyText;
+    }
     
     const txtAutonomyBar = document.getElementById('txt-autonomy-bar');
     const txtAutonomyBarM = document.getElementById('txt-autonomy-bar-m');
     if (txtAutonomyBar || txtAutonomyBarM) {
         let barPct = 50;
-        if (globalReserve.hoursTo19 !== undefined && !isNaN(globalReserve.hoursTo19) && !globalReserve.autonomyText.includes('Illimitée') && !globalReserve.autonomyText.includes('> 48 h')) {
-            barPct = Math.min(100, Math.max(5, Math.round((globalReserve.hoursTo19 / 36) * 100)));
+        if (globalReserve.hoursTo19 !== undefined && !isNaN(globalReserve.hoursTo19) && globalReserve.hoursTo19 > 0 && !globalReserve.autonomyText.includes('Illimitée') && !globalReserve.autonomyText.includes('> 48 h')) {
+            barPct = Math.min(100, Math.max(15, Math.round((globalReserve.hoursTo19 / 36) * 100)));
         } else if (globalReserve.autonomyText.includes('Illimitée') || globalReserve.autonomyText.includes('> 48 h')) {
             barPct = 100;
-        } else if (globalReserve.autonomyText.includes('19°C') || globalReserve.autonomyText.includes('<= 19') || globalReserve.hoursTo19 === 0) {
-            barPct = 0;
+        } else if (globalReserve.hoursTo19 === 0 || globalReserve.autonomyText.includes('Actif')) {
+            // Valorisation de la réserve tampon du bouclier d'inertie entre 15.0°C (0%) et 21.0°C (100%)
+            barPct = Math.min(85, Math.max(15, Math.round(((metrics.avgTStruct - 15.0) / 6.0) * 100)));
         }
         if (txtAutonomyBar) {
             txtAutonomyBar.style.width = `${barPct}%`;
@@ -2759,19 +2777,28 @@ function actualiserCockpitGlobal() {
     }
 
     // ============================================================
-    // 4. FLUX THERMIQUES LASER COURT (Modèle 2R2C - Dénominateur commun : Air Intérieur Ta)
+    // 4. FLUX THERMIQUES EN °C/h (AVEC PUISSANCE W / kW AU SURVOL)
     // ============================================================
-    // 4.1 Apports Solaires via les vitrages (avec répartition Air diatherme / Masse tache solaire)
+    // Capacité thermique horaire effective de l'ambiance (air + mobilier léger + peau superficielle) : ~ 3.5 Wh/(K·m³)
+    const totalVolM3 = metrics.totalVolumeM3 || 150;
+    const cEffAirKwhPerK = Math.max(0.15, totalVolM3 * 0.0035);
+    // Capacité thermique horaire de la masse lourde des parois : ~ 22 Wh/(K·m³)
+    const cMassTotalKwhPerK = Math.max(0.80, totalVolM3 * 0.022);
+
+    // 4.1 Apports Solaires via les vitrages
     const solGainKw = metrics.totalGainsSolairesKw || 0;
     const solAirKw = metrics.totalGainsSolairesAirKw || 0;
     const solMasseKw = metrics.totalGainsSolairesMasseKw || 0;
     const intGainKw = metrics.totalGainsInternesKw || 0;
-    const solarTooltip = `☀️ Apports Solaires totaux vitrages : +${solGainKw.toFixed(2)} kW\n• Convection immédiate vers l'air : +${solAirKw.toFixed(2)} kW\n• Rayonnement absorbé par la masse (dalles/murs) : +${solMasseKw.toFixed(2)} kW\n• Apports internes passifs (occupants/équipements) : +${intGainKw.toFixed(2)} kW`;
+    const solRate = solGainKw / cEffAirKwhPerK;
+    const solWatts = Math.round(solGainKw * 1000);
+    const solarTooltip = `☀️ Apports Solaires vitrages : +${solRate.toFixed(2)} °C/h (+${solWatts} W / +${solGainKw.toFixed(2)} kW)\n• Convection immédiate vers l'air : +${Math.round(solAirKw * 1000)} W (+${solAirKw.toFixed(2)} kW)\n• Rayonnement absorbé par la masse (dalles/murs) : +${Math.round(solMasseKw * 1000)} W (+${solMasseKw.toFixed(2)} kW)\n• Apports internes passifs (occupants/équipements) : +${Math.round(intGainKw * 1000)} W (+${intGainKw.toFixed(2)} kW)`;
 
     const txtFluxSolarVal = document.getElementById('txt-flux-solar-val');
     if (txtFluxSolarVal) {
-        txtFluxSolarVal.textContent = solGainKw > 0 ? `+${solGainKw.toFixed(2)} kW` : `0.00 kW`;
+        txtFluxSolarVal.textContent = solGainKw > 0 ? `+${solRate.toFixed(2)} °C/h` : `0.00 °C/h`;
         txtFluxSolarVal.className = `font-black ${solGainKw > 0 ? 'text-amber-400' : 'text-slate-400'}`;
+        txtFluxSolarVal.title = solarTooltip;
         if (txtFluxSolarVal.parentElement) txtFluxSolarVal.parentElement.title = solarTooltip;
     }
 
@@ -2780,7 +2807,13 @@ function actualiserCockpitGlobal() {
     const condGainKw = metrics.totalGainsConductionKw || 0;
     const depOpaqueKw = metrics.totalDepOpaqueMassKw || 0;
     const gainsOpaqueKw = metrics.totalGainsOpaqueMassKw || 0;
-    const lossTooltip = `❄️ Échange direct rapide Vitrages & VMC ↔ Extérieur : -${depEnveloppeKw.toFixed(2)} kW\n• Éléments sans inertie (Vitres + VMC/Infiltrations) : H_rapide = ${metrics.totalHRapideWPerK || 0} W/K\n• Air intérieur : ${metrics.avgTemp.toFixed(1)} °C ↔ Air extérieur : ${extTemp.toFixed(1)} °C`;
+    const depRate = depEnveloppeKw / cEffAirKwhPerK;
+    const condRate = condGainKw / cEffAirKwhPerK;
+    const depWatts = Math.round(depEnveloppeKw * 1000);
+    const condWatts = Math.round(condGainKw * 1000);
+    const lossTooltip = depEnveloppeKw >= condGainKw
+        ? `❄️ Échange direct rapide Vitrages & VMC ↔ Extérieur : -${depRate.toFixed(2)} °C/h (-${depWatts} W / -${depEnveloppeKw.toFixed(2)} kW)\n• Éléments sans inertie (Vitres + VMC/Infiltrations) : H_rapide = ${metrics.totalHRapideWPerK || 0} W/K\n• Air intérieur : ${metrics.avgTemp.toFixed(1)} °C ↔ Air extérieur : ${extTemp.toFixed(1)} °C`
+        : `🌡️ Gain direct rapide Vitrages & VMC ↔ Extérieur : +${condRate.toFixed(2)} °C/h (+${condWatts} W / +${condGainKw.toFixed(2)} kW)\n• Éléments sans inertie (Vitres + VMC/Infiltrations) : H_rapide = ${metrics.totalHRapideWPerK || 0} W/K\n• Air intérieur : ${metrics.avgTemp.toFixed(1)} °C ↔ Air extérieur : ${extTemp.toFixed(1)} °C`;
 
     const txtFluxExtTag = document.getElementById('txt-flux-ext-tag');
     const txtFluxExtVal = document.getElementById('txt-flux-ext-val');
@@ -2788,10 +2821,11 @@ function actualiserCockpitGlobal() {
     const haloExt = document.getElementById('flux-laser-ext-halo');
 
     if (txtFluxExtTag && txtFluxExtVal && lineExt && haloExt) {
+        txtFluxExtVal.title = lossTooltip;
         if (txtFluxExtVal.parentElement) txtFluxExtVal.parentElement.title = lossTooltip;
-        if (depEnveloppeKw > 0.05) {
+        if (depEnveloppeKw > 0.03) {
             txtFluxExtTag.textContent = "❄️ Vitres & VMC";
-            txtFluxExtVal.textContent = `-${depEnveloppeKw.toFixed(2)} kW`;
+            txtFluxExtVal.textContent = `-${depRate.toFixed(2)} °C/h`;
             txtFluxExtVal.style.color = "#38BDF8";
             lineExt.setAttribute('d', "M 310 270 L 190 270");
             lineExt.setAttribute('stroke', "#38BDF8");
@@ -2799,9 +2833,9 @@ function actualiserCockpitGlobal() {
             lineExt.setAttribute('marker-end', "url(#mk-laser-blue)");
             haloExt.setAttribute('d', "M 310 270 L 190 270");
             haloExt.setAttribute('stroke', "#38BDF8");
-        } else if (condGainKw > 0.05) {
+        } else if (condGainKw > 0.03) {
             txtFluxExtTag.textContent = "🌡️ Vitres & VMC";
-            txtFluxExtVal.textContent = `+${condGainKw.toFixed(2)} kW`;
+            txtFluxExtVal.textContent = `+${condRate.toFixed(2)} °C/h`;
             txtFluxExtVal.style.color = "#F59E0B";
             lineExt.setAttribute('d', "M 190 270 L 310 270");
             lineExt.setAttribute('stroke', "#F59E0B");
@@ -2811,7 +2845,7 @@ function actualiserCockpitGlobal() {
             haloExt.setAttribute('stroke', "#F59E0B");
         } else {
             txtFluxExtTag.textContent = "⚖️ Vitres & VMC";
-            txtFluxExtVal.textContent = "0.00 kW";
+            txtFluxExtVal.textContent = "0.00 °C/h";
             txtFluxExtVal.style.color = "#10B981";
             lineExt.setAttribute('d', "M 310 270 L 310 270");
             lineExt.setAttribute('stroke', "#10B981");
@@ -2823,17 +2857,24 @@ function actualiserCockpitGlobal() {
     }
 
     // 4.2b Flux Lent Parois Lourdes <-> Air Extérieur (Déperdition/Gain de la masse Tm à travers l'isolation)
-    const opaqueExtTooltip = `🧱↔🌍 Échange lent Parois Lourdes ↔ Extérieur : ${depOpaqueKw > 0 ? '-' + depOpaqueKw.toFixed(2) : (gainsOpaqueKw > 0 ? '+' + gainsOpaqueKw.toFixed(2) : '0.00')} kW\n• Masse des parois (Tm) : ${metrics.avgTStruct.toFixed(1)} °C ↔ Extérieur : ${extTemp.toFixed(1)} °C\n• Conductance enveloppe opaque (Murs hors vitres + Toit + Dalle) : H_op = ${metrics.totalHOpaqueWPerK || 0} W/K`;
+    const depOpaqueRate = depOpaqueKw / cMassTotalKwhPerK;
+    const gainsOpaqueRate = gainsOpaqueKw / cMassTotalKwhPerK;
+    const depOpaqueWatts = Math.round(depOpaqueKw * 1000);
+    const gainsOpaqueWatts = Math.round(gainsOpaqueKw * 1000);
+    const opaqueExtTooltip = depOpaqueKw >= gainsOpaqueKw
+        ? `🧱↔🌍 Échange lent Parois Lourdes ↔ Extérieur : -${depOpaqueRate.toFixed(2)} °C/h sur la masse (-${depOpaqueWatts} W / -${depOpaqueKw.toFixed(2)} kW)\n• Masse des parois (Tm) : ${metrics.avgTStruct.toFixed(1)} °C ↔ Extérieur : ${extTemp.toFixed(1)} °C\n• Conductance enveloppe opaque (Murs hors vitres + Toit + Dalle) : H_op = ${metrics.totalHOpaqueWPerK || 0} W/K`
+        : `🧱↔🌍 Gain lent Extérieur → Parois Lourdes : +${gainsOpaqueRate.toFixed(2)} °C/h sur la masse (+${gainsOpaqueWatts} W / +${gainsOpaqueKw.toFixed(2)} kW)\n• Masse des parois (Tm) : ${metrics.avgTStruct.toFixed(1)} °C ↔ Extérieur : ${extTemp.toFixed(1)} °C\n• Conductance enveloppe opaque (Murs hors vitres + Toit + Dalle) : H_op = ${metrics.totalHOpaqueWPerK || 0} W/K`;
     const txtFluxOpaqueExtTag = document.getElementById('txt-flux-opaque-ext-tag');
     const txtFluxOpaqueExtVal = document.getElementById('txt-flux-opaque-ext-val');
     const lineOpaqueExt = document.getElementById('flux-laser-opaque-ext-line');
     const haloOpaqueExt = document.getElementById('flux-laser-opaque-ext-halo');
 
     if (txtFluxOpaqueExtTag && txtFluxOpaqueExtVal && lineOpaqueExt && haloOpaqueExt) {
+        txtFluxOpaqueExtVal.title = opaqueExtTooltip;
         if (txtFluxOpaqueExtVal.parentElement) txtFluxOpaqueExtVal.parentElement.title = opaqueExtTooltip;
         if (depOpaqueKw > 0.03) {
             txtFluxOpaqueExtTag.textContent = "❄️ Parois → Ext.";
-            txtFluxOpaqueExtVal.textContent = `-${depOpaqueKw.toFixed(2)} kW`;
+            txtFluxOpaqueExtVal.textContent = `-${depOpaqueRate.toFixed(2)} °C/h`;
             txtFluxOpaqueExtVal.style.color = "#38BDF8";
             lineOpaqueExt.setAttribute('d', "M 820 150 L 945 150");
             lineOpaqueExt.setAttribute('stroke', "#38BDF8");
@@ -2843,7 +2884,7 @@ function actualiserCockpitGlobal() {
             haloOpaqueExt.setAttribute('stroke', "#38BDF8");
         } else if (gainsOpaqueKw > 0.03) {
             txtFluxOpaqueExtTag.textContent = "🌡️ Ext. → Parois";
-            txtFluxOpaqueExtVal.textContent = `+${gainsOpaqueKw.toFixed(2)} kW`;
+            txtFluxOpaqueExtVal.textContent = `+${gainsOpaqueRate.toFixed(2)} °C/h`;
             txtFluxOpaqueExtVal.style.color = "#F59E0B";
             lineOpaqueExt.setAttribute('d', "M 945 150 L 820 150");
             lineOpaqueExt.setAttribute('stroke', "#F59E0B");
@@ -2853,7 +2894,7 @@ function actualiserCockpitGlobal() {
             haloOpaqueExt.setAttribute('stroke', "#F59E0B");
         } else {
             txtFluxOpaqueExtTag.textContent = "⚖️ Parois ↔ Ext.";
-            txtFluxOpaqueExtVal.textContent = "0.00 kW";
+            txtFluxOpaqueExtVal.textContent = "0.00 °C/h";
             txtFluxOpaqueExtVal.style.color = "#10B981";
             lineOpaqueExt.setAttribute('d', "M 820 150 L 820 150");
             lineOpaqueExt.setAttribute('stroke', "#10B981");
@@ -2866,7 +2907,9 @@ function actualiserCockpitGlobal() {
 
     // 4.3 Flux Convectif Interne : Parois Lourdes <-> Air Intérieur (Nœud Masse Tm <-> Nœud Air Ta)
     const fluxWallKw = (metrics.totalFluxWallKw !== undefined) ? metrics.totalFluxWallKw : (globalReserve.fluxPowerKw || 0);
-    const wallTooltip = `🧱 Échange convectif interne Parois ↔ Air : ${fluxWallKw > 0 ? '+' : ''}${fluxWallKw.toFixed(2)} kW\n• Température Masse (Tm) : ${metrics.avgTStruct.toFixed(1)} °C vs Air (Ta) : ${metrics.avgTemp.toFixed(1)} °C\n• Couplage convectif pur H_ci = ${metrics.totalHCiWPerK || 0} W/K (h_ci ~ 2.5-2.8 W/m²K)`;
+    const wallRate = fluxWallKw / cEffAirKwhPerK;
+    const wallWatts = Math.round(fluxWallKw * 1000);
+    const wallTooltip = `🧱 Échange convectif interne Parois ↔ Air : ${wallRate >= 0 ? '+' : ''}${wallRate.toFixed(2)} °C/h (${wallWatts >= 0 ? '+' : ''}${wallWatts} W / ${fluxWallKw >= 0 ? '+' : ''}${fluxWallKw.toFixed(2)} kW)\n• Température Masse (Tm) : ${metrics.avgTStruct.toFixed(1)} °C vs Air (Ta) : ${metrics.avgTemp.toFixed(1)} °C\n• Couplage convectif pur H_ci = ${metrics.totalHCiWPerK || 0} W/K (h_ci ~ 2.5-2.8 W/m²K)`;
 
     const txtFluxWallTag = document.getElementById('txt-flux-wall-tag');
     const txtFluxWallVal = document.getElementById('txt-flux-wall-val');
@@ -2874,10 +2917,11 @@ function actualiserCockpitGlobal() {
     const haloWall = document.getElementById('flux-laser-wall-halo');
 
     if (txtFluxWallTag && txtFluxWallVal && lineWall && haloWall) {
+        txtFluxWallVal.title = wallTooltip;
         if (txtFluxWallVal.parentElement) txtFluxWallVal.parentElement.title = wallTooltip;
-        if (fluxWallKw > 0.10) {
+        if (fluxWallKw > 0.05) {
             txtFluxWallTag.textContent = "🔥 Murs → Air";
-            txtFluxWallVal.textContent = `+${fluxWallKw.toFixed(2)} kW`;
+            txtFluxWallVal.textContent = `+${wallRate.toFixed(2)} °C/h`;
             txtFluxWallVal.style.color = "#F59E0B";
             lineWall.setAttribute('d', "M 902 270 L 785 270");
             lineWall.setAttribute('stroke', "#F59E0B");
@@ -2885,9 +2929,9 @@ function actualiserCockpitGlobal() {
             lineWall.setAttribute('marker-end', "url(#mk-laser-orange)");
             haloWall.setAttribute('d', "M 902 270 L 785 270");
             haloWall.setAttribute('stroke', "#F59E0B");
-        } else if (fluxWallKw < -0.10) {
+        } else if (fluxWallKw < -0.05) {
             txtFluxWallTag.textContent = "🧱 Air → Murs";
-            txtFluxWallVal.textContent = `${fluxWallKw.toFixed(2)} kW`;
+            txtFluxWallVal.textContent = `${wallRate.toFixed(2)} °C/h`;
             txtFluxWallVal.style.color = "#38BDF8";
             lineWall.setAttribute('d', "M 805 270 L 902 270");
             lineWall.setAttribute('stroke', "#38BDF8");
@@ -2897,7 +2941,7 @@ function actualiserCockpitGlobal() {
             haloWall.setAttribute('stroke', "#38BDF8");
         } else {
             txtFluxWallTag.textContent = "⚖️ Murs ↔ Air";
-            txtFluxWallVal.textContent = "0.00 kW";
+            txtFluxWallVal.textContent = "0.00 °C/h";
             txtFluxWallVal.style.color = "#10B981";
             lineWall.setAttribute('d', "M 902 270 L 902 270");
             lineWall.setAttribute('stroke', "#10B981");
@@ -2918,31 +2962,41 @@ function actualiserCockpitGlobal() {
     // ============================================================
     // 5. BILAN PROGRESSIF ET TRAJECTOIRE ÉNERGÉTIQUE (MODÈLE 2R2C)
     // ============================================================
-    // Décomposition des 3 flux élémentaires dans la carte Balance
+    // Décomposition des 3 flux élémentaires dans la carte Balance (en °C/h avec W au survol)
     const txtFluxSolarDetail = document.getElementById('txt-flux-solar-detail');
     if (txtFluxSolarDetail) {
-        txtFluxSolarDetail.textContent = solGainKw > 0 ? `+${solGainKw.toFixed(2)} kW` : `0.00 kW`;
+        txtFluxSolarDetail.textContent = solGainKw > 0 ? `+${solRate.toFixed(2)} °C/h` : `0.00 °C/h`;
         txtFluxSolarDetail.className = `text-xs sm:text-sm font-black ${solGainKw > 0 ? 'text-amber-400' : 'text-slate-400'}`;
+        txtFluxSolarDetail.title = solarTooltip;
         if (txtFluxSolarDetail.parentElement) txtFluxSolarDetail.parentElement.title = solarTooltip;
     }
 
     const txtFluxWallDetail = document.getElementById('txt-flux-wall-detail');
     if (txtFluxWallDetail) {
-        const signWall = fluxWallKw > 0 ? '+' : '';
-        txtFluxWallDetail.textContent = `${signWall}${fluxWallKw.toFixed(2)} kW`;
+        const signWall = wallRate > 0 ? '+' : '';
+        txtFluxWallDetail.textContent = `${signWall}${wallRate.toFixed(2)} °C/h`;
         txtFluxWallDetail.className = `text-xs sm:text-sm font-black ${fluxWallKw > 0.05 ? 'text-amber-400' : (fluxWallKw < -0.05 ? 'text-sky-400' : 'text-slate-300')}`;
+        txtFluxWallDetail.title = wallTooltip;
         if (txtFluxWallDetail.parentElement) txtFluxWallDetail.parentElement.title = wallTooltip;
     }
 
     const txtFluxLossDetail = document.getElementById('txt-flux-loss-detail');
     if (txtFluxLossDetail) {
-        txtFluxLossDetail.textContent = `-${depEnveloppeKw.toFixed(2)} kW`;
-        txtFluxLossDetail.className = `text-xs sm:text-sm font-black ${depEnveloppeKw > 0 ? 'text-sky-400' : 'text-slate-400'}`;
+        if (depEnveloppeKw >= condGainKw) {
+            txtFluxLossDetail.textContent = `-${depRate.toFixed(2)} °C/h`;
+            txtFluxLossDetail.className = `text-xs sm:text-sm font-black ${depEnveloppeKw > 0 ? 'text-sky-400' : 'text-slate-400'}`;
+        } else {
+            txtFluxLossDetail.textContent = `+${condRate.toFixed(2)} °C/h`;
+            txtFluxLossDetail.className = `text-xs sm:text-sm font-black text-amber-400`;
+        }
+        txtFluxLossDetail.title = lossTooltip;
         if (txtFluxLossDetail.parentElement) txtFluxLossDetail.parentElement.title = lossTooltip;
     }
 
     // Solde Net Instantané unifié autour de Ta : Solde = Solaire + Conduction - PertesDirectes + Murs
     const soldeNetReel = solGainKw + condGainKw - depEnveloppeKw + fluxWallKw;
+    const netRate = soldeNetReel / cEffAirKwhPerK;
+    const netWatts = Math.round(soldeNetReel * 1000);
     const valPasse = metrics.totalBilanPasseKwh || 0;
     const valFlux = soldeNetReel;
     const valFinal = metrics.totalBilanNetKwh || 0;
@@ -2956,17 +3010,65 @@ function actualiserCockpitGlobal() {
 
     const txtKwFlux = document.getElementById('txt-kw-flux');
     const txtKwFluxDisplay = document.getElementById('txt-kw-flux-display');
-    const signFlux = valFlux > 0 ? '+' : '';
-    const fluxFormatted = `${signFlux}${valFlux.toFixed(2)} kW`;
-    const fluxColorClass = valFlux >= 0 ? 'text-amber-400' : 'text-sky-400';
+    const verdictBox = document.getElementById('balance-verdict-box');
+    const verdictTitle = document.getElementById('txt-balance-verdict-title');
+    const verdictDesc = document.getElementById('txt-balance-verdict-desc');
+
+    const signRate = netRate > 0 ? '+' : '';
+    const rateFormatted = `${signRate}${netRate.toFixed(2)} °C/h`;
+    const netTooltip = `Solde net sur l'air intérieur : ${rateFormatted} (${netWatts >= 0 ? '+' : ''}${netWatts} W / ${valFlux >= 0 ? '+' : ''}${valFlux.toFixed(2)} kW)\n• Solaire vitres : +${solRate.toFixed(2)} °C/h (+${solWatts} W)\n• Échange Murs ↔ Air : ${wallRate >= 0 ? '+' : ''}${wallRate.toFixed(2)} °C/h (${wallWatts >= 0 ? '+' : ''}${wallWatts} W)\n• Vitres & VMC ↔ Ext. : -${depRate.toFixed(2)} °C/h (-${depWatts} W)`;
 
     if (txtKwFlux) {
-        txtKwFlux.textContent = fluxFormatted;
-        txtKwFlux.className = `font-extrabold ${fluxColorClass}`;
+        txtKwFlux.textContent = rateFormatted;
+        txtKwFlux.title = netTooltip;
     }
     if (txtKwFluxDisplay) {
-        txtKwFluxDisplay.textContent = fluxFormatted;
-        txtKwFluxDisplay.className = `text-base sm:text-lg font-black ${fluxColorClass}`;
+        txtKwFluxDisplay.textContent = rateFormatted;
+        txtKwFluxDisplay.title = netTooltip;
+    }
+    if (verdictBox) {
+        verdictBox.title = netTooltip;
+        if (netRate < -0.05) {
+            verdictBox.className = "mt-2 rounded-lg bg-sky-950/35 border border-sky-500/30 px-2.5 py-2 transition-colors";
+            if (verdictTitle) {
+                verdictTitle.textContent = "🔵 Tendance : Refroidissement";
+                verdictTitle.className = "text-[10px] sm:text-[11px] font-extrabold text-sky-300";
+            }
+            if (txtKwFlux) txtKwFlux.className = "text-xs sm:text-sm font-black text-sky-400";
+            if (verdictDesc) {
+                if (fluxWallKw < -0.05 && depEnveloppeKw > 0.05) {
+                    verdictDesc.textContent = `Sans chauffage actif, l'air cède des calories aux vitrages/VMC et recharge vos parois plus fraîches (${netWatts} W au total).`;
+                } else if (fluxWallKw > 0.05) {
+                    verdictDesc.textContent = `Vos murs restituent +${wallRate.toFixed(2)} °C/h (+${wallWatts} W) pour amortir les pertes extérieures (-${depRate.toFixed(2)} °C/h).`;
+                } else {
+                    verdictDesc.textContent = `Les pertes vers l'extérieur (${extTemp.toFixed(1)}°C dehors) l'emportent sur les apports actuels (${netWatts} W).`;
+                }
+            }
+        } else if (netRate > 0.05) {
+            verdictBox.className = "mt-2 rounded-lg bg-amber-950/35 border border-amber-500/30 px-2.5 py-2 transition-colors";
+            if (verdictTitle) {
+                verdictTitle.textContent = "🟠 Tendance : Réchauffement naturel";
+                verdictTitle.className = "text-[10px] sm:text-[11px] font-extrabold text-amber-300";
+            }
+            if (txtKwFlux) txtKwFlux.className = "text-xs sm:text-sm font-black text-amber-400";
+            if (verdictDesc) {
+                if (solGainKw > 0.15) {
+                    verdictDesc.textContent = `Les apports solaires (+${solRate.toFixed(2)} °C/h) dépassent les déperditions et réchauffent naturellement votre intérieur (+${netWatts} W).`;
+                } else {
+                    verdictDesc.textContent = `La restitution de chaleur de vos parois (+${wallRate.toFixed(2)} °C/h) fait remonter la température de l'air (+${netWatts} W).`;
+                }
+            }
+        } else {
+            verdictBox.className = "mt-2 rounded-lg bg-emerald-950/35 border border-emerald-500/30 px-2.5 py-2 transition-colors";
+            if (verdictTitle) {
+                verdictTitle.textContent = "🟢 Tendance : Équilibre stable";
+                verdictTitle.className = "text-[10px] sm:text-[11px] font-extrabold text-emerald-300";
+            }
+            if (txtKwFlux) txtKwFlux.className = "text-xs sm:text-sm font-black text-emerald-400";
+            if (verdictDesc) {
+                verdictDesc.textContent = `Ce qui chauffe compense exactement ce qui refroidit : votre température intérieure reste stable (${netWatts >= 0 ? '+' : ''}${netWatts} W).`;
+            }
+        }
     }
 
     const txtKwhFinal = document.getElementById('txt-kwh-final');
@@ -2981,8 +3083,8 @@ function actualiserCockpitGlobal() {
     const barLoss = document.getElementById('balance-bar-loss');
     const needle = document.getElementById('balance-needle');
     if (barGain && barLoss && needle) {
-        const apportsTotaux = Math.max(0.1, solGainKw + condGainKw + (fluxWallKw > 0 ? fluxWallKw : 0));
-        const pertesTotales = Math.max(0.1, depEnveloppeKw + (fluxWallKw < 0 ? Math.abs(fluxWallKw) : 0));
+        const apportsTotaux = Math.max(0.05, solGainKw + condGainKw + (fluxWallKw > 0 ? fluxWallKw : 0));
+        const pertesTotales = Math.max(0.05, depEnveloppeKw + (fluxWallKw < 0 ? Math.abs(fluxWallKw) : 0));
         const totalFluxAbs = apportsTotaux + pertesTotales;
         const gainPct = Math.min(90, Math.max(10, Math.round((apportsTotaux / totalFluxAbs) * 100)));
         const lossPct = 100 - gainPct;
@@ -3096,7 +3198,7 @@ function actualiserCockpitGlobal() {
     }
 
     // ============================================================
-    // 6. SYNTHÈSE EN MOTS SIMPLES (Dynamique et humaine)
+    // 6. SYNTHÈSE EN MOTS SIMPLES (Dynamique et humaine, en °C/h + W au survol)
     // ============================================================
     const txtSummary = document.getElementById('txt-summary');
     if (txtSummary) {
@@ -3106,26 +3208,27 @@ function actualiserCockpitGlobal() {
         const isHeatingOn = typeof isHeatingSeasonActive === 'function' ? isHeatingSeasonActive() : false;
         const isColdOrHeatingSeason = isHeatingOn || outdoorTemp < 18.5;
         const isWarmSeason = !isHeatingOn && outdoorTemp >= 22.0;
+        const absWallRateStr = Math.abs(wallRate).toFixed(2);
 
-        if (fluxWallKw > 0.15) {
+        if (fluxWallKw > 0.08) {
             if (isColdOrHeatingSeason) {
-                const autoText = globalReserve.autonomyDetail || (globalReserve.autonomyText ? `vous disposez d'environ ${globalReserve.autonomyText} d'autonomie thermique sans surconsommer de chauffage.` : "elles soutiennent la température intérieure sans surconsommation.");
-                synthese = `Dehors il fait ${tExt}°C, et votre intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}). Vos parois massives restituent leur chaleur emmagasinée (+${Math.abs(fluxWallKw).toFixed(2)} kW) : ${autoText}`;
+                const autoText = globalReserve.autonomyDetail || (globalReserve.autonomyText ? `Bouclier thermique : ${globalReserve.autonomyText}.` : "elles soutiennent la température intérieure sans surconsommation.");
+                synthese = `Dehors il fait ${tExt}°C, et votre intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}). Vos parois massives restituent leur chaleur emmagasinée (+${absWallRateStr} °C/h) : ${autoText}`;
             } else if (isWarmSeason) {
-                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois chaudes déchargent leur chaleur accumulée (+${Math.abs(fluxWallKw).toFixed(2)} kW) dans l'air intérieur : surventilez dès que la fraîcheur extérieure le permet.`;
+                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois chaudes déchargent leur chaleur accumulée (+${absWallRateStr} °C/h) dans l'air intérieur : surventilez dès que la fraîcheur extérieure le permet.`;
             } else {
-                synthese = `Dehors il fait ${tExt}°C, et votre intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}). Vos parois massives restituent doucement leur chaleur (+${Math.abs(fluxWallKw).toFixed(2)} kW) pour stabiliser le confort.`;
+                synthese = `Dehors il fait ${tExt}°C, et votre intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}). Vos parois massives restituent doucement leur chaleur (+${absWallRateStr} °C/h) pour stabiliser le confort.`;
             }
-        } else if (fluxWallKw < -0.15) {
+        } else if (fluxWallKw < -0.08) {
             if (isColdOrHeatingSeason) {
-                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives absorbent activement la chaleur (${fluxWallKw.toFixed(2)} kW) : elles rechargent votre volant thermique pour stabiliser la température et créer une réserve nocturne.`;
+                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives à ${metrics.avgTStruct.toFixed(1)}°C absorbent une partie de la chaleur de l'air (-${absWallRateStr} °C/h) : elles rechargent votre bouclier d'inertie pour amortir le froid extérieur.`;
             } else if (isWarmSeason) {
-                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives absorbent activement la chaleur (${fluxWallKw.toFixed(2)} kW) pour amortir la hausse de température et préserver votre fraîcheur.`;
+                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives absorbent activement la chaleur (-${absWallRateStr} °C/h) pour amortir la hausse de température et préserver votre fraîcheur.`;
             } else {
-                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives absorbent les calories (${fluxWallKw.toFixed(2)} kW) pour équilibrer la température ambiante.`;
+                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives absorbent les calories (-${absWallRateStr} °C/h) pour équilibrer la température ambiante.`;
             }
         } else {
-            synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C avec un confort thermique stable. Les échanges thermiques entre l'air intérieur et la masse des parois sont équilibrés.`;
+            synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C avec des parois en équilibre à ${metrics.avgTStruct.toFixed(1)}°C (0.00 °C/h entre murs et air). ${globalReserve.autonomyDetail || ''}`;
         }
 
         if (metrics.avgRH > 58 && deltaAhGlobal >= 0.5) {
@@ -3134,6 +3237,7 @@ function actualiserCockpitGlobal() {
             synthese += " ⚠️ Conseil aération : l'air extérieur est saturé en vapeur d'eau, évitez d'aérer longuement pour ne pas humidifier vos parois.";
         }
         txtSummary.textContent = synthese;
+        txtSummary.title = `Détail des puissances instantanées : Solaire +${solWatts} W | Murs↔Air ${wallWatts >= 0 ? '+' : ''}${wallWatts} W | Vitres & VMC -${depWatts} W | Parois↔Ext. -${depOpaqueWatts} W | Solde net air : ${netWatts >= 0 ? '+' : ''}${netWatts} W`;
     }
 
     // Horodatage du calcul

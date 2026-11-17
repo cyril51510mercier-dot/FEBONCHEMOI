@@ -388,16 +388,16 @@
                     <!-- 1.1 APPORTS SOLAIRES (SOUS L'ASTRE SOLAIRE DANS LE FAISCEAU) -->
                     <div class="absolute top-[24%] left-[10%] sm:left-[12%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-amber-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-amber-300">☀️ Solaire</span>
-                        <strong class="font-black text-amber-400" id="txt-flux-solar-val">+0.00 kW</strong>
+                        <strong class="font-black text-amber-400" id="txt-flux-solar-val">+0.00 °C/h</strong>
                     </div>
 
                     <!-- 2. FLUX DIRECT RAPIDE : VITRAGES & VMC <-> EXTÉRIEUR (À LA FENÊTRE R+1) -->
                     <div class="absolute top-[41%] left-[11%] sm:left-[14%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-sky-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-slate-300" id="txt-flux-ext-tag">❄️ Vitres & VMC</span>
-                        <strong class="font-black text-sky-300" id="txt-flux-ext-val">-- kW</strong>
+                        <strong class="font-black text-sky-300" id="txt-flux-ext-val">-- °C/h</strong>
                     </div>
 
-                    <!-- 3. BATTERIE DES MURS & AUTONOMIE (DIRECTEMENT DANS LA POINTE DU TOIT) -->
+                    <!-- 3. BATTERIE DES MURS & BOUCLIER D'INERTIE (DIRECTEMENT DANS LA POINTE DU TOIT) -->
                     <div class="absolute top-[6%] sm:top-[7%] right-[3%] sm:right-auto sm:left-[64%] pointer-events-auto flex flex-col gap-1 text-xs">
                         <div class="flex items-center gap-1.5">
                             <span class="bg-black/65 border border-amber-500/40 px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-xs font-black uppercase tracking-wider text-amber-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm">
@@ -405,8 +405,8 @@
                             </span>
                         </div>
                         <div class="hidden sm:flex items-center gap-1.5 bg-black/65 border border-amber-500/30 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] backdrop-blur-xs w-fit shadow-sm">
-                            <span class="text-slate-300 font-medium">Autonomie (~19°C) :</span>
-                            <strong class="text-sky-300 font-black" id="txt-autonomy-val">-- h</strong>
+                            <span class="text-slate-300 font-medium">Bouclier & réserve :</span>
+                            <strong class="text-sky-300 font-black" id="txt-autonomy-val">--</strong>
                             <div class="w-10 sm:w-14 bg-black/80 h-1.5 rounded-full overflow-hidden border border-white/20 shrink-0">
                                 <div id="txt-autonomy-bar" class="h-full bg-gradient-to-r from-[#D96B43] to-sky-400 rounded-full transition-all duration-500" style="width: 50%;"></div>
                             </div>
@@ -416,13 +416,13 @@
                     <!-- 3.1 FLUX LENT ENVELOPPE OPAQUE : PAROIS LOURDES <-> EXTÉRIEUR (SUR L'ENVELOPPE EXTÉRIEURE DROITE) -->
                     <div class="absolute top-[23%] right-[3%] sm:right-[6%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-sky-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-slate-300" id="txt-flux-opaque-ext-tag">❄️ Parois → Ext.</span>
-                        <strong class="font-black text-sky-300" id="txt-flux-opaque-ext-val">-- kW</strong>
+                        <strong class="font-black text-sky-300" id="txt-flux-opaque-ext-val">-- °C/h</strong>
                     </div>
 
                     <!-- 4. FLUX CONVECTIF INTERNE : PAROIS LOURDES <-> AIR INTÉRIEUR (AU MUR DROIT R+1) -->
                     <div class="absolute top-[41%] right-[3%] sm:right-[11%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-amber-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-slate-300" id="txt-flux-wall-tag">🔥 Murs → Air</span>
-                        <strong class="font-black text-amber-300" id="txt-flux-wall-val">-- kW</strong>
+                        <strong class="font-black text-amber-300" id="txt-flux-wall-val">-- °C/h</strong>
                     </div>
 
                     <!-- 5. AIR INTÉRIEUR (AU CŒUR DU VOLUME DE LA MAISON, AU-DESSUS DU PLANCHER R+1) -->
@@ -525,8 +525,8 @@
                     </div>
                     <div class="flex flex-col gap-1 mt-0.5">
                         <div class="flex items-center justify-between text-[9px] text-slate-300">
-                            <span class="text-slate-400">Autonomie :</span>
-                            <strong class="text-sky-300 font-bold truncate max-w-[90px]" id="txt-autonomy-val-m">--</strong>
+                            <span class="text-slate-400">Bouclier :</span>
+                            <strong class="text-sky-300 font-bold truncate max-w-[115px]" id="txt-autonomy-val-m">--</strong>
                         </div>
                         <div class="w-full bg-black/80 h-1.5 rounded-full overflow-hidden border border-white/20">
                             <div id="txt-autonomy-bar-m" class="h-full bg-gradient-to-r from-[#D96B43] to-sky-400 rounded-full transition-all duration-500" style="width: 50%;"></div>
@@ -562,44 +562,54 @@
                                 <span>⚖️</span> Balance des Flux en Direct
                             </span>
                             <span class="text-[10px] text-amber-300 font-semibold bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-500/30">
-                                En Direct
+                                En Direct (°C/h)
                             </span>
                         </div>
                         <p class="text-[10px] text-slate-400 m-0 mb-2.5">
-                            Équilibre dynamique 2R2C de l'air intérieur : apports solaires, masse des parois et pertes directes
+                            Ce qui réchauffe et ce qui refroidit votre air intérieur en ce moment (puissance en W au survol)
                         </p>
                     </div>
 
-                    <div class="my-auto bg-slate-900/90 border border-slate-800/80 rounded-xl p-3">
-                        <!-- Décomposition des 3 flux élémentaires aboutissant au Solde Net -->
-                        <div class="grid grid-cols-3 gap-1.5 sm:gap-2 mb-2.5 text-center">
+                    <div class="my-auto bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 space-y-2.5">
+                        <!-- Décomposition des 3 flux élémentaires aboutissant à la Tendance Nette -->
+                        <div class="grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
                             <div class="bg-amber-950/30 border border-amber-500/30 rounded-lg p-1.5 flex flex-col">
                                 <span class="text-[9px] text-amber-300/90 font-semibold uppercase tracking-wider">☀️ Solaire</span>
-                                <strong id="txt-flux-solar-detail" class="text-xs sm:text-sm font-black text-amber-400">+0.00 kW</strong>
+                                <strong id="txt-flux-solar-detail" class="text-xs sm:text-sm font-black text-amber-400">+0.00 °C/h</strong>
                             </div>
                             <div class="bg-slate-800/60 border border-slate-700/60 rounded-lg p-1.5 flex flex-col">
-                                <span class="text-[9px] text-slate-300/90 font-semibold uppercase tracking-wider">🧱 Murs</span>
-                                <strong id="txt-flux-wall-detail" class="text-xs sm:text-sm font-black text-slate-200">±0.00 kW</strong>
+                                <span class="text-[9px] text-slate-300/90 font-semibold uppercase tracking-wider">🧱 Murs ↔ Air</span>
+                                <strong id="txt-flux-wall-detail" class="text-xs sm:text-sm font-black text-slate-200">±0.00 °C/h</strong>
                             </div>
                             <div class="bg-sky-950/30 border border-sky-500/30 rounded-lg p-1.5 flex flex-col">
-                                <span class="text-[9px] text-sky-300/90 font-semibold uppercase tracking-wider">❄️ Pertes</span>
-                                <strong id="txt-flux-loss-detail" class="text-xs sm:text-sm font-black text-sky-400">-0.00 kW</strong>
+                                <span class="text-[9px] text-sky-300/90 font-semibold uppercase tracking-wider">❄️ Vitres & VMC</span>
+                                <strong id="txt-flux-loss-detail" class="text-xs sm:text-sm font-black text-sky-400">-0.00 °C/h</strong>
                             </div>
                         </div>
 
-                        <div class="flex justify-between items-center text-[10px] font-bold mb-1.5">
-                            <span class="text-amber-400">☀️ Apports (+ kW)</span>
-                            <span class="text-sky-400">❄️ Déperditions (− kW)</span>
+                        <div>
+                            <div class="flex justify-between items-center text-[10px] font-bold mb-1">
+                                <span class="text-amber-400">☀️ Ce qui chauffe (+ °C/h)</span>
+                                <span class="text-sky-400">❄️ Ce qui refroidit (− °C/h)</span>
+                            </div>
+                            <div class="thermal-balance-track">
+                                <div id="balance-bar-gain" class="h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-500" style="width: 50%;"></div>
+                                <div id="balance-bar-loss" class="h-full bg-gradient-to-r from-sky-500 to-blue-600 transition-all duration-500" style="width: 50%;"></div>
+                                <div id="balance-needle" class="balance-needle-marker" style="left: 50%;" title="Équilibre instantané"></div>
+                            </div>
                         </div>
-                        <div class="thermal-balance-track">
-                            <div id="balance-bar-gain" class="h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-500" style="width: 50%;"></div>
-                            <div id="balance-bar-loss" class="h-full bg-gradient-to-r from-sky-500 to-blue-600 transition-all duration-500" style="width: 50%;"></div>
-                            <div id="balance-needle" class="balance-needle-marker" style="left: 50%;" title="Équilibre du solde instantané"></div>
-                        </div>
-                        <div class="flex justify-between items-center text-[10px] text-slate-400 mt-2">
-                            <span>Stockage</span>
-                            <span class="text-slate-200 font-bold">Solde net : <strong id="txt-kw-flux" class="text-amber-400 font-black">-- kW</strong></span>
-                            <span>Décharge</span>
+
+                        <!-- Bandeau du Verdict en français clair (remplace Stockage / Décharge) -->
+                        <div id="balance-verdict-box" class="rounded-lg p-2.5 border bg-sky-950/35 border-sky-500/35 transition-colors duration-300">
+                            <div class="flex items-center justify-between">
+                                <span id="txt-balance-verdict-title" class="text-[10px] sm:text-xs font-extrabold uppercase tracking-wide text-sky-300">
+                                    🔵 Tendance : Refroidissement
+                                </span>
+                                <strong id="txt-kw-flux" class="text-xs sm:text-sm font-black text-sky-300">-- °C/h</strong>
+                            </div>
+                            <p id="txt-balance-verdict-desc" class="text-[10px] text-slate-300 m-0 mt-1 leading-snug">
+                                L'air intérieur cède plus de chaleur qu'il n'en reçoit : la température tend à baisser doucement sans chauffage.
+                            </p>
                         </div>
                     </div>
                 </div>
