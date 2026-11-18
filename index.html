@@ -79,6 +79,10 @@
                         ⚡ Super Scan
                     </button>
 
+                    <a href="pieces.html" class="custom-pill-btn bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-500/40 px-3.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 no-underline whitespace-nowrap">
+                        🏡 Détail Pièces
+                    </a>
+
                     <button onclick="voirToutesLesRecommandations()" class="custom-pill-btn bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 px-3.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
                         📋 Plan d'Action
                     </button>
@@ -397,22 +401,6 @@
                         <strong class="font-black text-sky-300" id="txt-flux-ext-val">-- °C/h</strong>
                     </div>
 
-                    <!-- 3. BATTERIE DES MURS & BOUCLIER D'INERTIE (DIRECTEMENT DANS LA POINTE DU TOIT) -->
-                    <div class="absolute top-[6%] sm:top-[7%] right-[3%] sm:right-auto sm:left-[64%] pointer-events-auto flex flex-col gap-1 text-xs">
-                        <div class="flex items-center gap-1.5">
-                            <span class="bg-black/65 border border-amber-500/40 px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-xs font-black uppercase tracking-wider text-amber-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm">
-                                <span>🛡️</span> <span class="hidden sm:inline">Murs et inertie :</span><span class="sm:hidden">Murs :</span> <strong class="text-amber-300 font-black text-xs sm:text-sm ml-0.5" id="txt-wall-temp">-- °C</strong>
-                            </span>
-                        </div>
-                        <div class="hidden sm:flex items-center gap-1.5 bg-black/65 border border-amber-500/30 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] backdrop-blur-xs w-fit shadow-sm">
-                            <span class="text-slate-300 font-medium">Bouclier & réserve :</span>
-                            <strong class="text-sky-300 font-black" id="txt-autonomy-val">--</strong>
-                            <div class="w-10 sm:w-14 bg-black/80 h-1.5 rounded-full overflow-hidden border border-white/20 shrink-0">
-                                <div id="txt-autonomy-bar" class="h-full bg-gradient-to-r from-[#D96B43] to-sky-400 rounded-full transition-all duration-500" style="width: 50%;"></div>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- 3.1 FLUX LENT ENVELOPPE OPAQUE : PAROIS LOURDES <-> EXTÉRIEUR (SUR L'ENVELOPPE EXTÉRIEURE DROITE) -->
                     <div class="absolute top-[23%] right-[3%] sm:right-[6%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-sky-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-slate-300" id="txt-flux-opaque-ext-tag">❄️ Parois → Ext.</span>
@@ -421,7 +409,7 @@
 
                     <!-- 4. FLUX CONVECTIF INTERNE : PAROIS LOURDES <-> AIR INTÉRIEUR (AU MUR DROIT R+1) -->
                     <div class="absolute top-[41%] right-[3%] sm:right-[11%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-amber-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
-                        <span class="font-bold text-slate-300" id="txt-flux-wall-tag">🔥 Murs → Air</span>
+                        <span class="font-bold text-slate-300" id="txt-flux-wall-tag">🔥 Parois → Air</span>
                         <strong class="font-black text-amber-300" id="txt-flux-wall-val">-- °C/h</strong>
                     </div>
 
@@ -515,47 +503,30 @@
                     </div>
                 </div>
 
-                <!-- Carte 3 : Murs & Inertie -->
-                <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between shadow-sm">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="text-[10px] font-bold text-amber-400 flex items-center gap-1">
-                            <span>🛡️</span> Murs & Inertie
-                        </span>
-                        <strong class="text-xs font-black text-amber-300" id="txt-wall-temp-m">-- °C</strong>
-                    </div>
-                    <div class="flex flex-col gap-1 mt-0.5">
-                        <div class="flex items-center justify-between text-[9px] text-slate-300">
-                            <span class="text-slate-400">Bouclier :</span>
-                            <strong class="text-sky-300 font-bold truncate max-w-[115px]" id="txt-autonomy-val-m">--</strong>
+                <!-- Carte 3 : Tenue Occupant (CLO) pleine largeur mobile -->
+                <div class="col-span-2 bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between gap-2 shadow-sm">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[10px] font-bold text-amber-400 flex items-center gap-1">
+                                <span>🧍</span> Tenue de l'occupant :
+                            </span>
+                            <strong class="text-xs font-black text-amber-300"><span id="currentCloValue-m">1.00</span> Clo</strong>
                         </div>
-                        <div class="w-full bg-black/80 h-1.5 rounded-full overflow-hidden border border-white/20">
-                            <div id="txt-autonomy-bar-m" class="h-full bg-gradient-to-r from-[#D96B43] to-sky-400 rounded-full transition-all duration-500" style="width: 50%;"></div>
-                        </div>
+                        <p class="text-[9px] text-slate-400 m-0 truncate mt-0.5" id="currentCloDesc-m">(Chemise & pull)</p>
                     </div>
-                </div>
-
-                <!-- Carte 4 : Tenue Occupant (CLO) -->
-                <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between shadow-sm">
-                    <div class="flex items-center justify-between mb-0.5">
-                        <span class="text-[10px] font-bold text-amber-400 flex items-center gap-1">
-                            <span>🧍</span> Occupant
-                        </span>
-                        <strong class="text-xs font-black text-amber-300"><span id="currentCloValue-m">1.00</span> Clo</strong>
-                    </div>
-                    <p class="text-[8px] text-slate-400 m-0 truncate" id="currentCloDesc-m">(Chemise & pull)</p>
-                    <div class="flex items-center gap-1 mt-1 pt-1 border-t border-slate-800/80 justify-between">
-                        <button onclick="adjustClothing(-0.2)" class="flex-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-white/20 rounded py-0.5 text-[9px] font-bold text-center" title="Alléger tenue (-0.2 Clo)">−0.2</button>
-                        <button onclick="adjustClothing(0.2)" class="flex-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-white/20 rounded py-0.5 text-[9px] font-bold text-center" title="Couvrir tenue (+0.2 Clo)">+0.2</button>
-                        <button onclick="resetClothing()" class="px-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 border border-white/20 rounded py-0.5 text-[9px] font-bold text-center" title="Réinitialiser saison">↺</button>
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button onclick="adjustClothing(-0.2)" class="px-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-white/20 rounded py-1 text-[10px] font-bold text-center" title="Alléger tenue (-0.2 Clo)">−0.2</button>
+                        <button onclick="adjustClothing(0.2)" class="px-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-white/20 rounded py-1 text-[10px] font-bold text-center" title="Couvrir tenue (+0.2 Clo)">+0.2</button>
+                        <button onclick="resetClothing()" class="px-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 border border-white/20 rounded py-1 text-[10px] font-bold text-center" title="Réinitialiser saison">↺</button>
                     </div>
                 </div>
             </div>
 
-            <!-- 4. BILAN THERMIQUE DU JOUR : BALANCE DES FLUX & TRAJECTOIRE ÉNERGÉTIQUE CÔTE-À-CÔTE -->
+            <!-- 4. BILAN THERMIQUE DU JOUR : BALANCE DES FLUX & BILAN PASSIF SUR 24H CÔTE-À-CÔTE -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
                 
-                <!-- COLONNE GAUCHE : BALANCE DES FLUX EN DIRECT (LG:COL-SPAN-5, COMPACTE) -->
-                <div class="lg:col-span-5 bg-slate-950/90 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-inner flex flex-col justify-between">
+                <!-- COLONNE GAUCHE : BALANCE DES FLUX EN DIRECT (LG:COL-SPAN-6) -->
+                <div class="lg:col-span-6 bg-slate-950/90 border border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-inner flex flex-col justify-between">
                     <div>
                         <div class="flex items-center justify-between mb-1 pb-1 border-b border-slate-800">
                             <span class="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-1.5">
@@ -577,8 +548,8 @@
                                 <span class="text-[9px] text-amber-300/90 font-semibold uppercase tracking-wider">☀️ Solaire</span>
                                 <strong id="txt-flux-solar-detail" class="text-xs sm:text-sm font-black text-amber-400">+0.00 °C/h</strong>
                             </div>
-                            <div class="bg-slate-800/60 border border-slate-700/60 rounded-lg p-1.5 flex flex-col">
-                                <span class="text-[9px] text-slate-300/90 font-semibold uppercase tracking-wider">🧱 Murs ↔ Air</span>
+                            <div class="bg-slate-800/60 border border-slate-700/60 rounded-lg p-1.5 flex flex-col" title="Température moyenne des parois lourdes (murs, sols, plafonds) et échange convectif avec l'air">
+                                <span class="text-[9px] text-slate-300/90 font-semibold uppercase tracking-wider">🧱 Parois (<span id="txt-wall-temp" class="text-amber-300 font-bold">-- °C</span>)</span>
                                 <strong id="txt-flux-wall-detail" class="text-xs sm:text-sm font-black text-slate-200">±0.00 °C/h</strong>
                             </div>
                             <div class="bg-sky-950/30 border border-sky-500/30 rounded-lg p-1.5 flex flex-col">
@@ -589,8 +560,8 @@
 
                         <div>
                             <div class="flex justify-between items-center text-[10px] font-bold mb-1">
-                                <span class="text-amber-400">☀️ Ce qui chauffe (+ °C/h)</span>
-                                <span class="text-sky-400">❄️ Ce qui refroidit (− °C/h)</span>
+                                <span class="text-amber-400">☀️ Ce qui chauffe</span>
+                                <span class="text-sky-400">❄️ Ce qui refroidit</span>
                             </div>
                             <div class="thermal-balance-track">
                                 <div id="balance-bar-gain" class="h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-500" style="width: 50%;"></div>
@@ -599,7 +570,7 @@
                             </div>
                         </div>
 
-                        <!-- Bandeau du Verdict en français clair (remplace Stockage / Décharge) -->
+                        <!-- Bandeau du Verdict en français clair -->
                         <div id="balance-verdict-box" class="rounded-lg p-2.5 border bg-sky-950/35 border-sky-500/35 transition-colors duration-300">
                             <div class="flex items-center justify-between">
                                 <span id="txt-balance-verdict-title" class="text-[10px] sm:text-xs font-extrabold uppercase tracking-wide text-sky-300">
@@ -614,134 +585,41 @@
                     </div>
                 </div>
 
-                <!-- COLONNE DROITE : TRAJECTOIRE ÉNERGÉTIQUE SCIENTIFIQUE DU JOUR & RÉVEIL 07H (LG:COL-SPAN-7) -->
-                <div class="lg:col-span-7 bg-slate-950/90 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-inner flex flex-col justify-between">
+                <!-- COLONNE DROITE : BILAN PASSIF SUR 24H (EFFORT DE CHAUFFE & RÉVEIL 07H, LG:COL-SPAN-6) -->
+                <div class="lg:col-span-6 bg-slate-950/90 border border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-inner flex flex-col justify-between">
                     <div>
                         <div class="flex items-center justify-between mb-1 pb-1 border-b border-slate-800">
                             <span class="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-1.5">
-                                <span>📈</span> Trajectoire Thermique & Réveil à 07h
+                                <span>📊</span> Bilan passif sur 24h
                             </span>
-                            <span class="text-[10px] text-slate-400 font-medium">
-                                Bilan passif 24h (kWh) & projection nocturne
+                            <span class="text-[10px] text-purple-300 font-semibold bg-purple-950/40 px-2 py-0.5 rounded-full border border-purple-500/30">
+                                Projection 24h & Nuit
                             </span>
                         </div>
+                        <p class="text-[10px] text-slate-400 m-0 mb-2.5">
+                            Besoin énergétique de la journée et température estimée demain matin au lever
+                        </p>
                     </div>
 
-                    <!-- Mini Graphique Vectoriel (00h -> Maintenant -> Minuit -> Réveil 07h) -->
-                    <div class="w-full my-auto bg-slate-900/90 border border-slate-800/80 rounded-xl p-2.5">
-                        <svg viewBox="0 0 480 142" class="w-full h-auto select-none" xmlns="http://www.w3.org/2000/svg">
-                            <defs>
-                                <linearGradient id="gradBarPassed" x1="0%" y1="0%" x2="0%" y2="100%">
-                                    <stop offset="0%" stop-color="#10B981" stop-opacity="0.85"/>
-                                    <stop offset="100%" stop-color="#047857" stop-opacity="0.30"/>
-                                </linearGradient>
-                                <linearGradient id="gradBarFinal" x1="0%" y1="0%" x2="0%" y2="100%">
-                                    <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.85"/>
-                                    <stop offset="100%" stop-color="#0284C7" stop-opacity="0.30"/>
-                                </linearGradient>
-                                <linearGradient id="gradBarWakeup" x1="0%" y1="0%" x2="0%" y2="100%">
-                                    <stop offset="0%" stop-color="#A855F7" stop-opacity="0.75"/>
-                                    <stop offset="100%" stop-color="#6B21A8" stop-opacity="0.25"/>
-                                </linearGradient>
-                            </defs>
-
-                            <!-- Axe de référence 0 kWh -->
-                            <line x1="35" y1="70" x2="450" y2="70" stroke="#475569" stroke-width="1.2" stroke-dasharray="3 3"/>
-                            <text x="28" y="73" fill="#64748B" font-size="9" text-anchor="end" font-weight="bold">0</text>
-                            <text x="454" y="73" fill="#64748B" font-size="7.5" text-anchor="start">kWh</text>
-
-                            <!-- Séparateur Nuit (Minuit -> 07h) -->
-                            <rect x="300" y="8" width="138" height="100" rx="6" fill="#0F172A" fill-opacity="0.45"/>
-                            <line x1="300" y1="10" x2="300" y2="106" stroke="#334155" stroke-width="1" stroke-dasharray="2 2"/>
-
-                            <!-- 1. Origine 00h -->
-                            <circle cx="48" cy="70" r="3.5" fill="#64748B"/>
-                            <text x="48" y="86" fill="#64748B" font-size="8.5" text-anchor="middle" font-weight="600">00h</text>
-                            <text x="48" y="97" fill="#475569" font-size="7.5" text-anchor="middle">Départ</text>
-
-                            <!-- 2. Zone Passé / Cumul à Maintenant (Barre kWh) -->
-                            <g id="chart-bar-passed-group">
-                                <rect id="chart-bar-passed" x="148" y="40" width="40" height="30" rx="3" fill="url(#gradBarPassed)" stroke="#10B981" stroke-width="1.2"/>
-                                <text id="chart-txt-passed" x="168" y="32" fill="#34D399" font-size="10.5" font-weight="bold" text-anchor="middle">-- kWh</text>
-                                <text x="168" y="86" fill="#94A3B8" font-size="8.5" font-weight="bold" text-anchor="middle">Maintenant</text>
-                                <text x="168" y="97" fill="#64748B" font-size="7.5" text-anchor="middle">Cumulé</text>
-                            </g>
-
-                            <!-- 3. Zone Atterrissage / 24h Minuit (Barre kWh) -->
-                            <g id="chart-bar-final-group">
-                                <rect id="chart-bar-final" x="280" y="30" width="40" height="40" rx="3" fill="url(#gradBarFinal)" stroke="#38BDF8" stroke-width="1.2"/>
-                                <text id="chart-txt-final" x="300" y="22" fill="#BAE6FD" font-size="10.5" font-weight="bold" text-anchor="middle">-- kWh</text>
-                                <text x="300" y="86" fill="#94A3B8" font-size="8.5" font-weight="bold" text-anchor="middle">Minuit (24h)</text>
-                                <text x="300" y="97" fill="#64748B" font-size="7.5" text-anchor="middle">Bilan jour</text>
-                            </g>
-
-                            <!-- 4. Zone Réveil Thermique / Demain 07h (Sans chauffage) -->
-                            <g id="chart-bar-wakeup-group">
-                                <rect id="chart-bar-wakeup" x="398" y="42" width="40" height="28" rx="3" fill="url(#gradBarWakeup)" stroke="#C084FC" stroke-width="1.2"/>
-                                <text id="chart-txt-wakeup-temp" x="418" y="21" fill="#E9D5FF" font-size="10.5" font-weight="bold" text-anchor="middle">~--.- °C</text>
-                                <text id="chart-txt-wakeup-wall" x="418" y="32" fill="#C084FC" font-size="7.5" font-weight="bold" text-anchor="middle">Murs --.-°C</text>
-                                <text x="418" y="86" fill="#D8B4FE" font-size="8.5" font-weight="bold" text-anchor="middle">🌅 Réveil 07h</text>
-                                <text x="418" y="97" fill="#94A3B8" font-size="7" text-anchor="middle">Sans chauffer</text>
-                            </g>
-
-                            <!-- 1. Trajectoire Prévisionnelle Théorique (24h stable, en pointillés discrets) -->
-                            <path id="chart-theo-curve" d="M 48 70 C 98 70, 120 60, 168 60 C 220 60, 255 50, 300 50" fill="none" stroke="#64748B" stroke-width="1.8" stroke-dasharray="3 3"/>
-
-                            <!-- 2. Trajectoire Réelle in situ (00h -> Maintenant, trait plein orange lumineux) -->
-                            <path id="chart-trend-curve" d="M 48 70 C 98 70, 120 50, 168 50" fill="none" stroke="#F59E0B" stroke-width="3" stroke-linecap="round"/>
-
-                            <!-- 3. Prolongement Projection (Maintenant -> Minuit 24h, tirets orange) -->
-                            <path id="chart-proj-curve" d="M 168 50 C 220 50, 255 40, 300 40" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-dasharray="4 3" opacity="0.85"/>
-
-                            <!-- 4. Prolongement Nocturne Passif (Minuit 24h -> Réveil 07h, tirets violets) -->
-                            <path id="chart-wakeup-curve" d="M 300 40 C 345 40, 375 55, 418 55" fill="none" stroke="#C084FC" stroke-width="2.2" stroke-dasharray="3 3" opacity="0.9"/>
-
-                            <!-- Puces des jalons -->
-                            <circle id="chart-dot-passed" cx="168" cy="50" r="4.8" fill="#F59E0B" stroke="#FFFFFF" stroke-width="1.6"/>
-                            <circle id="chart-dot-final" cx="300" cy="40" r="4.8" fill="#38BDF8" stroke="#FFFFFF" stroke-width="1.6"/>
-                            <circle id="chart-dot-theo" cx="300" cy="50" r="3.2" fill="#64748B" stroke="#1E293B" stroke-width="1.4"/>
-                            <circle id="chart-dot-wakeup" cx="418" cy="55" r="4.8" fill="#C084FC" stroke="#FFFFFF" stroke-width="1.6"/>
-                        </svg>
-                    </div>
-
-                    <!-- Légende Explicative de la Double Courbe + Nuit -->
-                    <div class="flex flex-wrap items-center justify-between text-[9px] sm:text-[10px] text-slate-400 mt-1.5 px-1 gap-1">
-                        <span class="flex items-center gap-1">
-                            <span class="inline-block w-3 h-0.5 bg-amber-400 rounded-full"></span>
-                            <strong class="text-amber-300 font-bold">Réel in situ</strong>
-                        </span>
-                        <span class="flex items-center gap-1">
-                            <span class="inline-block w-3 h-0.5 border-b-2 border-dashed border-amber-400"></span>
-                            <span class="text-amber-200">Projection minuit</span>
-                        </span>
-                        <span class="flex items-center gap-1">
-                            <span class="inline-block w-3 h-0.5 border-b-2 border-dotted border-slate-500"></span>
-                            <span class="text-slate-400" id="txt-theo-landing-legend">Prévision théorique</span>
-                        </span>
-                        <span class="flex items-center gap-1">
-                            <span class="inline-block w-3 h-0.5 border-b-2 border-dotted border-purple-400"></span>
-                            <span class="text-purple-300">Dérive nuit → 07h</span>
-                        </span>
-                    </div>
-
-                    <!-- Traduction Concrète : Effort de Chauffe Requis (24h) & Réveil Thermique (07h) -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-800/80">
-                        <div id="box-heating-effort" class="rounded-lg bg-slate-900/90 border border-slate-700/70 px-2.5 py-1.5">
-                            <div class="flex items-center justify-between gap-1">
-                                <span id="txt-heating-effort-title" class="text-[10px] font-bold text-slate-300">🔥 Effort de chauffe requis (24h)</span>
-                                <span id="txt-heating-effort-val" class="text-xs font-black text-amber-400">-- kWh</span>
+                    <!-- Les 2 indicateurs synthétiques majeurs (sans courbe complexe) -->
+                    <div class="my-auto flex flex-col gap-3">
+                        <div id="box-heating-effort" class="rounded-xl bg-amber-950/30 border border-amber-500/35 p-3 transition-colors">
+                            <div class="flex items-center justify-between gap-2">
+                                <span id="txt-heating-effort-title" class="text-xs font-extrabold text-amber-200">🔥 Effort de chauffe requis (sur 24h)</span>
+                                <span id="txt-heating-effort-val" class="text-sm sm:text-base font-black text-amber-400">-- kWh</span>
                             </div>
-                            <p id="txt-heating-effort-desc" class="text-[9px] sm:text-[10px] text-slate-400 m-0 mt-0.5 leading-tight">
-                                Calcul du besoin de compensation thermique...
+                            <p id="txt-heating-effort-desc" class="text-[11px] text-slate-300 m-0 mt-1 leading-snug">
+                                Calcul du besoin de compensation thermique sur la journée...
                             </p>
                         </div>
-                        <div id="box-wakeup-forecast" class="rounded-lg bg-purple-950/25 border border-purple-500/30 px-2.5 py-1.5">
-                            <div class="flex items-center justify-between gap-1">
-                                <span class="text-[10px] font-bold text-purple-200">🌅 Réveil demain 07h (sans chauffer)</span>
-                                <span id="txt-wakeup-summary-val" class="text-xs font-black text-purple-300">--.- °C</span>
+
+                        <div id="box-wakeup-forecast" class="rounded-xl bg-purple-950/30 border border-purple-500/35 p-3 transition-colors">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-extrabold text-purple-200">🌅 Réveil demain 07h (sans chauffer)</span>
+                                <span id="txt-wakeup-summary-val" class="text-xs sm:text-sm font-black text-purple-300">--.- °C</span>
                             </div>
-                            <p id="txt-wakeup-summary-desc" class="text-[9px] sm:text-[10px] text-slate-300 m-0 mt-0.5 leading-tight">
-                                Simulation nocturne 2R2C de l'air et des murs...
+                            <p id="txt-wakeup-summary-desc" class="text-[11px] text-slate-300 m-0 mt-1 leading-snug">
+                                Simulation nocturne de l'air et des parois jusqu'à 07h00...
                             </p>
                         </div>
                     </div>
@@ -761,9 +639,9 @@
                 <div class="flex items-start gap-2.5">
                     <span class="text-xl mt-0.5 shrink-0">💬</span>
                     <div class="text-xs sm:text-sm flex-1">
-                        <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                             <strong class="text-white font-bold">Ce qui se passe en ce moment :</strong>
-                            <!-- Focus Pièces extrêmes (basé sur le PMV) -->
+                            <!-- Focus Pièces extrêmes (basé sur le PMV) + Lien vers la page Détail Pièces -->
                             <div id="box-room-extremes" class="flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[11px]">
                                 <span id="badge-best-room" class="px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 font-bold">
                                     🏆 Top confort : --
@@ -771,6 +649,9 @@
                                 <span id="badge-worst-room" class="px-2 py-0.5 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-200 font-bold">
                                     ⚠️ Point d'attention : --
                                 </span>
+                                <a href="pieces.html" class="px-2.5 py-0.5 rounded-full bg-sky-950/90 hover:bg-sky-900 border border-sky-400/50 text-sky-200 font-extrabold no-underline transition flex items-center gap-1">
+                                    <span>🏡</span> <span>Voir toutes les pièces →</span>
+                                </a>
                             </div>
                         </div>
                         <p class="text-slate-300 leading-relaxed text-xs sm:text-[13px] m-0" id="txt-summary">
@@ -824,67 +705,10 @@
 
         </div>
 
-        <!-- ============================================================== -->
-        <!-- SECTION PIÈCES : SÉLECTEUR & AFFICHAGE ADAPTATIF MOBILE / PC   -->
-        <!-- ============================================================== -->
-        <section class="flex flex-col gap-3">
-            
-            <!-- Sélecteur Moderne de Pièces & Commutateur de Vue -->
-            <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-2.5">
-                <div class="flex flex-wrap justify-between items-center gap-2">
-                    <div class="flex items-center gap-2">
-                        <span class="text-base">🏡</span>
-                        <strong class="text-xs sm:text-sm text-slate-800">Pièces à afficher et scanner :</strong>
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                        <div class="flex gap-1.5">
-                            <button onclick="toggleAllRooms(true)" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs px-2.5 py-1 rounded-lg font-semibold cursor-pointer">Tout cocher</button>
-                            <button onclick="toggleAllRooms(false)" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs px-2.5 py-1 rounded-lg font-semibold cursor-pointer">Tout décocher</button>
-                        </div>
-
-                        <div class="view-mode-toggle ml-1">
-                            <button id="btn-view-cards" onclick="setDashboardViewMode('cards')" class="view-mode-btn active" title="Vue Cartes (optimisée téléphone)">📱 Cartes</button>
-                            <button id="btn-view-table" onclick="setDashboardViewMode('table')" class="view-mode-btn" title="Vue Tableau (synthétique)">📊 Tableau</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Chips des Pièces -->
-                <div id="room-checkboxes" class="flex flex-wrap gap-2 pt-1"></div>
-            </div>
-
-            <!-- Conteneur Adaptatif : Tableau Desktop & Cartes Mobile -->
-            <div id="dashboard-table-container" class="responsive-mobile-cards bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
-                <table id="dashboard-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
-                    <thead>
-                        <tr style="background: #F8FAFC; border-bottom: 2px solid #E2E8F0; color: #475569; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px;">
-                            <th style="padding: 12px 14px;" data-base-text="Pièce / Zone">Pièce / Zone</th>
-                            <th style="padding: 12px 10px; text-align: center;" data-base-text="Statut Capteur">Statut Capteur</th>
-                            <th style="padding: 12px 10px; text-align: right;" data-base-text="Température">Température</th>
-                            <th style="padding: 12px 10px; text-align: right;" data-base-text="Humidité Rel.">Humidité Rel.</th>
-                            <th style="padding: 12px 10px; text-align: right;" data-base-text="Humidité Abs.">Humidité Abs.</th>
-                            <th style="padding: 12px 10px; text-align: center;" data-base-text="PMV (Confort)">PMV (Confort)</th>
-                            <th style="padding: 12px 10px; text-align: right;" data-base-text="Bilan Net (24h)">Bilan Net (24h)</th>
-                            <th style="padding: 12px 10px; text-align: right;" data-base-text="T° Masse Parois">T° Masse Parois</th>
-                            <th style="padding: 12px 10px; text-align: center;" data-base-text="Séchage Linge">Séchage Linge</th>
-                            <th style="padding: 12px 14px; text-align: center;">Action Prioritaire</th>
-                        </tr>
-                    </thead>
-                    <tbody id="dashboard-table-body">
-                        <!-- Alimenté dynamiquement par engine.js -->
-                    </tbody>
-                </table>
-            </div>
-
-            <div id="dashboard-grid" style="display: none;"></div>
-
-        </section>
-
     </main>
 
     <!-- Pied de Page -->
-    <footer style="text-align: center; padding: 18px; font-size: 0.8rem; color: #94A3B8; border-top: 1px solid #E2E8F0; margin-top: 24px;">
+    <footer style="text-align: center; padding: 18px; font-size: 0.8rem; color: #94A3B8; border-top: 1px solid #E2E8F0; margin-top: 16px;">
         <p style="margin: 0;">Solstice Engine v3.6 • Modélisation Dynamique 2R2C / ISO 7730 / EN ISO 52016-1</p>
     </footer>
 
@@ -921,37 +745,9 @@
             toggleCityInput(false);
         }
 
-        // Bascule de Mode d'Affichage Pièces (Cartes vs Tableau)
-        function setDashboardViewMode(mode) {
-            const container = document.getElementById('dashboard-table-container');
-            const btnCards = document.getElementById('btn-view-cards');
-            const btnTable = document.getElementById('btn-view-table');
-
-            if (mode === 'cards') {
-                container.classList.add('responsive-mobile-cards');
-                btnCards.classList.add('active');
-                btnTable.classList.remove('active');
-                localStorage.setItem('SOLSTICE_VIEW_MODE', 'cards');
-            } else {
-                container.classList.remove('responsive-mobile-cards');
-                btnTable.classList.add('active');
-                btnCards.classList.remove('active');
-                localStorage.setItem('SOLSTICE_VIEW_MODE', 'table');
-            }
-        }
-
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof updateHeatingSeasonDisplay === 'function') {
                 updateHeatingSeasonDisplay();
-            }
-
-            const savedMode = localStorage.getItem('SOLSTICE_VIEW_MODE');
-            if (savedMode) {
-                setDashboardViewMode(savedMode);
-            } else if (window.innerWidth <= 768) {
-                setDashboardViewMode('cards');
-            } else {
-                setDashboardViewMode('table');
             }
         });
     </script>

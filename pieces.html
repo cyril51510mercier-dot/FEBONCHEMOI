@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOLSTICE • Détail par Pièce & Capteurs</title>
+    
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- 1. SDK Supabase & Auth Guard -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        (async function verifierAuthentification() {
+            const SUPABASE_URL = 'https://hgmvwaehgedudklftltb.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhnbXZ3YWVoZ2VkdWRrbGZ0bHRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyNTczMDEsImV4cCI6MjEwNTgzMzMwMX0.-w01Tc3baMZ0gCc4DMIH3VKI7P32m1wSifiWsruDKps';
+            
+            const authClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            const { data: { session } } = await authClient.auth.getSession();
+            
+            if (!session) {
+                window.location.href = 'login.html';
+            }
+        })();
+    </script>
+
+    <!-- Configuration PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0B101D">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/869/869869.png">
+
+    <!-- Tailwind CSS (sans preflight) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: {
+                preflight: false,
+            }
+        };
+    </script>
+</head>
+<body style="background-color: #F1F5F9; font-family: system-ui, -apple-system, sans-serif; color: #0F172A; margin: 0; padding: 0;">
+
+    <main class="dashboard-container" style="max-width: 1240px; margin: 14px auto; padding: 0 12px; display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- EN-TÊTE NAVIGATION & RÉSUMÉ PIÈCES -->
+        <div class="w-full bg-[#0B101D] border border-slate-800 rounded-3xl p-3.5 sm:p-5 shadow-[0_15px_40px_rgba(0,0,0,0.45)] text-slate-100 flex flex-col gap-3.5">
+            
+            <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+                <div class="flex items-center gap-3">
+                    <span class="text-3xl sm:text-4xl drop-shadow">🏡</span>
+                    <div>
+                        <h1 class="text-xl sm:text-2xl font-black tracking-tight text-white m-0 leading-tight">
+                            SOLSTICE <span class="text-sky-400 font-light text-lg sm:text-xl">| Détail par Pièce</span>
+                        </h1>
+                        <p class="text-xs sm:text-sm text-slate-300 m-0 mt-0.5 font-medium">
+                            Mesures capteurs, température des parois, confort PMV et séchage pièce par pièce
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Barre de Navigation -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <a href="index.html" class="custom-pill-btn bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 px-3.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 no-underline whitespace-nowrap">
+                        ← 🏠 Synthèse
+                    </a>
+
+                    <button id="btn-sync-all" onclick="synchroniserTouteLaMaison(event)" class="custom-pill-btn bg-[#D96B43] hover:bg-[#C25832] text-white border-0 px-3.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer shadow-md whitespace-nowrap">
+                        ⚡ Super Scan
+                    </button>
+
+                    <button onclick="voirToutesLesRecommandations()" class="custom-pill-btn bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 px-3.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+                        📋 Plan d'Action
+                    </button>
+
+                    <a href="setup.html" class="custom-pill-btn bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center gap-1.5 no-underline whitespace-nowrap">
+                        ⚙️ Config BEM
+                    </a>
+
+                    <span id="global-calc-timestamp" class="text-[11px] text-slate-400 font-medium px-2 py-1 bg-slate-900/60 rounded-lg border border-slate-800">
+                        --:--
+                    </span>
+                </div>
+            </div>
+
+            <!-- Bandeau Repères Rapides (Ville, Top/Flop Confort PMV, Tenue Clo & Pièces Tampons) -->
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-bold text-slate-300 flex items-center gap-1">
+                        <span>📍</span>
+                        <span id="summary-city-name" class="text-amber-400 font-black">Reims</span>
+                    </span>
+                    <span id="badge-best-room" class="px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 font-bold text-[11px]">
+                        🏆 Top confort : --
+                    </span>
+                    <span id="badge-worst-room" class="px-2.5 py-0.5 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-200 font-bold text-[11px]">
+                        ⚠️ Point d'attention : --
+                    </span>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <!-- Ajustement rapide Tenue (Clo) -->
+                    <div class="flex items-center gap-1.5 bg-slate-950/70 border border-slate-800 rounded-xl px-2.5 py-1">
+                        <span class="text-amber-400 font-bold">🧍 <span id="currentCloValue">1.00</span> Clo</span>
+                        <button onclick="adjustClothing(-0.2)" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/20 rounded px-1.5 py-0.5 text-[10px] font-bold cursor-pointer">−0.2</button>
+                        <button onclick="adjustClothing(0.2)" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/20 rounded px-1.5 py-0.5 text-[10px] font-bold cursor-pointer">+0.2</button>
+                    </div>
+
+                    <label class="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white transition font-medium select-none bg-slate-950/60 border border-slate-800 rounded-xl px-2.5 py-1">
+                        <input type="checkbox" id="include-buffer-checkbox" onchange="toggleIncludeBuffer(this.checked)" class="accent-[#D96B43] rounded cursor-pointer">
+                        <span>Pièces tampons</span>
+                    </label>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- SECTION PIÈCES : SÉLECTEUR & AFFICHAGE ADAPTATIF MOBILE / PC   -->
+        <!-- ============================================================== -->
+        <section class="flex flex-col gap-3">
+            
+            <!-- Sélecteur Moderne de Pièces & Commutateur de Vue -->
+            <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-2.5">
+                <div class="flex flex-wrap justify-between items-center gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-base">🏡</span>
+                        <strong class="text-xs sm:text-sm text-slate-800">Pièces à afficher et scanner :</strong>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <div class="flex gap-1.5">
+                            <button onclick="toggleAllRooms(true)" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs px-2.5 py-1 rounded-lg font-semibold cursor-pointer">Tout cocher</button>
+                            <button onclick="toggleAllRooms(false)" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs px-2.5 py-1 rounded-lg font-semibold cursor-pointer">Tout décocher</button>
+                        </div>
+
+                        <div class="view-mode-toggle ml-1">
+                            <button id="btn-view-cards" onclick="setDashboardViewMode('cards')" class="view-mode-btn active" title="Vue Cartes (optimisée téléphone)">📱 Cartes</button>
+                            <button id="btn-view-table" onclick="setDashboardViewMode('table')" class="view-mode-btn" title="Vue Tableau (synthétique)">📊 Tableau</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chips des Pièces -->
+                <div id="room-checkboxes" class="flex flex-wrap gap-2 pt-1"></div>
+            </div>
+
+            <!-- Conteneur Adaptatif : Tableau Desktop & Cartes Mobile -->
+            <div id="dashboard-table-container" class="responsive-mobile-cards bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+                <table id="dashboard-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+                    <thead>
+                        <tr style="background: #F8FAFC; border-bottom: 2px solid #E2E8F0; color: #475569; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                            <th style="padding: 12px 14px;" data-base-text="Pièce / Zone">Pièce / Zone</th>
+                            <th style="padding: 12px 10px; text-align: center;" data-base-text="Statut Capteur">Statut Capteur</th>
+                            <th style="padding: 12px 10px; text-align: right;" data-base-text="Température">Température</th>
+                            <th style="padding: 12px 10px; text-align: right;" data-base-text="Humidité Rel.">Humidité Rel.</th>
+                            <th style="padding: 12px 10px; text-align: right;" data-base-text="Humidité Abs.">Humidité Abs.</th>
+                            <th style="padding: 12px 10px; text-align: center;" data-base-text="PMV (Confort)">PMV (Confort)</th>
+                            <th style="padding: 12px 10px; text-align: right;" data-base-text="Bilan Net (24h)">Bilan Net (24h)</th>
+                            <th style="padding: 12px 10px; text-align: right;" data-base-text="T° Parois">T° Parois</th>
+                            <th style="padding: 12px 10px; text-align: center;" data-base-text="Séchage Linge">Séchage Linge</th>
+                            <th style="padding: 12px 14px; text-align: center;">Action Prioritaire</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashboard-table-body">
+                        <!-- Alimenté dynamiquement par engine.js -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="dashboard-grid" style="display: none;"></div>
+
+        </section>
+
+    </main>
+
+    <!-- Pied de Page -->
+    <footer style="text-align: center; padding: 18px; font-size: 0.8rem; color: #94A3B8; border-top: 1px solid #E2E8F0; margin-top: 24px;">
+        <p style="margin: 0;">Solstice Engine v3.6 • Modélisation Dynamique 2R2C / ISO 7730 / EN ISO 52016-1</p>
+    </footer>
+
+    <!-- Scripts Solstice -->
+    <script src="engine.js?v=3.6" defer></script>
+    <script>
+        function voirToutesLesRecommandations() {
+            sessionStorage.setItem('currentZoneId', 'all');
+            window.location.href = 'reco.html';
+        }
+
+        function setDashboardViewMode(mode) {
+            const container = document.getElementById('dashboard-table-container');
+            const btnCards = document.getElementById('btn-view-cards');
+            const btnTable = document.getElementById('btn-view-table');
+            if (!container || !btnCards || !btnTable) return;
+
+            if (mode === 'cards') {
+                container.classList.add('responsive-mobile-cards');
+                btnCards.classList.add('active');
+                btnTable.classList.remove('active');
+                localStorage.setItem('SOLSTICE_VIEW_MODE', 'cards');
+            } else {
+                container.classList.remove('responsive-mobile-cards');
+                btnTable.classList.add('active');
+                btnCards.classList.remove('active');
+                localStorage.setItem('SOLSTICE_VIEW_MODE', 'table');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedMode = localStorage.getItem('SOLSTICE_VIEW_MODE');
+            if (savedMode) {
+                setDashboardViewMode(savedMode);
+            } else if (window.innerWidth <= 768) {
+                setDashboardViewMode('cards');
+            } else {
+                setDashboardViewMode('table');
+            }
+        });
+    </script>
+</body>
+</html>

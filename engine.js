@@ -559,7 +559,7 @@ function initialiserDashboard() {
                 <td data-label="Humidité Abs." style="padding: 12px 10px; text-align: right; font-weight: 600; color: #0284C7;" id="ah-${idCapteur}">-- g/m³</td>
                 <td data-label="PMV (Confort)" style="padding: 12px 10px; text-align: center;"><span id="pmv-badge-${idCapteur}" style="font-weight: 700; padding: 4px 8px; border-radius: 6px; font-size: 0.82rem;">--</span></td>
                 <td data-label="Bilan Net (24h)" style="padding: 12px 10px; text-align: right; font-weight: 600;" id="energy-${idCapteur}">-- kWh/j</td>
-                <td data-label="T° Masse Parois" style="padding: 12px 10px; text-align: right; font-weight: 600; color: #D97706;" id="tstruct-${idCapteur}">-- °C</td>
+                <td data-label="T° Parois" style="padding: 12px 10px; text-align: right; font-weight: 600; color: #D97706;" id="tstruct-${idCapteur}">-- °C</td>
                 <td data-label="Séchage Linge" style="padding: 12px 10px; text-align: center; font-weight: 600;" id="drying-${idCapteur}">--</td>
                 <td data-label="Action" style="padding: 10px 12px; text-align: center;" id="action-${idCapteur}">
                     <button onclick="voirRecommandations('${safeName}')" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 5px 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer; color: #0F172A;">🔍 Diag</button>
@@ -637,7 +637,7 @@ function getRoomMetric(nomPiece, colIndex) {
     if (colIndex === 7) return isOutdoor ? -999 : tStruct;
     if (colIndex === 8) {
         const effectiveVel = isOutdoor ? ((outdoorWind || 0) / 3.6) : vel;
-        return parseFloat(calculateDryingPotential(ta, rh, effectiveVel).score10);
+        return parseFloat(calculateDryingPotential(ta, rh, effectiveVel, { isOutdoor }).score10);
     }
 
     return 0;
@@ -986,7 +986,7 @@ function calculateAbsoluteHumidity(ta, rh) {
     return parseFloat(ah.toFixed(1));
 }
 
-function calculateDryingPotential(ta, rh, vel = 0.1) {
+function calculateDryingPotential(ta, rh, vel = 0.1, options = {}) {
     if (ta === undefined || rh === undefined || isNaN(ta) || isNaN(rh)) {
         return { vpdkPa: 0, dryingIndex: 0, scorePercent: 0, score10: "0.0", status: "Inconnu", color: "#94A3B8" };
     }
@@ -994,18 +994,50 @@ function calculateDryingPotential(ta, rh, vel = 0.1) {
     const pSat = 611.2 * Math.exp((17.67 * ta) / (ta + 243.5)); 
     const vpd = (pSat * (1 - rh / 100)) / 1000; 
 
-    const dryingIndex = vpd * (1 + 0.5 * vel);
+    // Le vent accélère l'évaporation uniquement si l'air n'est pas saturé d'humidité (plafonné à 4 m/s ~ 15 km/h d'effet utile)
+    const effectiveVel = Math.min(4.0, Math.max(0.05, vel));
+    const drynessWindEfficiency = Math.max(0.15, Math.min(1.0, (90 - rh) / 40));
+    let dryingIndex = vpd * (1 + 0.45 * effectiveVel * drynessWindEfficiency);
+
+    let timeNote = "";
+    if (options && options.isOutdoor) {
+        const nowH = new Date().getHours();
+        const sunriseH = window.solsticeEphemeris?.sunriseHour || 7;
+        const sunsetH = window.solsticeEphemeris?.sunsetHour || 19;
+        const isNightNow = (nowH >= sunsetH || nowH < sunriseH);
+        const isDuskFalling = (!isNightNow && nowH >= (sunsetH - 2));
+        const weatherStr = (typeof sunshineStatus === 'string' ? sunshineStatus : '').toLowerCase();
+        const isWetWeather = weatherStr.includes('rain') || weatherStr.includes('drizzle') || weatherStr.includes('snow') || weatherStr.includes('fog') || weatherStr.includes('mist');
+
+        if (isWetWeather) {
+            dryingIndex = 0;
+            timeNote = " (Pluie/Humidité)";
+        } else if (isNightNow) {
+            // La nuit : absence d'apport solaire + refroidissement radiatif du linge vers le ciel froid + rosée nocturne
+            dryingIndex *= 0.18;
+            timeNote = " (Nuit / Rosée)";
+        } else if (isDuskFalling) {
+            // Fin d'après-midi (< 2h avant le coucher du soleil) : chute thermique et remontée d'HR imminentes
+            dryingIndex *= 0.42;
+            timeNote = " (Nuit imminente)";
+        }
+
+        // Pénalité supplémentaire si humidité relative extérieure élevée (>= 80% : proximité du point de rosée sur textile froid)
+        if (rh >= 80) {
+            dryingIndex *= Math.max(0.15, (95 - rh) / 20);
+        }
+    }
 
     const scorePercent = Math.min(100, Math.max(0, Math.round((dryingIndex / 1.8) * 100)));
     const score10 = (scorePercent / 10).toFixed(1);
 
-    let status = "Très Lent";
+    let status = "Très Lent" + timeNote;
     let color = "#EF4444"; 
 
-    if (scorePercent >= 80) { status = "Ultra Rapide"; color = "#059669"; }
-    else if (scorePercent >= 60) { status = "Rapide"; color = "#10B981"; }
-    else if (scorePercent >= 40) { status = "Modéré"; color = "#F59E0B"; }
-    else if (scorePercent >= 20) { status = "Lent"; color = "#F97316"; }
+    if (scorePercent >= 80) { status = "Ultra Rapide" + timeNote; color = "#059669"; }
+    else if (scorePercent >= 60) { status = "Rapide" + timeNote; color = "#10B981"; }
+    else if (scorePercent >= 40) { status = "Modéré" + timeNote; color = "#F59E0B"; }
+    else if (scorePercent >= 20) { status = "Lent" + timeNote; color = "#F97316"; }
 
     return {
         vpdkPa: parseFloat(vpd.toFixed(3)),
@@ -2340,9 +2372,9 @@ function calculateGlobalHabitatMetrics() {
 
     const effOutdoor = getEffectiveOutdoorAir();
     const velExt = (outdoorWind || 0) / 3.6;
-    const tDryingExt = (effOutdoor.streetSensor && typeof effOutdoor.streetSensor.ta === 'number') ? effOutdoor.streetSensor.ta : effOutdoor.tAir;
-    const rhDryingExt = (effOutdoor.streetSensor && typeof effOutdoor.streetSensor.rh === 'number') ? effOutdoor.streetSensor.rh : effOutdoor.rhAir;
-    const dryingOutdoor = calculateDryingPotential(tDryingExt, rhDryingExt, velExt);
+    const tDryingExt = effOutdoor.tAir;
+    const rhDryingExt = effOutdoor.rhAir;
+    const dryingOutdoor = calculateDryingPotential(tDryingExt, rhDryingExt, velExt, { isOutdoor: true });
 
     const avgDryingIndoorIndex = weightedDryingIndex / totalVolume;
     const indoorDryingScore10 = (Math.min(100, Math.max(0, Math.round((avgDryingIndoorIndex / 1.8) * 100))) / 10).toFixed(1);
@@ -2465,7 +2497,7 @@ function mettreAJourTuile(nomPiece) {
         }
 
         const velExt = (outdoorWind || 0) / 3.6;
-        const dryingExt = calculateDryingPotential(currentTa, currentRh, velExt);
+        const dryingExt = calculateDryingPotential(currentTa, currentRh, velExt, { isOutdoor: true });
         if (dryingEl) {
             const locName = isStreet ? "Côté Rue (au soleil)" : (isGarden ? "Au Jardin (ombragé)" : "Extérieur");
             dryingEl.innerHTML = `
@@ -2655,10 +2687,11 @@ function actualiserCockpitGlobal() {
     const txtExtDrying = document.getElementById('txt-ext-drying');
     if (txtExtDrying) {
         txtExtDrying.textContent = `${extDrying}/10`;
-        let dryingTooltip = `Séchage extérieur au Jardin : ${extDrying}/10`;
+        const dryingRef = calculateDryingPotential(extTemp, extRh, (outdoorWind || 0) / 3.6, { isOutdoor: true });
+        let dryingTooltip = `Séchage extérieur (Air réf. ${extTemp.toFixed(1)}°C, HR ${extRh.toFixed(0)}%, Vent ${(outdoorWind || 0).toFixed(0)} km/h) : ${extDrying}/10 — ${dryingRef.status}`;
         if (effOutdoor.streetSensor) {
-            const dryingStreet = calculateDryingPotential(effOutdoor.streetSensor.ta, effOutdoor.streetSensor.rh, (outdoorWind || 0) / 3.6);
-            dryingTooltip += `\nSéchage Côté Rue (au soleil) : ${dryingStreet.score10}/10 (${dryingStreet.status})`;
+            const dryingStreet = calculateDryingPotential(effOutdoor.streetSensor.ta, effOutdoor.streetSensor.rh, (outdoorWind || 0) / 3.6, { isOutdoor: true });
+            dryingTooltip += `\nSéchage Côté Rue : ${dryingStreet.score10}/10 (${dryingStreet.status})`;
         }
         txtExtDrying.parentElement.title = dryingTooltip;
     }
@@ -2954,7 +2987,7 @@ function actualiserCockpitGlobal() {
     const fluxWallKw = (metrics.totalFluxWallKw !== undefined) ? metrics.totalFluxWallKw : (globalReserve.fluxPowerKw || 0);
     const wallRate = fluxWallKw / cEffAirKwhPerK;
     const wallWatts = Math.round(fluxWallKw * 1000);
-    const wallTooltip = `🧱 Échange convectif interne Parois ↔ Air : ${wallRate >= 0 ? '+' : ''}${wallRate.toFixed(2)} °C/h (${wallWatts >= 0 ? '+' : ''}${wallWatts} W / ${fluxWallKw >= 0 ? '+' : ''}${fluxWallKw.toFixed(2)} kW)\n• Température Masse (Tm) : ${metrics.avgTStruct.toFixed(1)} °C vs Air (Ta) : ${metrics.avgTemp.toFixed(1)} °C\n• Couplage convectif pur H_ci = ${metrics.totalHCiWPerK || 0} W/K (h_ci ~ 2.5-2.8 W/m²K)`;
+    const wallTooltip = `🧱 Échange convectif interne Parois (murs, sols, plafonds) ↔ Air : ${wallRate >= 0 ? '+' : ''}${wallRate.toFixed(2)} °C/h (${wallWatts >= 0 ? '+' : ''}${wallWatts} W / ${fluxWallKw >= 0 ? '+' : ''}${fluxWallKw.toFixed(2)} kW)\n• Température des Parois (Tm) : ${metrics.avgTStruct.toFixed(1)} °C vs Air (Ta) : ${metrics.avgTemp.toFixed(1)} °C\n• Couplage convectif pur H_ci = ${metrics.totalHCiWPerK || 0} W/K (h_ci ~ 2.5-2.8 W/m²K)`;
 
     const txtFluxWallTag = document.getElementById('txt-flux-wall-tag');
     const txtFluxWallVal = document.getElementById('txt-flux-wall-val');
@@ -2965,7 +2998,7 @@ function actualiserCockpitGlobal() {
         txtFluxWallVal.title = wallTooltip;
         if (txtFluxWallVal.parentElement) txtFluxWallVal.parentElement.title = wallTooltip;
         if (fluxWallKw > 0.05) {
-            txtFluxWallTag.textContent = "🔥 Murs → Air";
+            txtFluxWallTag.textContent = "🔥 Parois → Air";
             txtFluxWallVal.textContent = `+${wallRate.toFixed(2)} °C/h`;
             txtFluxWallVal.style.color = "#F59E0B";
             lineWall.setAttribute('d', "M 902 270 L 785 270");
@@ -2975,7 +3008,7 @@ function actualiserCockpitGlobal() {
             haloWall.setAttribute('d', "M 902 270 L 785 270");
             haloWall.setAttribute('stroke', "#F59E0B");
         } else if (fluxWallKw < -0.05) {
-            txtFluxWallTag.textContent = "🧱 Air → Murs";
+            txtFluxWallTag.textContent = "🧱 Air → Parois";
             txtFluxWallVal.textContent = `${wallRate.toFixed(2)} °C/h`;
             txtFluxWallVal.style.color = "#38BDF8";
             lineWall.setAttribute('d', "M 805 270 L 902 270");
@@ -2985,7 +3018,7 @@ function actualiserCockpitGlobal() {
             haloWall.setAttribute('d', "M 805 270 L 902 270");
             haloWall.setAttribute('stroke', "#38BDF8");
         } else {
-            txtFluxWallTag.textContent = "⚖️ Murs ↔ Air";
+            txtFluxWallTag.textContent = "⚖️ Parois ↔ Air";
             txtFluxWallVal.textContent = "0.00 °C/h";
             txtFluxWallVal.style.color = "#10B981";
             lineWall.setAttribute('d', "M 902 270 L 902 270");
@@ -3317,7 +3350,7 @@ function actualiserCockpitGlobal() {
         }
     }
 
-    // Encadrés sous le graphique : Effort de chauffe requis (24h) & Réveil demain 07h
+    // Encadrés du Bilan passif sur 24h : Effort de chauffe requis (24h) & Réveil demain 07h
     const boxHeatingEffort = document.getElementById('box-heating-effort');
     const txtHeatingEffortTitle = document.getElementById('txt-heating-effort-title');
     const txtHeatingEffortVal = document.getElementById('txt-heating-effort-val');
@@ -3326,21 +3359,21 @@ function actualiserCockpitGlobal() {
     if (boxHeatingEffort && txtHeatingEffortTitle && txtHeatingEffortVal && txtHeatingEffortDesc) {
         if (valFinal < -0.15) {
             const effortKwh = Math.abs(valFinal).toFixed(1);
-            boxHeatingEffort.className = "rounded-lg bg-amber-950/30 border border-amber-500/30 px-2.5 py-1.5";
-            txtHeatingEffortTitle.textContent = "🔥 Effort de chauffe requis (24h)";
-            txtHeatingEffortTitle.className = "text-[10px] font-bold text-amber-200";
+            boxHeatingEffort.className = "rounded-xl bg-amber-950/30 border border-amber-500/35 p-3 transition-colors";
+            txtHeatingEffortTitle.textContent = "🔥 Effort de chauffe requis (sur 24h)";
+            txtHeatingEffortTitle.className = "text-xs font-extrabold text-amber-200";
             txtHeatingEffortVal.textContent = `~${effortKwh} kWh`;
-            txtHeatingEffortVal.className = "text-xs font-black text-amber-400";
-            txtHeatingEffortDesc.textContent = `Énergie à fournir par votre chauffage sur la journée pour compenser les pertes et maintenir ${metrics.avgTemp.toFixed(1)}°C.`;
-            boxHeatingEffort.title = `Bilan passif sur 24h : ${valFinal.toFixed(2)} kWh. Sans apport de chauffage de ~${effortKwh} kWh, la maison puiserait cette énergie dans sa réserve.`;
+            txtHeatingEffortVal.className = "text-sm sm:text-base font-black text-amber-400";
+            txtHeatingEffortDesc.textContent = `Énergie à fournir par votre chauffage sur la journée pour compenser les pertes naturelles et maintenir ${metrics.avgTemp.toFixed(1)}°C.`;
+            boxHeatingEffort.title = `Bilan passif sur 24h : ${valFinal.toFixed(2)} kWh. Sans apport de chauffage de ~${effortKwh} kWh, la maison puiserait cette énergie dans ses parois.`;
         } else {
-            boxHeatingEffort.className = "rounded-lg bg-emerald-950/30 border border-emerald-500/30 px-2.5 py-1.5";
-            txtHeatingEffortTitle.textContent = "☀️ Autonomie passive (24h)";
-            txtHeatingEffortTitle.className = "text-[10px] font-bold text-emerald-200";
+            boxHeatingEffort.className = "rounded-xl bg-emerald-950/30 border border-emerald-500/35 p-3 transition-colors";
+            txtHeatingEffortTitle.textContent = "☀️ Autonomie passive (sur 24h)";
+            txtHeatingEffortTitle.className = "text-xs font-extrabold text-emerald-200";
             txtHeatingEffortVal.textContent = `0 kWh requis (+${valFinal.toFixed(1)} kWh)`;
-            txtHeatingEffortVal.className = "text-xs font-black text-emerald-400";
-            txtHeatingEffortDesc.textContent = `Le soleil et l'inertie de vos murs couvrent 100% des pertes thermiques de la journée.`;
-            boxHeatingEffort.title = `Excédent thermique naturel de +${valFinal.toFixed(2)} kWh stocké dans vos parois lourdes.`;
+            txtHeatingEffortVal.className = "text-sm sm:text-base font-black text-emerald-400";
+            txtHeatingEffortDesc.textContent = `Le soleil et l'inertie de vos parois couvrent 100% des pertes thermiques de la journée.`;
+            boxHeatingEffort.title = `Excédent thermique naturel de +${valFinal.toFixed(2)} kWh stocké dans vos parois (murs, sols, plafonds).`;
         }
     }
 
@@ -3349,9 +3382,9 @@ function actualiserCockpitGlobal() {
     const txtWakeupSummaryDesc = document.getElementById('txt-wakeup-summary-desc');
     if (boxWakeupForecast && txtWakeupSummaryVal && txtWakeupSummaryDesc) {
         const signDeltaWake = deltaWakeupAir >= 0 ? '+' : '';
-        txtWakeupSummaryVal.textContent = `Air ~${wakeupAirTemp.toFixed(1)}°C · Murs ~${wakeupWallTemp.toFixed(1)}°C`;
-        txtWakeupSummaryDesc.textContent = `Dérive passive d'ici 07h : ${signDeltaWake}${deltaWakeupAir.toFixed(1)}°C (nuit à ${minExtNight07.toFixed(1)}°C dehors, amortie par vos murs).`;
-        boxWakeupForecast.title = `Simulation 2R2C sur ${hoursTo07h}h sans chauffage actif : l'air passera de ${metrics.avgTemp.toFixed(1)}°C à ~${wakeupAirTemp.toFixed(1)}°C et la masse des murs à ~${wakeupWallTemp.toFixed(1)}°C.`;
+        txtWakeupSummaryVal.textContent = `Air ~${wakeupAirTemp.toFixed(1)}°C · Parois ~${wakeupWallTemp.toFixed(1)}°C`;
+        txtWakeupSummaryDesc.textContent = `Évolution naturelle d'ici 07h : ${signDeltaWake}${deltaWakeupAir.toFixed(1)}°C sur l'air (nuit à ${minExtNight07.toFixed(1)}°C dehors, amortie par vos parois).`;
+        boxWakeupForecast.title = `Simulation 2R2C sur ${hoursTo07h}h sans chauffage actif : l'air passera de ${metrics.avgTemp.toFixed(1)}°C à ~${wakeupAirTemp.toFixed(1)}°C et vos parois (murs, sols, plafonds) à ~${wakeupWallTemp.toFixed(1)}°C.`;
     }
 
     const radiatorGroup = document.getElementById('radiator-heating-group');
@@ -3376,7 +3409,7 @@ function actualiserCockpitGlobal() {
         const b = metrics.bestComfortRoom;
         const bSign = b.pmv > 0 ? '+' : '';
         badgeBestRoom.textContent = `🏆 Top confort : ${b.name} (PMV ${bSign}${b.pmv.toFixed(2)} · ${b.ta.toFixed(1)}°C)`;
-        badgeBestRoom.title = `Pièce la plus proche du confort neutre (PMV 0.00) : ${b.name} — Air ${b.ta.toFixed(1)}°C, Murs ${b.tStruct.toFixed(1)}°C, HR ${b.rh}%`;
+        badgeBestRoom.title = `Pièce la plus proche du confort neutre (PMV 0.00) : ${b.name} — Air ${b.ta.toFixed(1)}°C, Parois ${b.tStruct.toFixed(1)}°C, HR ${b.rh}%`;
     }
     if (badgeWorstRoom && metrics.worstComfortRoom) {
         const w = metrics.worstComfortRoom;
@@ -3387,7 +3420,7 @@ function actualiserCockpitGlobal() {
             const wSign = w.pmv > 0 ? '+' : '';
             const reasonTag = w.pmv < -0.5 ? 'fraîche' : (w.pmv > 0.5 ? 'chaude' : 'écart PMV');
             badgeWorstRoom.textContent = `⚠️ Point d'attention : ${w.name} (PMV ${wSign}${w.pmv.toFixed(2)} · ${w.ta.toFixed(1)}°C)`;
-            badgeWorstRoom.title = `Pièce la plus éloignée de la neutralité thermique (${reasonTag}) : ${w.name} — Air ${w.ta.toFixed(1)}°C, Murs ${w.tStruct.toFixed(1)}°C, HR ${w.rh}%`;
+            badgeWorstRoom.title = `Pièce la plus éloignée de la neutralité thermique (${reasonTag}) : ${w.name} — Air ${w.ta.toFixed(1)}°C, Parois ${w.tStruct.toFixed(1)}°C, HR ${w.rh}%`;
         }
     }
 
