@@ -401,6 +401,15 @@
                         <strong class="font-black text-sky-300" id="txt-flux-ext-val">-- °C/h</strong>
                     </div>
 
+                    <!-- 3. ENCART PAROIS (EN HAUT À DROITE DU TOIT SUR LE DESSIN) -->
+                    <div class="absolute top-[6%] sm:top-[7%] right-[3%] sm:right-auto sm:left-[64%] pointer-events-auto flex flex-col gap-1 text-xs">
+                        <div class="flex items-center gap-1.5">
+                            <span class="bg-black/65 border border-amber-500/40 px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-xs font-black uppercase tracking-wider text-amber-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm" title="Température moyenne de la masse des parois (murs, sols, plafonds)">
+                                <span>🧱</span> <span>Parois :</span> <strong class="text-amber-300 font-black text-xs sm:text-sm ml-0.5" id="txt-wall-temp">-- °C</strong>
+                            </span>
+                        </div>
+                    </div>
+
                     <!-- 3.1 FLUX LENT ENVELOPPE OPAQUE : PAROIS LOURDES <-> EXTÉRIEUR (SUR L'ENVELOPPE EXTÉRIEURE DROITE) -->
                     <div class="absolute top-[23%] right-[3%] sm:right-[6%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-sky-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-slate-300" id="txt-flux-opaque-ext-tag">❄️ Parois → Ext.</span>
@@ -548,8 +557,8 @@
                                 <span class="text-[9px] text-amber-300/90 font-semibold uppercase tracking-wider">☀️ Solaire</span>
                                 <strong id="txt-flux-solar-detail" class="text-xs sm:text-sm font-black text-amber-400">+0.00 °C/h</strong>
                             </div>
-                            <div class="bg-slate-800/60 border border-slate-700/60 rounded-lg p-1.5 flex flex-col" title="Température moyenne des parois lourdes (murs, sols, plafonds) et échange convectif avec l'air">
-                                <span class="text-[9px] text-slate-300/90 font-semibold uppercase tracking-wider">🧱 Parois (<span id="txt-wall-temp" class="text-amber-300 font-bold">-- °C</span>)</span>
+                            <div class="bg-slate-800/60 border border-slate-700/60 rounded-lg p-1.5 flex flex-col" title="Échange convectif entre les parois (murs, sols, plafonds) et l'air intérieur">
+                                <span class="text-[9px] text-slate-300/90 font-semibold uppercase tracking-wider">🧱 Parois ↔ Air</span>
                                 <strong id="txt-flux-wall-detail" class="text-xs sm:text-sm font-black text-slate-200">±0.00 °C/h</strong>
                             </div>
                             <div class="bg-sky-950/30 border border-sky-500/30 rounded-lg p-1.5 flex flex-col">
@@ -587,18 +596,10 @@
 
                 <!-- COLONNE DROITE : BILAN PASSIF SUR 24H (EFFORT DE CHAUFFE & RÉVEIL 07H, LG:COL-SPAN-6) -->
                 <div class="lg:col-span-6 bg-slate-950/90 border border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-inner flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between mb-1 pb-1 border-b border-slate-800">
-                            <span class="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-1.5">
-                                <span>📊</span> Bilan passif sur 24h
-                            </span>
-                            <span class="text-[10px] text-purple-300 font-semibold bg-purple-950/40 px-2 py-0.5 rounded-full border border-purple-500/30">
-                                Projection 24h & Nuit
-                            </span>
-                        </div>
-                        <p class="text-[10px] text-slate-400 m-0 mb-2.5">
-                            Besoin énergétique de la journée et température estimée demain matin au lever
-                        </p>
+                    <div class="flex items-center justify-between mb-2.5 pb-1.5 border-b border-slate-800">
+                        <span class="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-1.5">
+                            <span>📊</span> Bilan passif sur 24h
+                        </span>
                     </div>
 
                     <!-- Les 2 indicateurs synthétiques majeurs (sans courbe complexe) -->
