@@ -1085,11 +1085,33 @@ function calculateDifferentialVentilation(zoneConfig, roomData, envData) {
     const verresTxt = `~${nbVerres} verre${nbVerres > 1 ? 's' : ''} d'eau`;
 
     const isWetRoom = Array.isArray(zoneConfig?.usages) && (zoneConfig.usages.includes('kitchen') || zoneConfig.usages.includes('bath'));
-    const winType = zoneConfig?.windows?.find(w => w.vent && w.vent !== 'fixe' && w.vent !== 'fixed')?.vent || 'battante';
-    const isOscillo = (winType === 'oscillante' || winType === 'oscillo_battante' || winType === 'partial');
-    const optimalDurationMin = isOscillo ? 12 : 6;
     const canOpenWin = hasOpenableWindows(zoneConfig);
     const hasVmc = zoneConfig?.equipment?.vmcSystem === 'marche_forcee' || zoneConfig?.equipment?.vmcSystem === 'trappe';
+
+    // Calcul physique EN 16798-7 (Phaff & De Gids) du débit réel d'ouverture des fenêtres de la pièce (tirage thermique ΔT + vent)
+    let effOpenAreaM2 = 0;
+    if (Array.isArray(zoneConfig?.windows) && zoneConfig.windows.length > 0) {
+        zoneConfig.windows.forEach(w => {
+            if (!w || !w.vent) return;
+            const v = String(w.vent).toLowerCase().trim();
+            const wArea = parseFloat(w.area) || 1.5;
+            if (v === 'total' || v === 'battante') {
+                effOpenAreaM2 += wArea * 0.85;
+            } else if (v === 'partial' || v === 'oscillo_battante' || v === 'oscillante' || v === 'coulissante') {
+                effOpenAreaM2 += wArea * 0.28;
+            }
+        });
+    }
+    if (effOpenAreaM2 <= 0) effOpenAreaM2 = 1.1;
+
+    const deltaTStack = Math.max(0.8, Math.abs(ta - tExt));
+    const windVelMs = Math.max(0.5, ((envData && typeof envData.wind_speed === 'number') ? envData.wind_speed : (typeof outdoorWind === 'number' ? outdoorWind : 10)) / 3.6);
+    const hWin = 1.25; // Hauteur moyenne d'ouvrant (m)
+    // Vitesse effective de renouvellement par ouverture simple face : v_eff = sqrt(0.0035 * H * ΔT + 0.001 * v_wind² + 0.01)
+    const vEffFlow = Math.sqrt((0.0035 * hWin * deltaTStack) + (0.001 * windVelMs * windVelMs) + 0.01);
+    const qWindowM3h = Math.max(60, 3600 * 0.5 * effOpenAreaM2 * vEffFlow);
+    // Temps exact (en minutes) pour renouveler 1 volume complet de la pièce sans refroidir la masse des parois
+    const optimalDurationMin = Math.min(20, Math.max(3, Math.round((volume / qWindowM3h) * 60)));
 
     let status = 'comfort'; // 'urgent_dry', 'recommended_dry', 'blocked_humid', 'comfort', 'dry_air'
     let canVentilate = false;
@@ -1171,6 +1193,8 @@ function calculateDifferentialVentilation(zoneConfig, roomData, envData) {
         verresTxt,
         glassesOfWater: nbVerres,
         optimalDurationMin,
+        qWindowM3h: Math.round(qWindowM3h),
+        effOpenAreaM2: parseFloat(effOpenAreaM2.toFixed(2)),
         status,
         canVentilate,
         title,
@@ -4264,7 +4288,7 @@ window.SolsticeEngine = {
     calculateHabitatHarmonyScore: typeof calculateHabitatHarmonyScore !== 'undefined' ? calculateHabitatHarmonyScore : (typeof calculateHabitatAccordageScore !== 'undefined' ? calculateHabitatAccordageScore : null),
     hasOpenableWindows: typeof hasOpenableWindows !== 'undefined' ? hasOpenableWindows : null,
 
-    evaluateSimulatedPMV(baseState, checkedActionKeys, envData) {
+    evaluateSimulatedPMV(baseState, checkedActionKeys, envData, zoneConfigOpt = null) {
         let simTa = baseState.ta;
         let simTr = baseState.tr;
         let simVel = baseState.vel;
@@ -4272,68 +4296,164 @@ window.SolsticeEngine = {
         let simClo = baseState.clo;
         const rf = (baseState.reactivityFactor !== undefined && !isNaN(baseState.reactivityFactor)) ? baseState.reactivityFactor : 1.0;
         const tExt = (envData && typeof envData.t_ext === 'number') ? envData.t_ext : 12;
+        const rhExt = (envData && typeof envData.rh_ext === 'number') ? envData.rh_ext : 60;
         const isColdSituation = (baseState.ta < 21.5 && tExt < baseState.ta);
 
-        // 1. Volets / Rideaux : distinction stricte entre protection solaire d'été et bouclier thermique d'hiver
+        const zCfg = zoneConfigOpt || baseState.zoneConfig || null;
+        const p2r2c = (zCfg && this.calculateZone2R2CParams) ? this.calculateZone2R2CParams(zCfg) : null;
+        const area = parseFloat(zCfg?.area) || 15;
+        const height = parseFloat(zCfg?.height) || 2.5;
+        const volume = area * height;
+        const totalEnvArea = Math.max(25, (2 * area) + (4 * Math.sqrt(area) * height));
+        const hCi = (p2r2c && p2r2c.hCi > 0) ? p2r2c.hCi : (volume * 3.0);
+        const hRapide = (p2r2c && p2r2c.hRapide > 0) ? p2r2c.hRapide : (volume * 0.38);
+        const hOpaque = (p2r2c && p2r2c.hOpaque > 0) ? p2r2c.hOpaque : (volume * 0.35);
+        const cMassWh = (p2r2c && p2r2c.cMassWhPerK > 0) ? p2r2c.cMassWhPerK : (area * 45);
+
+        const glassUMap = { single: 5.7, double_old: 2.8, double_standard: 1.5, double_recent: 1.2, triple: 0.7 };
+        const shutterDeltaRMap = {
+            roulant_pvc: 0.22,
+            battant_bois: 0.20,
+            roulant_metal: 0.15,
+            persienne: 0.12,
+            store_banne: 0.08,
+            rideau_interieur: 0.09,
+            store_interieur: 0.07
+        };
+
+        let deltaHShutters = 0;
+        let sumWinAreaDeltaTsurf = 0;
+        const deltaTInOut = Math.max(1.5, baseState.ta - tExt);
+
+        if (Array.isArray(zCfg?.windows) && zCfg.windows.length > 0) {
+            zCfg.windows.forEach(w => {
+                const wA = parseFloat(w.area) || 0;
+                if (wA <= 0) return;
+                const uW = glassUMap[w.glass] || 1.5;
+                const dR = shutterDeltaRMap[w.shutter] || (w.shutter && w.shutter !== 'aucun' ? 0.15 : 0.12);
+                const uClosed = 1 / ((1 / uW) + dR);
+                const dU = Math.max(0.12, uW - uClosed);
+                deltaHShutters += (wA * dU);
+                // Hausse physique de température de surface intérieure du vitrage (h_int = 7.7 W/m²K selon ISO 6946)
+                const dTsurf = (dU / 7.7) * deltaTInOut;
+                sumWinAreaDeltaTsurf += (wA * dTsurf);
+            });
+        } else {
+            const fallbackWinArea = area * 0.16;
+            deltaHShutters = fallbackWinArea * 0.35;
+            sumWinAreaDeltaTsurf = fallbackWinArea * ((0.35 / 7.7) * deltaTInOut);
+        }
+
+        // 1. Volets / Rideaux : calcul physique 2R2C & ISO 6946 à partir des vrais vitrages et fermetures de la pièce
         if (checkedActionKeys.includes('shutter_close_night') || checkedActionKeys.includes('thermal_curtain')) {
-            simTr += 0.45 * rf;
-            simTa += 0.15 * rf;
+            const dTaNight = Math.min(1.2, Math.max(0.06, (deltaHShutters * deltaTInOut) / Math.max(40, (hCi * 0.35) + hRapide)));
+            const dTmrViewFactor = sumWinAreaDeltaTsurf / totalEnvArea;
+            const dTmrNight = Math.min(1.8, Math.max(0.12, (dTmrViewFactor * 2.8) + (0.65 * dTaNight)));
+            simTr += dTmrNight * rf;
+            simTa += dTaNight * rf;
+        }
+
+        // 2. Apports solaires réels de la pièce (Hiver : ouverture volets sun_heat | Été : fermeture volets shutter_close)
+        let solObj = { totalW: area * 22, airW: area * 4, massW: area * 18 };
+        if (zCfg && this.calculateWindowSolarGainW) {
+            const calcSol = this.calculateWindowSolarGainW(zCfg, true, 0.80);
+            if (calcSol && calcSol.totalW > 30) solObj = calcSol;
+        }
+        const dTmrSolar = Math.min(2.2, Math.max(0.18, (solObj.massW / Math.max(120, (cMassWh * 0.25) + hOpaque)) + (solObj.totalW / (7.7 * totalEnvArea))));
+        const dTaSolar = Math.min(1.6, Math.max(0.10, (solObj.airW + (hCi * 0.30 * dTmrSolar)) / Math.max(45, (hCi * 0.30) + hRapide)));
+
+        if (checkedActionKeys.includes('sun_heat')) {
+            simTr += dTmrSolar * rf;
+            simTa += dTaSolar * rf;
         }
         if (checkedActionKeys.includes('shutter_close') || checkedActionKeys.includes('anticipate_sun')) {
             if (isColdSituation) {
-                simTr += 0.40 * rf;
-                simTa += 0.15 * rf;
+                const dTaCold = Math.min(1.0, Math.max(0.05, (deltaHShutters * deltaTInOut) / Math.max(40, (hCi * 0.35) + hRapide)));
+                const dTmrCold = Math.min(1.5, Math.max(0.10, ((sumWinAreaDeltaTsurf / totalEnvArea) * 2.5) + (0.5 * dTaCold)));
+                simTr += dTmrCold * rf;
+                simTa += dTaCold * rf;
             } else {
-                simTr -= 0.60 * rf;
-                simTa -= 0.20 * rf;
+                simTr -= dTmrSolar * rf;
+                simTa -= dTaSolar * rf;
             }
         }
-        // 2. Surventilation / Free-cooling
+
+        // 3. Surventilation / Free-cooling (dépend du débit réel des ouvrants de la pièce et de l'écart Ta - Text)
         if (checkedActionKeys.includes('free_cooling')) {
-            simTa = Math.max(tExt, simTa - 0.55 * rf);
-            simTr -= 0.40 * rf;
+            const ventInfo = (zCfg && this.calculateDifferentialVentilation)
+                ? this.calculateDifferentialVentilation(zCfg, { ta: baseState.ta, rh: baseState.rh }, envData)
+                : { qWindowM3h: 220 };
+            const qWin = ventInfo.qWindowM3h || 220;
+            const hFreeCool = 0.34 * qWin;
+            const coolFrac = hFreeCool / (hFreeCool + hCi + hRapide);
+            const dTaCool = Math.min(2.5, Math.max(0.20, Math.max(0.5, baseState.ta - tExt) * coolFrac * 1.35));
+            simTa = Math.max(tExt, simTa - (dTaCool * rf));
+            simTr -= (dTaCool * 0.65 * rf);
         }
-        // 3. Brasseur d'air (Été : rafraîchissement convectif | Hiver : destratification sous plafond haut)
+
+        // 4. Brasseur d'air (Été : vitesse d'air selon équipement | Hiver : gradient réel de stratification sous plafond haut)
         if (checkedActionKeys.includes('fan_on')) {
-            simVel += 0.25 * rf;
+            const fanType = zCfg?.equipment?.fanSystem || 'mobile';
+            const dVel = (fanType === 'plafond') ? 0.35 : 0.25;
+            simVel += dVel * rf;
         }
         if (checkedActionKeys.includes('fan_destrat')) {
-            simTa += 0.45 * rf;
-            simTr += 0.20 * rf;
+            const emitter = zCfg?.equipment?.heating?.system || 'convection';
+            const gammaMap = { convection: 0.85, radiator_steel: 0.55, radiator_cast: 0.40, floor: 0.18, none: 0.45 };
+            const gamma = gammaMap[emitter] || 0.55;
+            const dTaStrat = Math.min(1.4, Math.max(0.20, 0.55 * gamma * Math.max(0.6, height - 1.4)));
+            simTa += dTaStrat * rf;
+            simTr += (dTaStrat * 0.45) * rf;
         }
-        // 4. Purge humidité (aération flash ou VMC) & réduction VMC en air sec froid
+
+        // 5. Purge humidité (aération flash ou VMC) : bilan de masse exact de vapeur d'eau (Magnus-Tetens) entre air int. et air ext.
         if (checkedActionKeys.includes('vmc_boost') || checkedActionKeys.includes('open_win_humidity')) {
-            simRh = Math.max(45, simRh - 6 * rf);
-            if (isColdSituation) simTr += 0.10 * rf;
+            const ahIn = this.calculateAbsoluteHumidity ? this.calculateAbsoluteHumidity(baseState.ta, baseState.rh) : 10;
+            const ahOut = this.calculateAbsoluteHumidity ? this.calculateAbsoluteHumidity(tExt, rhExt) : 7;
+            const exchangeEff = checkedActionKeys.includes('open_win_humidity') ? 0.65 : 0.42;
+            const ahAfter = (ahOut < ahIn) ? (ahIn - ((ahIn - ahOut) * exchangeEff * rf)) : (ahIn * 0.92);
+            const pSatTa = 6.112 * Math.exp((17.67 * baseState.ta) / (baseState.ta + 243.5));
+            const pvAfter = (ahAfter * (baseState.ta + 273.15)) / 216.7;
+            const rhAfter = Math.max(38, Math.min(baseState.rh - 2, Math.round((pvAfter / pSatTa) * 100)));
+            simRh = rhAfter;
+            if (isColdSituation) simTr += 0.12 * rf;
         }
         if (checkedActionKeys.includes('vmc_reduce_cold')) {
-            simTa += 0.25 * rf;
-            simRh = Math.min(50, simRh + 4 * rf);
+            const qVmcSavedW = (p2r2c && p2r2c.hVentilation > 0) ? (p2r2c.hVentilation * 0.45 * deltaTInOut) : (0.34 * volume * 0.35 * deltaTInOut);
+            const dTaVmc = Math.min(0.8, Math.max(0.12, qVmcSavedW / Math.max(35, (hCi * 0.3) + hRapide)));
+            simTa += dTaVmc * rf;
+            simRh = Math.min(52, simRh + (5 * rf));
         }
-        // 5. Apports solaires gratuits (court terme et pré-charge 48h)
-        if (checkedActionKeys.includes('sun_heat')) {
-            simTr += 0.65 * rf;
-            simTa += 0.25 * rf;
-        }
-        // 6. Actionnables de confort & sobriété (Tenue Clo, Thermostat/Robinet, Plancher, Climatisation)
+
+        // 6. Ajustement vestimentaire exact (résolution Fanger pour ramener le PMV vers 0.00 dans cette pièce)
+        const basePmvNow = this.calculatePMV(baseState.ta, baseState.tr, baseState.vel, baseState.rh, baseState.met, baseState.clo);
         if (checkedActionKeys.includes('clothing_adjust_warm')) {
-            simClo += 0.25 * rf;
+            const neededDeltaClo = Math.min(0.45, Math.max(0.15, Math.abs(basePmvNow) * 0.55));
+            simClo += neededDeltaClo * rf;
         }
         if (checkedActionKeys.includes('clothing_adjust_cool')) {
-            simClo = Math.max(0.3, simClo - 0.20 * rf);
+            const neededRemoveClo = Math.min(0.35, Math.max(0.15, Math.abs(basePmvNow) * 0.50));
+            simClo = Math.max(0.30, simClo - (neededRemoveClo * rf));
         }
+
+        // 7. Appoint ciblé thermostat / plancher chauffant : hausse thermique requise pour ramener le PMV de la pièce vers le confort (-0.20)
         if (checkedActionKeys.includes('heating_boost_comfort') || checkedActionKeys.includes('floor_inertia')) {
-            simTa += 0.60 * rf;
-            simTr += 0.35 * rf;
+            const deficitPmv = Math.max(0.25, (-0.15) - basePmvNow);
+            const neededDeltaTop = Math.min(1.5, Math.max(0.45, deficitPmv * 2.1));
+            const emitter = zCfg?.equipment?.heating?.system || 'convection';
+            const radShare = (emitter === 'floor') ? 0.55 : (emitter === 'radiator_cast' ? 0.45 : 0.32);
+            simTa += (neededDeltaTop * (1.0 + (0.3 - radShare))) * rf;
+            simTr += (neededDeltaTop * (0.7 + radShare)) * rf;
         }
         if (checkedActionKeys.includes('heating_cut')) {
-            if (baseState.ta > 21.0) {
-                simTa -= 0.45 * rf;
+            if (baseState.ta > 20.5 || basePmvNow > 0.20) {
+                const excessT = Math.min(1.2, Math.max(0.3, (baseState.ta - 20.0) * 0.5));
+                simTa -= excessT * rf;
             }
         }
         if (checkedActionKeys.includes('cooling_setpoint_eco')) {
-            if (baseState.ta < 24.5) {
-                simTa += 0.35 * rf;
+            if (baseState.ta < 25.0) {
+                simTa += Math.min(0.8, Math.max(0.25, (25.5 - baseState.ta) * 0.35)) * rf;
             }
         }
 

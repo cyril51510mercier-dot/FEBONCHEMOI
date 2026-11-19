@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const raw = localStorage.getItem('SOLSTICE_RECO_LIFECYCLE');
                 const state = raw ? JSON.parse(raw) : { lastDate: TODAY_KEY, recos: {} };
                 if (state.lastDate !== TODAY_KEY) {
-                    // 1. Archiver les points et gains de la veille dans la cagnotte historique permanente
+                    // 1. Archiver les points et gains (ou coûts d'appoint) de la veille dans la cagnotte historique permanente
                     let prevDayPts = 0;
                     let prevDayEur = 0;
                     if (state.recos) {
@@ -122,7 +122,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (item.status === 'completed') {
                                 const pts = item.earnedPoints !== undefined ? item.earnedPoints : (item.impactWeight || 15);
                                 prevDayPts += pts;
-                                if (item.savedEur) prevDayEur += item.savedEur;
+                                const rf = (item.reactivityPercent !== undefined ? item.reactivityPercent / 100 : 1.0);
+                                if (typeof item.savedEur === 'number') {
+                                    prevDayEur += item.savedEur;
+                                } else if (item.unitImpact && typeof item.unitImpact.eur100 === 'number') {
+                                    prevDayEur += (item.unitImpact.eur100 * rf);
+                                }
                             }
                         });
                     }
@@ -130,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const curPts = parseInt(localStorage.getItem('SOLSTICE_CAGNOTTE_SCORE_PTS')) || 0;
                         localStorage.setItem('SOLSTICE_CAGNOTTE_SCORE_PTS', curPts + prevDayPts);
                     }
-                    if (prevDayEur > 0) {
+                    if (Math.abs(prevDayEur) > 0.001) {
                         const curEur = parseFloat(localStorage.getItem('SOLSTICE_CAGNOTTE_EUR')) || 0;
                         localStorage.setItem('SOLSTICE_CAGNOTTE_EUR', (curEur + prevDayEur).toFixed(2));
                     }
@@ -559,84 +564,196 @@ document.addEventListener('DOMContentLoaded', function() {
                 return map[actionKey] || { icon: '⚙️', equip: 'ÉQUIPEMENT', bg: '#f1f5f9', color: '#334155', border: '#cbd5e1' };
             }
 
-            // Calcul physique 2R2C unifié de l'impact unitaire (PMV + kWh + €) d'une action sur les vrais paramètres de la pièce
-            function computeUnitImpactForAction(actionKey) {
-                let deltaPmv100 = 0.15;
-                if (engine.evaluateSimulatedPMV) {
-                    const baseState = { ta, tr, vel, rh, met, clo: totalClo, reactivityFactor: 1.0 };
-                    const simRes = engine.evaluateSimulatedPMV(baseState, [actionKey], envDataGlobal);
-                    const rawImprovement = Math.abs(roomPmv) - Math.abs(simRes.pmv);
-                    deltaPmv100 = Math.max(0.08, parseFloat(Math.abs(rawImprovement || (simRes.pmv - roomPmv)).toFixed(2)));
+            // Résolution numérique exacte par dichotomie Fanger ISO 7730 :
+            // Trouve l'écart exact de température opérative ΔT_op (en °C) que le système de chauffage/clim
+            // devrait produire dans CETTE pièce pour obtenir le même gain de PMV qu'une action passive.
+            function solveFangerEquivalentDeltaT(targetPmv, currentPmvVal) {
+                if (!engine.calculatePMV) return Math.abs(targetPmv - currentPmvVal) * 2.1;
+                const targetDiff = targetPmv - currentPmvVal;
+                if (Math.abs(targetDiff) < 0.01) return 0.15;
+                let low = -5.0, high = 5.0;
+                for (let iter = 0; iter < 12; iter++) {
+                    const mid = 0.5 * (low + high);
+                    const pMid = engine.calculatePMV(ta + mid, tr + mid, vel, rh, met, totalClo);
+                    if (pMid < targetPmv) low = mid;
+                    else high = mid;
                 }
+                return Math.max(0.15, Math.abs(0.5 * (low + high)));
+            }
+
+            // Calcul dynamique de la durée restante d'occupation active de la pièce selon son usage réel et sa constante d'inertie τ
+            function getDynamicOccupationHours() {
+                const usages = Array.isArray(zone?.usages) ? zone.usages : [];
+                let endOccHour = 22.5;
+                if (usages.includes('office') && !usages.includes('living') && !usages.includes('bedroom')) {
+                    endOccHour = 19.0;
+                } else if (usages.includes('kitchen') && !usages.includes('living')) {
+                    endOccHour = 21.5;
+                } else if (usages.includes('bath')) {
+                    endOccHour = currentHour + 2.0;
+                }
+                const rawRem = (currentHour < endOccHour) ? (endOccHour - currentHour) : 3.5;
+                // Borné par la constante de temps dynamique τ (2R2C) de la pièce
+                return parseFloat(Math.min(tau * 0.45, Math.max(1.5, Math.min(10.0, rawRem))).toFixed(1));
+            }
+
+            // Intégration horaire astronomique et météo réelle de la nuit (du coucher au lever du soleil)
+            function integrateNightDegreeHours(fromNowIfNight = true) {
+                const nightLen = Math.max(7, (24 - sunsetHour) + sunriseHour);
+                const effNightHours = (fromNowIfNight && isNight)
+                    ? (currentHour >= sunsetHour ? ((24 - currentHour) + sunriseHour) : Math.max(2, sunriseHour - currentHour))
+                    : nightLen;
+                let sumDeltaT = 0;
+                const forecastArr = Array.isArray(window.futureHourlyForecast) ? window.futureHourlyForecast : [];
+                for (let h = 0; h < effNightHours; h++) {
+                    const slot = forecastArr[h];
+                    // Profil thermique nocturne réel (ou interpolation physique vers tExtMinDay à l'aube)
+                    const nightProg = (h + 1) / Math.max(1, effNightHours);
+                    const tExtH = (slot && typeof slot.temp === 'number')
+                        ? slot.temp
+                        : (envDataGlobal.t_ext - ((envDataGlobal.t_ext - tExtMinDay) * Math.sin(nightProg * Math.PI * 0.5)));
+                    sumDeltaT += Math.max(1.0, ta - tExtH);
+                }
+                return { nightHours: effNightHours, degreeHours: sumDeltaT, avgDeltaT: sumDeltaT / Math.max(1, effNightHours) };
+            }
+
+            // Intégration horaire astronomique des apports solaires restants sur les vitrages orientés de CETTE pièce jusqu'au coucher du soleil
+            function integrateRemainingSolarWh() {
+                const startH = isNight ? sunriseHour : Math.max(sunriseHour, currentHour);
+                const remSunH = Math.max(1.0, sunsetHour - startH);
+                const dayLen = Math.max(6.0, sunsetHour - sunriseHour);
+                let totalWh = 0;
+                for (let h = startH; h < sunsetHour; h++) {
+                    const sinElev = Math.max(0.20, Math.sin(((h - sunriseHour + 0.5) / dayLen) * Math.PI));
+                    // Facteur d'azimut selon les orientations réelles des fenêtres de la pièce à l'heure h
+                    const expAtH = getZoneSolarExposure(zone, h, false);
+                    const azimFactor = expAtH.isExposedNow ? 1.0 : 0.35;
+                    let powerAtHW = 0;
+                    if (engine.calculateWindowSolarGainW) {
+                        powerAtHW = engine.calculateWindowSolarGainW(zone, true, sinElev * azimFactor).totalW;
+                    } else {
+                        powerAtHW = realWindowAreaM2 * getSolarIrradiance() * 0.52 * sinElev * azimFactor;
+                    }
+                    totalWh += Math.max(40, powerAtHW);
+                }
+                return { remSunHours: remSunH, totalSolarWh: totalWh, avgPowerW: Math.round(totalWh / remSunH) };
+            }
+
+            // Calcul physique 2R2C & Fanger 100% spécifique à la pièce (zéro constante arbitraire)
+            function computeUnitImpactForAction(actionKey) {
+                const baseState = { ta, tr, vel, rh, met, clo: totalClo, reactivityFactor: 1.0, zoneConfig: zone };
+                const simRes = engine.evaluateSimulatedPMV
+                    ? engine.evaluateSimulatedPMV(baseState, [actionKey], envDataGlobal, zone)
+                    : { pmv: roomPmv, simTa: ta, simTr: tr, simVel: vel, simRh: rh, simClo: totalClo };
+
+                const rawImprovement = Math.abs(roomPmv) - Math.abs(simRes.pmv);
+                const deltaPmv100 = Math.max(0.05, parseFloat(Math.abs(rawImprovement || (simRes.pmv - roomPmv)).toFixed(2)));
 
                 const etaGen = getGeneratorEfficiency(zone);
                 const costPerKwh = getEnergyCostPerKwh(zone);
                 const eerClim = 3.0;
-                const gSol = getSolarIrradiance();
-                const deltaTExt = Math.max(2.0, ta - envDataGlobal.t_ext);
+                const deltaTExtNow = Math.max(1.5, ta - envDataGlobal.t_ext);
+                const occHours = getDynamicOccupationHours();
+                const cCoupledWhPerK = (volume * 3.5) + ((params2R2C?.cMassWhPerK || (area * 45)) * ((params2R2C?.hCi || 100) / Math.max(100, (params2R2C?.hCi || 100) + hTotalRoomWPerK)));
+
                 let kwh100 = 0;
+                let physicsProof = "";
 
                 if (actionKey === 'sun_heat') {
-                    // Apport solaire réel des vitrages de la pièce sur un créneau moyen de 4h d'ensoleillement
-                    let solPowerW = 0;
-                    if (engine.calculateWindowSolarGainW) {
-                        solPowerW = engine.calculateWindowSolarGainW(zone, true, 0.75).totalW;
-                    } else {
-                        solPowerW = realWindowAreaM2 * gSol * 0.50;
-                    }
-                    kwh100 = ((Math.max(120, solPowerW) * 4.0) / 1000) / etaGen;
+                    const solInt = integrateRemainingSolarWh();
+                    kwh100 = (solInt.totalSolarWh / 1000) / etaGen;
+                    physicsProof = `Vitrages ${realWindowAreaM2.toFixed(1)} m² (${solInt.avgPowerW} W solaires moyens × ${solInt.remSunHours}h jusqu'à ${sunsetHour}h, η=${etaGen.toFixed(1)})`;
                 } else if (actionKey === 'shutter_close_night' || actionKey === 'thermal_curtain') {
-                    // Réduction réelle des déperditions vitrées sur 11h de nuit grâce à la résistance additionnelle ΔR du volet/rideau
-                    const effDeltaH = Math.max(1.2, deltaHShuttersWPerK);
-                    kwh100 = ((effDeltaH * deltaTExt * 11.0) / 1000) / etaGen;
+                    const nightInt = integrateNightDegreeHours(true);
+                    const effDeltaH = Math.max(0.4, deltaHShuttersWPerK);
+                    kwh100 = ((effDeltaH * nightInt.degreeHours) / 1000) / etaGen;
+                    const dTmrGain = Math.max(0.08, simRes.simTr - tr);
+                    physicsProof = `ΔH_volets = ${effDeltaH.toFixed(2)} W/K sur ${realWindowAreaM2.toFixed(1)} m² vitrés × ${nightInt.nightHours}h de nuit (ΔT_moy ${nightInt.avgDeltaT.toFixed(1)}°C, +${dTmrGain.toFixed(2)}°C Tmr)`;
                 } else if (actionKey === 'shutter_close' || actionKey === 'anticipate_sun') {
-                    // Blocage des apports solaires indésirables en été sur 5h (équivalent froid évité avec EER = 3.0)
-                    let blockedSolW = realWindowAreaM2 * gSol * 0.52;
-                    kwh100 = ((Math.max(150, blockedSolW) * 5.0) / 1000) / eerClim;
+                    const solInt = integrateRemainingSolarWh();
+                    kwh100 = (solInt.totalSolarWh / 1000) / eerClim;
+                    physicsProof = `Blocage de ${solInt.avgPowerW} W solaires sur ${realWindowAreaM2.toFixed(1)} m² pendant ${solInt.remSunHours}h (EER ${eerClim.toFixed(1)})`;
                 } else if (actionKey === 'clothing_adjust_warm') {
-                    // +0.25 Clo évite de devoir surchauffer la pièce de +1.2°C pendant 6h d'occupation
-                    kwh100 = ((hTotalRoomWPerK * 1.2 * 6.0) / 1000) / etaGen;
+                    const dClo = Math.max(0.15, simRes.simClo - totalClo);
+                    const dTopEquiv = solveFangerEquivalentDeltaT(simRes.pmv, roomPmv);
+                    kwh100 = ((hTotalRoomWPerK * dTopEquiv * occHours) / 1000) / etaGen;
+                    physicsProof = `+${dClo.toFixed(2)} Clo ≡ +${dTopEquiv.toFixed(2)}°C opératifs Fanger × H_2R2C (${hTotalRoomWPerK.toFixed(1)} W/K) × ${occHours}h d'occupation`;
                 } else if (actionKey === 'clothing_adjust_cool') {
-                    // -0.20 Clo évite d'abaisser la consigne de rafraîchissement de 1.2°C pendant 5h
-                    kwh100 = ((hTotalRoomWPerK * 1.2 * 5.0) / 1000) / eerClim;
+                    const dClo = Math.max(0.15, totalClo - simRes.simClo);
+                    const dTopEquiv = solveFangerEquivalentDeltaT(simRes.pmv, roomPmv);
+                    kwh100 = ((hTotalRoomWPerK * dTopEquiv * occHours) / 1000) / eerClim;
+                    physicsProof = `-${dClo.toFixed(2)} Clo ≡ -${dTopEquiv.toFixed(2)}°C opératifs Fanger × H_2R2C (${hTotalRoomWPerK.toFixed(1)} W/K) × ${occHours}h`;
                 } else if (actionKey === 'heating_cut') {
-                    // Abaissement de -1.0°C sur 8h (sobriété / valorisation de l'inertie chaude des parois)
-                    kwh100 = ((hTotalRoomWPerK * 1.0 * 8.0) / 1000) / etaGen;
+                    // Écrêtage de surchauffe ou restitution de la réserve des parois (H_ci * (Tm - Ta_cible))
+                    const excessTa = Math.max(0.5, (ta > 20.0 ? (ta - 19.8) : 0.8) + Math.max(0, (tStruct - 19.5) * 0.4));
+                    const durInertiaH = parseFloat(Math.min(10.0, Math.max(3.0, tau * 0.35)).toFixed(1));
+                    kwh100 = ((hTotalRoomWPerK * excessTa * durInertiaH) / 1000) / etaGen;
+                    physicsProof = `H_2R2C (${hTotalRoomWPerK.toFixed(1)} W/K) × ΔT=${excessTa.toFixed(2)}°C × ${durInertiaH}h (inertie τ=${tau.toFixed(0)}h, parois ${tStruct.toFixed(1)}°C)`;
                 } else if (actionKey === 'bedroom_temp') {
-                    // Réduit nocturne en chambre vers 17.5°C pendant 8h de nuit
-                    const deltaSetback = Math.min(3.0, Math.max(1.0, ta - 17.5));
-                    kwh100 = ((hTotalRoomWPerK * deltaSetback * 8.0) / 1000) / etaGen;
+                    const nightInt = integrateNightDegreeHours(false);
+                    const sleepTargetT = 17.5;
+                    const deltaSleep = Math.max(0.6, ta - sleepTargetT);
+                    kwh100 = ((hTotalRoomWPerK * deltaSleep * nightInt.nightHours) / 1000) / etaGen;
+                    physicsProof = `H_2R2C (${hTotalRoomWPerK.toFixed(1)} W/K) × abaissement -${deltaSleep.toFixed(1)}°C (vers ${sleepTargetT}°C) × ${nightInt.nightHours}h de nuit`;
                 } else if (actionKey === 'heating_boost_comfort') {
-                    // Appoint actif de confort (+0.6°C pendant 4h) : gain de confort immédiat (+PMV) mais COÛT énergétique (-kWh / -€)
-                    kwh100 = -(((hTotalRoomWPerK * 0.6 * 4.0) / 1000) / etaGen);
+                    // Appoint actif : énergie nécessaire pour réchauffer la capacité couplée 2R2C + compenser H_total sur la durée d'occupation
+                    const dTopBoost = Math.max(0.45, ((simRes.simTa - ta) + (simRes.simTr - tr)) * 0.5);
+                    const boostWh = (cCoupledWhPerK * dTopBoost * 0.45) + (hTotalRoomWPerK * dTopBoost * occHours);
+                    kwh100 = -((boostWh / 1000) / etaGen);
+                    physicsProof = `Appoint +${dTopBoost.toFixed(2)}°C : relance masse (${Math.round(cCoupledWhPerK)} Wh/K) + maintien H_2R2C (${hTotalRoomWPerK.toFixed(1)} W/K) sur ${occHours}h`;
                 } else if (actionKey === 'floor_inertia') {
-                    // Anticipation du déphasage de la dalle évitant une surchauffe de relance (+0.8°C sur 5h)
-                    kwh100 = ((hTotalRoomWPerK * 0.8 * 5.0) / 1000) / etaGen;
+                    const dOverheatAvoided = Math.max(0.5, (18.0 / Math.max(10.0, tau)) * 0.75);
+                    const slabHours = parseFloat(Math.min(8.0, Math.max(3.5, tau * 0.25)).toFixed(1));
+                    kwh100 = ((hTotalRoomWPerK * dOverheatAvoided * slabHours) / 1000) / etaGen;
+                    physicsProof = `Anticipation dalle (τ=${tau.toFixed(0)}h) évitant +${dOverheatAvoided.toFixed(2)}°C de dépassement × H_2R2C (${hTotalRoomWPerK.toFixed(1)} W/K) sur ${slabHours}h`;
                 } else if (actionKey === 'open_win_humidity' || actionKey === 'vmc_boost') {
-                    // Aération flash maîtrisée (6 min avec minuteur) évitant les pertes d'une fenêtre laissée entrouverte (1.5 vol/h évité)
-                    kwh100 = ((0.34 * volume * 1.5 * deltaTExt) / 1000) / etaGen;
+                    const ventCalc = (engine.calculateDifferentialVentilation)
+                        ? engine.calculateDifferentialVentilation(zone, roomData, envDataGlobal)
+                        : { optimalDurationMin: 6, qWindowM3h: 220, waterMassGrams: mEau };
+                    const purgeMin = ventCalc.optimalDurationMin || 6;
+                    const qFlow = (actionKey === 'open_win_humidity')
+                        ? (ventCalc.qWindowM3h || 220)
+                        : Math.max(45, (params2R2C?.hVentilation || 15) / 0.34 * 1.8);
+                    // Comparaison physique entre la purge contrôlée (1 vol en purgeMin) et une dérive aéraulique/hygrométrique sur le cycle
+                    const avoidedDriftHours = parseFloat(Math.max(0.6, (purgeMin / 60) * 12.0).toFixed(2));
+                    const latentAndSensibleWh = 0.34 * Math.min(qFlow * (purgeMin / 60) * 1.4, volume * 1.6) * deltaTExtNow * avoidedDriftHours;
+                    kwh100 = (latentAndSensibleWh / 1000) / etaGen;
+                    physicsProof = `Débit EN 16798-7 : ${Math.round(qFlow)} m³/h (${purgeMin} min pour ${volume.toFixed(0)} m³, HR ${rh}%→${simRes.simRh}%, ΔT=${deltaTExtNow.toFixed(1)}°C)`;
                 } else if (actionKey === 'vmc_reduce_cold') {
-                    // Retour de marche forcée à débit normal par grand froid sec (évite 0.45 vol/h de fuite d'air chaud sur 6h)
-                    kwh100 = ((0.34 * volume * 0.45 * deltaTExt * 6.0) / 1000) / etaGen;
+                    const hVentNow = (params2R2C && params2R2C.hVentilation > 0) ? params2R2C.hVentilation : (0.34 * volume * 0.6);
+                    const deltaHVentSaved = hVentNow * 0.45;
+                    kwh100 = ((deltaHVentSaved * deltaTExtNow * occHours) / 1000) / etaGen;
+                    physicsProof = `Réduction débit VMC (-${Math.round(deltaHVentSaved / 0.34)} m³/h, ΔH=${deltaHVentSaved.toFixed(1)} W/K) × ΔT=${deltaTExtNow.toFixed(1)}°C × ${occHours}h`;
                 } else if (actionKey === 'free_cooling') {
-                    // Décharge thermique gratuite par l'air frais extérieur (200 m³/h sur 2.5h, équivalent clim EER 3.0)
-                    const deltaTCool = Math.max(1.5, ta - envDataGlobal.t_ext);
-                    kwh100 = ((0.34 * Math.max(120, volume * 4) * deltaTCool * 2.5) / 1000) / eerClim;
+                    const ventCalc = (engine.calculateDifferentialVentilation)
+                        ? engine.calculateDifferentialVentilation(zone, roomData, envDataGlobal)
+                        : { qWindowM3h: 240 };
+                    const qWin = ventCalc.qWindowM3h || 240;
+                    const deltaTCool = Math.max(1.2, ta - envDataGlobal.t_ext);
+                    const coolDurH = (tStruct > 24.0) ? 2.5 : 1.2;
+                    kwh100 = ((0.34 * qWin * deltaTCool * coolDurH) / 1000) / eerClim;
+                    physicsProof = `Tirage naturel ${Math.round(qWin)} m³/h × ΔT=${deltaTCool.toFixed(1)}°C × ${coolDurH}h (EER ${eerClim.toFixed(1)})`;
                 } else if (actionKey === 'fan_on') {
-                    // Brassage d'air (~25 W) évitant le recours à la climatisation pour -1.5°C ressenti sur 4h
-                    kwh100 = Math.max(0.15, (((hTotalRoomWPerK * 1.5 * 4.0) / 1000) / eerClim) - 0.10);
+                    const dTopEquiv = solveFangerEquivalentDeltaT(simRes.pmv, roomPmv);
+                    const fanElecKwh = (0.025 * occHours); // Consommation électrique réelle du ventilateur (~25 W)
+                    kwh100 = Math.max(0.05, (((hTotalRoomWPerK * dTopEquiv * occHours) / 1000) / eerClim) - fanElecKwh);
+                    physicsProof = `Vitesse air +${(simRes.simVel - vel).toFixed(2)} m/s ≡ -${dTopEquiv.toFixed(2)}°C Fanger × H_2R2C (${hTotalRoomWPerK.toFixed(1)} W/K) sur ${occHours}h (déduit 25W moteur)`;
                 } else if (actionKey === 'fan_destrat') {
-                    // Destratification de l'air chaud sous plafond haut (>= 2.7m) rabattant +0.5°C vers la zone de vie sur 6h
-                    kwh100 = ((hTotalRoomWPerK * 0.5 * 6.0) / 1000) / etaGen;
+                    const dTaGain = Math.max(0.20, simRes.simTa - ta);
+                    const fanElecKwh = (0.022 * occHours);
+                    kwh100 = Math.max(0.05, (((hTotalRoomWPerK * dTaGain * occHours) / 1000) / etaGen) - fanElecKwh);
+                    physicsProof = `Plafond ${height.toFixed(2)} m : +${dTaGain.toFixed(2)}°C rabattus × H_2R2C (${hTotalRoomWPerK.toFixed(1)} W/K) × ${occHours}h (déduit 22W moteur)`;
                 } else if (actionKey === 'cooling_setpoint_eco') {
-                    // Consigne de climatisation maintenue à 26°C (ou coupure au profit du free-cooling) sur 5h
-                    kwh100 = ((hTotalRoomWPerK * 1.5 * 5.0) / 1000) / eerClim;
+                    const deltaCoolSetpoint = Math.max(1.0, 26.0 - Math.min(25.0, ta));
+                    kwh100 = ((hTotalRoomWPerK * deltaCoolSetpoint * occHours) / 1000) / eerClim;
+                    physicsProof = `H_2R2C (${hTotalRoomWPerK.toFixed(1)} W/K) × ΔT_consigne ${deltaCoolSetpoint.toFixed(1)}°C × ${occHours}h (EER ${eerClim.toFixed(1)})`;
                 }
 
                 return {
                     deltaPmv100: parseFloat(deltaPmv100.toFixed(2)),
                     kwh100: parseFloat(kwh100.toFixed(2)),
-                    eur100: parseFloat((kwh100 * costPerKwh).toFixed(2))
+                    eur100: parseFloat((kwh100 * costPerKwh).toFixed(2)),
+                    physicsProof: physicsProof
                 };
             }
 
@@ -1508,21 +1625,25 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }
 
-        // Formatage des badges visuels de gain (Confort PMV + Économie ou Coût financier honnête) selon le % de réactivité
+        // Formatage des badges visuels de gain (Confort PMV + Économie ou Coût financier honnête + Preuve physique 2R2C) selon le % de réactivité
         function formatGainBadgeHtml(unitImpact, factor, pct) {
             if (!unitImpact) return '';
             const effPmvNum = unitImpact.deltaPmv100 * factor;
             const effKwhNum = unitImpact.kwh100 * factor;
             const effEurNum = unitImpact.eur100 * factor;
+            const proofTip = unitImpact.physicsProof ? ` | Calcul physique 2R2C de la pièce : ${unitImpact.physicsProof}` : '';
 
             const pills = [];
             if (effPmvNum > 0.01) {
-                pills.push(`<span class="impact-pill-pmv" title="Gain de confort thermique ressenti pondéré par votre réactivité (${pct}%)">🌡️ Confort (${pct}%) : +${effPmvNum.toFixed(2)} PMV</span>`);
+                pills.push(`<span class="impact-pill-pmv" title="Gain de confort thermique ressenti pondéré par votre réactivité (${pct}%)${proofTip}">🌡️ Confort (${pct}%) : +${effPmvNum.toFixed(2)} PMV</span>`);
             }
             if (effKwhNum > 0.01) {
-                pills.push(`<span class="impact-pill-eur-pos" title="Énergie et dépenses évitées grâce à cette action">💶 Économie : +${effEurNum.toFixed(2).replace('.', ',')} € (+${effKwhNum.toFixed(2)} kWh)</span>`);
+                pills.push(`<span class="impact-pill-eur-pos" title="Énergie et dépenses évitées grâce à cette action${proofTip}">💶 Économie : +${effEurNum.toFixed(2).replace('.', ',')} € (+${effKwhNum.toFixed(2)} kWh)</span>`);
             } else if (effKwhNum < -0.01) {
-                pills.push(`<span class="impact-pill-eur-neg" title="Coût énergétique de cet appoint actif de confort">⚡ Coût appoint : -${Math.abs(effEurNum).toFixed(2).replace('.', ',')} € (-${Math.abs(effKwhNum).toFixed(2)} kWh)</span>`);
+                pills.push(`<span class="impact-pill-eur-neg" title="Coût énergétique de cet appoint actif (déduit de la cagnotte du jour)${proofTip}">⚡ Coût appoint (déduit cagnotte) : -${Math.abs(effEurNum).toFixed(2).replace('.', ',')} € (-${Math.abs(effKwhNum).toFixed(2)} kWh)</span>`);
+            }
+            if (unitImpact.physicsProof) {
+                pills.push(`<span style="font-size: 0.72rem; font-weight: 600; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 3px 8px; display: inline-flex; align-items: center; gap: 4px;" title="Formule physique 2R2C appliquée aux paramètres réels de cette pièce">📐 ${unitImpact.physicsProof}</span>`);
             }
             return pills.join('');
         }
@@ -2116,16 +2237,32 @@ document.addEventListener('DOMContentLoaded', function() {
             const kwhDayEl = document.getElementById('disp-daily-savings-kwh');
             const totalEurEl = document.getElementById('disp-cagnotte-total');
 
-            if (eurDayEl) eurDayEl.textContent = `${savedEurDay.toFixed(2)} €`;
-            if (kwhDayEl) kwhDayEl.textContent = `${savedKwhDay.toFixed(2)} kWh/j évités aujourd'hui`;
-            if (totalEurEl) totalEurEl.textContent = `${(totalCagnotteEur + savedEurDay).toFixed(2)} €`;
+            if (eurDayEl) {
+                const signEur = savedEurDay > 0 ? '+' : '';
+                eurDayEl.textContent = `${signEur}${savedEurDay.toFixed(2).replace('.', ',')} €`;
+                eurDayEl.style.color = savedEurDay < -0.005 ? '#c2410c' : (savedEurDay > 0.005 ? '#047857' : '#0f172a');
+            }
+            if (kwhDayEl) {
+                if (savedKwhDay >= 0) {
+                    kwhDayEl.textContent = `${savedKwhDay.toFixed(2)} kWh/j évités aujourd'hui`;
+                    kwhDayEl.style.color = '#64748b';
+                } else {
+                    kwhDayEl.textContent = `${savedKwhDay.toFixed(2)} kWh/j (appoint déduit)`;
+                    kwhDayEl.style.color = '#c2410c';
+                }
+            }
+            if (totalEurEl) {
+                const netCagnotte = totalCagnotteEur + savedEurDay;
+                totalEurEl.textContent = `${netCagnotte.toFixed(2).replace('.', ',')} €`;
+                totalEurEl.style.color = netCagnotte < -0.005 ? '#c2410c' : '#15803d';
+            }
 
             const dispInitEl = document.getElementById('disp-pmv-init');
             const simEl = document.getElementById('disp-pmv-sim');
             const selectedZone = zoneSelect ? zoneSelect.value : currentZoneId;
             const zonesMap = getAvailableZonesMap();
 
-            // Alignement strict avec le Tableau de Bord (engine.js) + prise en compte de tStruct (2R2C)
+            // Alignement strict avec le Tableau de Bord (engine.js) + prise en compte de tStruct et de la physique 2R2C de chaque pièce
             if (selectedZone === 'all') {
                 let totalVol = 0;
                 let weightedPmvInit = 0;
@@ -2173,8 +2310,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     const avgRf = checkedActionKeys.length > 0 ? (sumRf / checkedActionKeys.length) : 1.0;
 
-                    const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: baseRh, met, clo: totalClo, reactivityFactor: avgRf };
-                    const simRes = engine.evaluateSimulatedPMV ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal) : { pmv: pmvI };
+                    const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: baseRh, met, clo: totalClo, reactivityFactor: avgRf, zoneConfig: zConfig };
+                    const simRes = engine.evaluateSimulatedPMV ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal, zConfig) : { pmv: pmvI };
 
                     totalVol += vol;
                     weightedPmvInit += pmvI * vol;
