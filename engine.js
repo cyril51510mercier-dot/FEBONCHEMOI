@@ -1108,8 +1108,10 @@ function calculateDifferentialVentilation(zoneConfig, roomData, envData) {
                 title = `Boost VMC anti-humidité requis`;
                 detail = `Humidité très élevée (${rh}%). Enclenchez la VMC en vitesse rapide pour extraire la vapeur d'eau (pièce sans fenêtre ouvrable).`;
             } else {
-                title = `Hygrométrie critique (Sans ouvrant)`;
-                detail = `Humidité critique (${rh}%). Ouvrez la porte intérieure vers une pièce aérée pour chasser la vapeur d'eau.`;
+                canVentilate = false;
+                status = 'comfort';
+                title = `Hygrométrie élevée (Sans ouvrant ni VMC)`;
+                detail = `Humidité élevée (${rh}%), aucun équipement d'extraction direct configuré dans cette pièce.`;
             }
         } else if (ahExt >= ahInt) {
             status = 'blocked_humid';
@@ -1135,8 +1137,10 @@ function calculateDifferentialVentilation(zoneConfig, roomData, envData) {
                 title = `Boost VMC conseillé`;
                 detail = `Humidité élevée (${rh}%). Activez la vitesse rapide de la VMC pour assainir l'air (pièce sans fenêtre ouvrable).`;
             } else {
-                title = `Aération indirecte / Ouvrir porte`;
-                detail = `Humidité élevée (${rh}%). Ouvrez la porte vers les pièces voisines aérées pour assainir l'ambiance.`;
+                canVentilate = false;
+                status = 'comfort';
+                title = `Hygrométrie modérément élevée`;
+                detail = `Humidité à ${rh}% (aucun ouvrant direct ni VMC pilotable configuré dans cette pièce).`;
             }
         } else if (ahExt >= ahInt) {
             status = 'blocked_humid';
@@ -1229,12 +1233,6 @@ function getRoomActionNudge(nomPiece, zoneConfig, roomData, envData) {
             badgeStyle = "background: #ECFDF5; border: 1px solid #6EE7B7; color: #065F46; font-weight: 700;";
             tooltip = `💧 Extraire l'humidité via la VMC (pièce sans fenêtre ouvrable).`;
             actionKey = 'vmc_boost';
-        } else {
-            badgeIcon = "🚪";
-            badgeLabel = "Ouvrir porte";
-            badgeStyle = "background: #ECFDF5; border: 1px solid #6EE7B7; color: #065F46; font-weight: 700;";
-            tooltip = `💧 Aérer via les pièces adjacentes (aucun ouvrant direct).`;
-            actionKey = 'open_door_humidity';
         }
     } 
     // Règle 2 : Air extérieur saturé (fenêtres réputées fermées de base)

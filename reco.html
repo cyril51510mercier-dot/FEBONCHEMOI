@@ -272,6 +272,124 @@
             gap: 6px;
             flex-wrap: wrap;
         }
+
+        /* Carte d'Arbitrage Court Terme vs Long Terme */
+        .arbitrage-panel {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            padding: 1.25rem 1.35rem;
+            margin-bottom: 1.6rem;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+        }
+        .arbitrage-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 0.75rem;
+        }
+        .arbitrage-summary {
+            font-size: 0.88rem;
+            color: #334155;
+            background: #f8fafc;
+            border-left: 4px solid #6366f1;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+        .arbitrage-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+        }
+        @media (max-width: 720px) {
+            .arbitrage-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .arbitrage-option-card {
+            border-radius: 12px;
+            padding: 1rem 1.1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.2s ease;
+        }
+        .arbitrage-option-short {
+            background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%);
+            border: 1px solid #fcd34d;
+        }
+        .arbitrage-option-long {
+            background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%);
+            border: 1px solid #6ee7b7;
+        }
+        .arbitrage-option-card.active-choice {
+            box-shadow: 0 0 0 2px #0f172a;
+        }
+        .arbitrage-opt-title {
+            font-size: 0.96rem;
+            font-weight: 800;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 0.4rem;
+        }
+        .arbitrage-opt-desc {
+            font-size: 0.83rem;
+            color: #475569;
+            line-height: 1.45;
+            margin-bottom: 0.75rem;
+        }
+        .arbitrage-pros-cons {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 0.8rem;
+            margin-bottom: 0.9rem;
+        }
+        .arbitrage-pro {
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: #065f46;
+            padding: 6px 9px;
+            border-radius: 7px;
+            line-height: 1.38;
+        }
+        .arbitrage-con {
+            background: rgba(245, 158, 11, 0.09);
+            border: 1px solid rgba(245, 158, 11, 0.28);
+            color: #92400e;
+            padding: 6px 9px;
+            border-radius: 7px;
+            line-height: 1.38;
+        }
+        .arbitrage-btn {
+            width: 100%;
+            padding: 9px 12px;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 0.82rem;
+            cursor: pointer;
+            border: none;
+            transition: transform 0.15s ease, opacity 0.15s ease;
+        }
+        .arbitrage-btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.95;
+        }
+        .arbitrage-btn-short {
+            background: #d97706;
+            color: #ffffff;
+        }
+        .arbitrage-btn-long {
+            background: #059669;
+            color: #ffffff;
+        }
     </style>
 </head>
 <body>
@@ -295,7 +413,7 @@
         <div class="summary-card" style="display: flex; justify-content: space-between; align-items: center; margin: 1.25rem 0 1rem 0; padding: 0.9rem 1.4rem; background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
             <div>
                 <h2 style="margin: 0; border: none; padding: 0; font-size: 1.25rem; font-weight: 800; color: #0f172a;">📋 Plan d'Action Global du Logement</h2>
-                <p id="profileIndicator" style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #64748b;">Profil : Chargement...</p>
+                <p id="profileIndicator" style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #64748b;">⚖️ Tous les horizons temporels actifs (Court terme, Anticipation 24h & Stratégie 48-72h)</p>
             </div>
             <div style="font-size: 0.82rem; color: #475569; font-weight: 700; display: flex; align-items: center; gap: 6px; background: #f1f5f9; padding: 5px 12px; border-radius: 20px;">
                 <span>🌐 Toutes les pièces analysées</span>
@@ -381,6 +499,9 @@
 
         <!-- BANDEAU MINUTEURS ACTIFS D'OUVERTURE DE FENÊTRE (Notification de fermeture) -->
         <div id="active-window-timers-banner" style="display: none; margin-bottom: 1.25rem;"></div>
+
+        <!-- CARTE D'ARBITRAGE COURT TERME VS LONG TERME -->
+        <div id="arbitrage-card-container"></div>
 
         <!-- Groupes par Niveau -->
         <section>

@@ -247,14 +247,7 @@ document.addEventListener('DOMContentLoaded', function() {
             };
         }
 
-        // Recherche robuste du profil utilisateur
         const globalConfig = houseConfig.global || {};
-        const activeProfileKey = globalConfig.userProfile 
-                              || globalConfig.profile 
-                              || houseConfig.userProfile 
-                              || houseConfig.profile 
-                              || 'mid_term';
-
         const forcedSeason = globalConfig.forcedSeason;
         const manualHeating = globalConfig.heatingSeasonActive;
         const autoHeating = envDataGlobal.t_ext < 15;
@@ -264,15 +257,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? autoHeating 
                 : (manualHeating !== undefined && manualHeating !== null ? manualHeating : autoHeating));
 
-        const profilesDef = engine.PROFILES || {
-            short_term: { label: "Court termiste", allowedLevels: [1], maxDeltaPmv: 0.0 },
-            mid_term:   { label: "Moyen termiste", allowedLevels: [1, 2], maxDeltaPmv: 0.3 },
-            long_term:  { label: "Long termiste",  allowedLevels: [1, 2, 3], maxDeltaPmv: 0.6 }
-        };
-        const activeProfile = profilesDef[activeProfileKey] || profilesDef.mid_term;
-
         if (profileIndicator) {
-            profileIndicator.textContent = `Profil : ${activeProfile.label} (Tolérance PMV ±${activeProfile.maxDeltaPmv})`;
+            profileIndicator.textContent = `⚖️ Arbitrage libre Court Terme (Confort immédiat) ↔ Long Terme (Inertie des parois & Économies 24-72h)`;
         }
 
         const nowDate = new Date();
@@ -663,21 +649,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         nbVerres: effectiveNbVerres,
                         mEau: effectiveMEau
                     });
-                } else {
-                    pushRec({
-                        id: `${zoneId}_open_door_humidity`,
-                        level: 1,
-                        actionKey: 'open_door_humidity',
-                        zoneId,
-                        zoneName,
-                        timing: 'immediate',
-                        type: 'type-air',
-                        title: `🚪 Aération indirecte / Ouvrir porte (${effectiveVerresTxt})`,
-                        text: `Pièce sans ouvrant direct vers l'extérieur : ouvrez la porte vers une zone aérée pour chasser ${effectiveVerresTxt} et assainir la pièce.`,
-                        impactWeight: 15,
-                        nbVerres: effectiveNbVerres,
-                        mEau: effectiveMEau
-                    });
                 }
             } else if (vent.status === 'blocked_humid' && hasVmc && rh > 60) {
                 pushRec({ 
@@ -771,10 +742,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 pushRec({ id: `${zoneId}_fan_on`, level: 1, actionKey: 'fan_on', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: `Activer le brassage d'air (${zone.equipment.fanSystem})`, text: `Le flux d'air rafraîchit le ressenti cutané de 2 °C sans climatisation.`, impactWeight: 18 });
             }
 
-            if (!isBuffer && hasUnheatedDoor) {
-                pushRec({ id: `${zoneId}_buffer_door_close`, level: 1, actionKey: 'buffer_door_close', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Fermeture de la porte du local non chauffé', text: `Conservez la porte fermée avec le local non chauffé (garage/cellier) pour éviter les fuites thermiques.`, impactWeight: 12 });
-            }
-
             if (isHeatingSeasonActive && reserve.chargeCalories >= 75) {
                 pushRec({ id: `${zoneId}_high_calorie_stock_eco`, level: 1, actionKey: 'heating_cut', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Valorisation de l\'inertie chaude (Calories > 75 %)', text: `Les parois sont gorgées de chaleur (${reserve.chargeCalories} %). Baissez la consigne d'un degré.`, impactWeight: 16 });
             }
@@ -792,8 +759,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 pushRec({ id: `${zoneId}_bedroom_temp_drop`, level: 2, actionKey: 'bedroom_temp', zoneId, zoneName, timing: 'anticipated', type: 'type-eco', title: 'Consigne nocturne en chambre (17 °C à 18 °C)', text: `Réglez le thermostat à 17-18 °C 1h avant le coucher.`, impactWeight: 12 });
             }
 
-            // Anticipation de la fermeture des volets avant la tombée de la nuit (en fin d'après-midi)
-            if (isHeatingSeasonActive && needsHeat && !isNight && currentHour >= (sunsetHour - 2) && hasShutters) {
+            // Anticipation de la fermeture des volets avant la tombée de la nuit (en journée de saison de chauffe)
+            if (isHeatingSeasonActive && needsHeat && !isNight && hasShutters) {
                 pushRec({
                     id: `${zoneId}_anticipate_night_shutters`,
                     level: 2,
@@ -802,8 +769,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     zoneName,
                     timing: 'anticipated',
                     type: 'type-heat',
-                    title: `🌅 Préparer la fermeture des volets à ${sunsetHour}h`,
-                    text: `Le soleil se couche vers ${sunsetHour}h : fermez les volets dès le crépuscule pour piéger la chaleur du jour dans vos parois avant la chute nocturne.`,
+                    title: `🌅 Anticiper la fermeture des volets dès ${sunsetHour}h`,
+                    text: `Le soleil se couche vers ${sunsetHour}h : fermez les volets dès le crépuscule pour piéger la chaleur du jour dans vos parois (${tStruct.toFixed(1)}°C) avant la chute nocturne.`,
                     impactWeight: 15
                 });
             }
@@ -850,7 +817,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
-            return recs.filter(rec => activeProfile.allowedLevels.includes(rec.level));
+            return recs;
         }
 
         function getAllRecommendations() {
@@ -957,7 +924,222 @@ document.addEventListener('DOMContentLoaded', function() {
             renderCompletedCards(completedItems, containerCompleted, "Aucune action réalisée pour le moment.");
 
             renderActiveWindowTimers();
+            renderArbitrageCard(recs);
             updateMetrics(recs);
+        }
+
+        // ============================================================
+        // CARTE D'ARBITRAGE COURT TERME VS LONG TERME
+        // ============================================================
+        const SHORT_TERM_KEYS = new Set([
+            'clothing_adjust_warm',
+            'clothing_adjust_cool',
+            'heating_boost_comfort',
+            'fan_on',
+            'open_win_humidity',
+            'vmc_boost',
+            'shutter_close'
+        ]);
+        const LONG_TERM_KEYS = new Set([
+            'sun_heat',
+            'shutter_close_night',
+            'thermal_curtain',
+            'anticipate_sun',
+            'floor_inertia',
+            'bedroom_temp',
+            'heating_cut',
+            'free_cooling'
+        ]);
+
+        window.solsticeApplyArbitrageOption = function(mode) {
+            const now = Date.now();
+            const allRecs = getAllRecommendations();
+            const targetRecs = allRecs.filter(r => {
+                if (mode === 'short_term') {
+                    return r.level === 1 && (SHORT_TERM_KEYS.has(r.actionKey) || !LONG_TERM_KEYS.has(r.actionKey));
+                } else {
+                    return r.level >= 2 || LONG_TERM_KEYS.has(r.actionKey);
+                }
+            });
+
+            const listToApply = targetRecs.length > 0 ? targetRecs : allRecs;
+            listToApply.forEach(rec => {
+                let item = lifecycleState.recos[rec.id];
+                if (!item) {
+                    item = {
+                        id: rec.id,
+                        baseId: rec.baseId,
+                        occurrence: rec.occurrence || 1,
+                        actionKey: rec.actionKey,
+                        zoneId: rec.zoneId,
+                        zoneName: rec.zoneName,
+                        title: rec.title,
+                        text: rec.text,
+                        level: rec.level,
+                        timing: rec.timing,
+                        type: rec.type,
+                        impactWeight: rec.impactWeight,
+                        ventDurationMin: rec.ventDurationMin || 6,
+                        unitImpact: rec.unitImpact,
+                        appearedAt: rec.appearedAt || now,
+                        status: 'active'
+                    };
+                    lifecycleState.recos[rec.id] = item;
+                }
+                if (item.status !== 'completed') {
+                    const timeInfo = getActionTimeInfo(rec, item);
+                    item.status = 'completed';
+                    item.completedAt = now;
+                    item.earnedPoints = timeInfo.currentPoints;
+                    item.reactivityPercent = timeInfo.percent;
+                    item.elapsedMin = timeInfo.elapsedMin;
+                    item.elapsedMs = timeInfo.elapsedMs;
+                    startWindowCloseTimerForItem(item);
+                }
+            });
+
+            localStorage.setItem('SOLSTICE_ARBITRAGE_LAST_CHOICE', mode);
+
+            const completedMap = {};
+            Object.values(lifecycleState.recos || {}).forEach(i => {
+                if (i.status === 'completed') completedMap[i.id] = true;
+            });
+            localStorage.setItem('SOLSTICE_CHECKED_RECOS', JSON.stringify(completedMap));
+
+            saveRecoLifecycleState(lifecycleState);
+            render();
+        };
+
+        function renderArbitrageCard(allRecs) {
+            const container = document.getElementById('arbitrage-card-container');
+            if (!container) return;
+
+            const hMetrics = (engine.calculateGlobalHabitatMetrics ? engine.calculateGlobalHabitatMetrics() : null) || {
+                avgTemp: 19.0,
+                avgTStruct: 18.5,
+                avgPMV: -0.35,
+                avgTau: 22.0
+            };
+
+            const shortRecs = (allRecs || []).filter(r => r.level === 1 && (SHORT_TERM_KEYS.has(r.actionKey) || !LONG_TERM_KEYS.has(r.actionKey)));
+            const longRecs = (allRecs || []).filter(r => r.level >= 2 || LONG_TERM_KEYS.has(r.actionKey));
+
+            const sumStats = (arr, fallbackPmv, fallbackKwh) => {
+                if (!arr || arr.length === 0) {
+                    return { pmvGain: fallbackPmv, kwhGain: fallbackKwh, eurGain: fallbackKwh * 0.22, count: 0 };
+                }
+                let pmvSum = 0;
+                let kwhSum = 0;
+                let eurSum = 0;
+                arr.forEach(r => {
+                    const u = r.unitImpact || { deltaPmv100: 0.15, kwh100: 0.25, eur100: 0.06 };
+                    pmvSum += u.deltaPmv100;
+                    kwhSum += u.kwh100;
+                    eurSum += u.eur100;
+                });
+                return {
+                    pmvGain: Math.max(fallbackPmv, pmvSum / Math.max(1, arr.length)),
+                    kwhGain: Math.max(fallbackKwh, kwhSum),
+                    eurGain: Math.max(fallbackKwh * 0.20, eurSum),
+                    count: arr.length
+                };
+            };
+
+            const shortStats = sumStats(shortRecs, 0.28, 0.35);
+            const longStats = sumStats(longRecs, 0.22, 1.45);
+            const lastChoice = localStorage.getItem('SOLSTICE_ARBITRAGE_LAST_CHOICE') || '';
+
+            const isColdContext = isHeatingSeasonActive || hMetrics.avgPMV < -0.15 || envDataGlobal.t_ext < 16;
+
+            const summaryText = isColdContext
+                ? `Votre logement fonctionne à <strong>deux vitesses thermiques</strong> : l'air ambiant (<strong>${hMetrics.avgTemp.toFixed(1)} °C</strong>, réactif en 15 min) gouverne votre ressenti immédiat, tandis que vos parois (<strong>${hMetrics.avgTStruct.toFixed(1)} °C</strong>, inertie <strong>~${Math.round(hMetrics.avgTau || 20)}h</strong>) déterminent la température de demain matin à 07h et votre facture de chauffage. Choisissez librement votre priorité du moment ou combinez les deux :`
+                : `Votre logement combine l'air ambiant (<strong>${hMetrics.avgTemp.toFixed(1)} °C</strong>, réactif immédiatement) et la réserve de fraîcheur de vos parois (<strong>${hMetrics.avgTStruct.toFixed(1)} °C</strong>, inertie <strong>~${Math.round(hMetrics.avgTau || 20)}h</strong>). Vous pouvez privilégier le rafraîchissement ressenti immédiat ou la décharge thermique profonde des parois sur 24-48h :`;
+
+            const shortDesc = isColdContext
+                ? `Agir directement sur votre ressenti corporel présent (ajustement vestimentaire +0.25 Clo, appoint thermostatique local, aération flash) tout en conservant la lumière naturelle en journée.`
+                : `Agir immédiatement sur le ressenti cutané et l'air intérieur (brassage d'air, protection des vitrages actuellement au soleil, aération courte).`;
+
+            const shortPro = isColdContext
+                ? `<strong>✅ Avantages :</strong> Effet ressenti en quelques minutes (<strong>+${shortStats.pmvGain.toFixed(2)} PMV</strong>) • Conserve la vue extérieure et la lumière du jour • Zéro attente.`
+                : `<strong>✅ Avantages :</strong> Soulagement thermique immédiat (<strong>+${shortStats.pmvGain.toFixed(2)} PMV</strong>) dans les pièces occupées • Action simple et rapide.`;
+
+            const shortCon = isColdContext
+                ? `<strong>⚠️ Inconvénients :</strong> Ne recharge pas la masse thermique des parois (${hMetrics.avgTStruct.toFixed(1)} °C) pour la nuit • Économies plus limitées si recours à une relance de chauffage.`
+                : `<strong>⚠️ Inconvénients :</strong> Ne refroidit pas en profondeur la structure des parois • Risque de remontée rapide de la température dès l'arrêt du brassage.`;
+
+            const longDesc = isColdContext
+                ? `Utiliser vos parois comme batterie thermique : capter le soleil passif le jour, verrouiller les volets dès le coucher du soleil (${sunsetHour}h) et abaisser la consigne nocturne en s'appuyant sur l'inertie.`
+                : `Préserver et régénérer le bouclier de fraîcheur des parois : occultation préventive dès le matin et sur-ventilation nocturne profonde pour décharger la masse des murs.`;
+
+            const longPro = isColdContext
+                ? `<strong>✅ Avantages :</strong> Économie maximale (<strong>~${longStats.kwhGain.toFixed(2)} kWh/j soit ~${longStats.eurGain.toFixed(2).replace('.', ',')} €</strong>) • Protège la température des parois et amortit la chute au réveil demain 07h.`
+                : `<strong>✅ Avantages :</strong> Économie maximale (<strong>~${longStats.kwhGain.toFixed(2)} kWh/j soit ~${longStats.eurGain.toFixed(2).replace('.', ',')} €</strong>) • Garantie d'un logement frais sur 24 à 72h sans climatisation.`;
+
+            const longCon = isColdContext
+                ? `<strong>⚠️ Inconvénients :</strong> Effet progressif sur l'air ambiant (déphasage de plusieurs heures des parois) • Demande d'accepter une légère tolérance temporaire (±0.25 PMV) ou de fermer les volets dès ${sunsetHour}h.`
+                : `<strong>⚠️ Inconvénients :</strong> Baisse plus lente au thermomètre immédiat • Nécessite d'anticiper la fermeture des volets avant l'arrivée du soleil.`;
+
+            container.innerHTML = `
+                <div class="arbitrage-panel">
+                    <div class="arbitrage-header">
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.08rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                                <span>⚖️</span>
+                                <span>Carte d'Arbitrage : Confort Immédiat (Court Terme) vs Inertie & Sobriété (Long Terme)</span>
+                            </h3>
+                        </div>
+                        <span style="font-size: 0.75rem; font-weight: 700; background: #eef2ff; color: #4338ca; padding: 3px 10px; border-radius: 999px; border: 1px solid #c7d2fe;">
+                            2 options complémentaires au choix
+                        </span>
+                    </div>
+
+                    <div class="arbitrage-summary">
+                        ${summaryText}
+                    </div>
+
+                    <div class="arbitrage-grid">
+                        <!-- OPTION 1 : COURT TERME -->
+                        <div class="arbitrage-option-card arbitrage-option-short ${lastChoice === 'short_term' ? 'active-choice' : ''}">
+                            <div>
+                                <div class="arbitrage-opt-title">
+                                    <span>⚡ Option 1 — Privilégier le Court Terme (< 1h)</span>
+                                    <span style="font-size: 0.72rem; background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 999px; border: 1px solid #fde68a;">
+                                        +${shortStats.pmvGain.toFixed(2)} PMV immédiat
+                                    </span>
+                                </div>
+                                <div class="arbitrage-opt-desc">${shortDesc}</div>
+                                <div class="arbitrage-pros-cons">
+                                    <div class="arbitrage-pro">${shortPro}</div>
+                                    <div class="arbitrage-con">${shortCon}</div>
+                                </div>
+                            </div>
+                            <button type="button" class="arbitrage-btn arbitrage-btn-short" onclick="window.solsticeApplyArbitrageOption('short_term')">
+                                ⚡ Choisir & cocher les actions Court Terme ${shortStats.count > 0 ? `(${shortStats.count})` : ''}
+                            </button>
+                        </div>
+
+                        <!-- OPTION 2 : LONG TERME -->
+                        <div class="arbitrage-option-card arbitrage-option-long ${lastChoice === 'long_term' ? 'active-choice' : ''}">
+                            <div>
+                                <div class="arbitrage-opt-title">
+                                    <span>🛡️ Option 2 — Privilégier le Long Terme (24h–72h)</span>
+                                    <span style="font-size: 0.72rem; background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 999px; border: 1px solid #a7f3d0;">
+                                        ~${longStats.kwhGain.toFixed(2)} kWh/j (~${longStats.eurGain.toFixed(2).replace('.', ',')} €)
+                                    </span>
+                                </div>
+                                <div class="arbitrage-opt-desc">${longDesc}</div>
+                                <div class="arbitrage-pros-cons">
+                                    <div class="arbitrage-pro">${longPro}</div>
+                                    <div class="arbitrage-con">${longCon}</div>
+                                </div>
+                            </div>
+                            <button type="button" class="arbitrage-btn arbitrage-btn-long" onclick="window.solsticeApplyArbitrageOption('long_term')">
+                                🛡️ Choisir & cocher les actions Long Terme ${longStats.count > 0 ? `(${longStats.count})` : ''}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         // Formatage du badge de gain combiné PMV & Financier selon le pourcentage de réactivité
