@@ -83,7 +83,8 @@
                     </a>
 
                     <button onclick="voirToutesLesRecommandations()" class="custom-pill-btn bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 px-3.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
-                        📋 Plan d'Action
+                        <span>📋 Plan d'Action</span>
+                        <span id="nav-action-badge" class="hidden bg-amber-400 text-slate-950 text-[10px] font-black px-1.5 py-0.5 rounded-full">🔔 0</span>
                     </button>
 
                     <a href="setup.html" class="custom-pill-btn bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center gap-1.5 no-underline whitespace-nowrap">
@@ -579,6 +580,11 @@
                     </div>
                 </div>
             </div>
+
+            <!-- ============================================================== -->
+            <!-- 3.2 BANDEAU DE NOTIFICATION & VISUEL DIRECT DES ACTIONS À FAIRE -->
+            <!-- ============================================================== -->
+            <div id="live-action-notification-bar"></div>
 
             <!-- ============================================================== -->
             <!-- 4. PANNEAU UNIFIÉ : DIAGNOSTIC, BILAN 24H & ACTIONS IMMÉDIATES -->

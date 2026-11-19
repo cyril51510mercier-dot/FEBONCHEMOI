@@ -475,58 +475,162 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const canOpenWindows = hasOpenableWindows(zone);
             const mainVentType = zone?.windows?.find(w => w.vent && w.vent !== 'fixe' && w.vent !== 'fixed')?.vent || 'battante';
-            
-            const hasShutters = !zone?.windows || zone.windows.length === 0 || zone.windows.some(w => !w.shutter || w.shutter !== 'aucun');
-            const hasInteriorCurtains = zone?.windows?.some(w => w.shutter === 'rideau_interieur' || w.shutter === 'store_interieur');
-            const hasVmc = zone?.equipment?.vmcSystem && zone.equipment.vmcSystem !== 'aucun' && zone.equipment.vmcSystem !== 'none';
 
-            const adj = zone?.adj || {};
-            const hasUnheatedDoor = zone?.hasBufferDoor || adj.hasBufferDoor || 
-                                    [1, 2, 3, 4].some(i => adj[`wall${i}`] === 'unheated' && adj[`doorWall${i}`]);
+            const extShutterTypes = ['roulant_pvc', 'roulant_metal', 'battant_bois', 'persienne', 'store_banne'];
+            const intShutterTypes = ['rideau_interieur', 'store_interieur'];
+            const hasExteriorShutters = Array.isArray(zone?.windows) && zone.windows.length > 0
+                ? zone.windows.some(w => !w.shutter || extShutterTypes.includes(w.shutter))
+                : true;
+            const hasInteriorCurtains = Array.isArray(zone?.windows) && zone.windows.some(w => intShutterTypes.includes(w.shutter));
+            const hasAnyShutterOrCurtain = hasExteriorShutters || hasInteriorCurtains;
 
-            const hasEastWestWin = zone?.windows?.some(w => ['E', 'W'].includes(w.orient || w.orientation));
-            const hasRoofWin = zone?.windows?.some(w => w.tilt === 'inclinee');
+            // VMC réellement actionnable par l'occupant (marche forcée ou trappe réglable, hors VMC continue non pilotable)
+            const vmcSys = zone?.equipment?.vmcSystem || 'none';
+            const hasActionableVmc = (vmcSys === 'marche_forcee' || vmcSys === 'trappe');
+            const vmcActionLabel = (vmcSys === 'trappe') ? 'Ouvrir la bouche/trappe VMC' : 'Activer la VMC (marche forcée)';
 
-            // Calcul de l'impact unitaire d'une recommandation sur le PMV et sur l'énergie (kWh / €) à 100% de réactivité
+            const heatingSys = zone?.equipment?.heating?.system || 'none';
+            const hasHeating = heatingSys !== 'none' && heatingSys !== 'aucun';
+            const heatingRegs = Array.isArray(zone?.equipment?.heating?.regulation) ? zone.equipment.heating.regulation : [];
+            const regDeviceLabel = heatingRegs.includes('thermostatic_valve')
+                ? 'le robinet thermostatique'
+                : (heatingRegs.includes('thermostat_central') ? 'le thermostat central' : 'la consigne de chauffage');
+
+            const coolingSys = zone?.equipment?.cooling?.system || 'aucun';
+            const hasCooling = coolingSys !== 'aucun' && coolingSys !== 'none';
+            const fanSys = zone?.equipment?.fanSystem || 'aucun';
+            const hasFan = fanSys !== 'aucun' && fanSys !== 'none';
+            const hasRoofWin = Array.isArray(zone?.windows) && zone.windows.some(w => w.tilt === 'inclinee' || w.tilt === 'horizontale');
+
+            // Paramètres physiques 2R2C réels de la pièce (conductances H_total, H_windows, H_ventilation et surfaces vitrées)
+            const hTotalRoomWPerK = (params2R2C && params2R2C.hTotal > 0) ? params2R2C.hTotal : (volume * 0.75);
+            const glassUMap = { single: 5.7, double_old: 2.8, double_standard: 1.5, double_recent: 1.2, triple: 0.7 };
+            const shutterDeltaRMap = {
+                roulant_pvc: 0.22,
+                battant_bois: 0.20,
+                roulant_metal: 0.15,
+                persienne: 0.12,
+                store_banne: 0.08,
+                rideau_interieur: 0.09,
+                store_interieur: 0.07
+            };
+
+            let realWindowAreaM2 = 0;
+            let deltaHShuttersWPerK = 0;
+            if (Array.isArray(zone?.windows) && zone.windows.length > 0) {
+                zone.windows.forEach(w => {
+                    const wA = parseFloat(w.area) || 0;
+                    if (wA <= 0) return;
+                    realWindowAreaM2 += wA;
+                    const uW = glassUMap[w.glass] || 1.5;
+                    const dR = shutterDeltaRMap[w.shutter] || (w.shutter && w.shutter !== 'aucun' ? 0.15 : 0);
+                    if (dR > 0) {
+                        const uClosed = 1 / ((1 / uW) + dR);
+                        deltaHShuttersWPerK += wA * Math.max(0.15, uW - uClosed);
+                    }
+                });
+            } else {
+                realWindowAreaM2 = area * 0.16;
+                deltaHShuttersWPerK = realWindowAreaM2 * 0.35;
+            }
+
+            // Métadonnées visuelles de l'actionnable équipé pour l'affichage direct
+            function getActionableVisualMeta(actionKey) {
+                const map = {
+                    open_win_humidity:    { icon: '🪟', equip: 'FENÊTRE', bg: '#e0f2fe', color: '#0369a1', border: '#7dd3fc' },
+                    free_cooling:         { icon: '🪟', equip: 'FENÊTRE', bg: '#dbeafe', color: '#1d4ed8', border: '#93c5fd' },
+                    vmc_boost:            { icon: '🌀', equip: 'VMC PILOTABLE', bg: '#ccfbf1', color: '#0f766e', border: '#5eead4' },
+                    vmc_reduce_cold:      { icon: '🌀', equip: 'VMC PILOTABLE', bg: '#f0fdfa', color: '#115e59', border: '#99f6e4' },
+                    shutter_close:        { icon: '🛡️', equip: 'VOLETS / STORES', bg: '#fef3c7', color: '#b45309', border: '#fcd34d' },
+                    anticipate_sun:       { icon: '🛡️', equip: 'VOLETS / STORES', bg: '#ffedd5', color: '#c2410c', border: '#fdba74' },
+                    sun_heat:             { icon: '☀️', equip: 'VOLETS / RIDEAUX', bg: '#fef9c3', color: '#a16207', border: '#fde047' },
+                    shutter_close_night:  { icon: '🌙', equip: 'VOLETS', bg: '#e0e7ff', color: '#3730a3', border: '#a5b4fc' },
+                    thermal_curtain:      { icon: '🪟', equip: 'RIDEAUX ÉPAIS', bg: '#ede9fe', color: '#5b21b6', border: '#c4b5fd' },
+                    clothing_adjust_warm: { icon: '🧥', equip: 'TENUE (CLO)', bg: '#fae8ff', color: '#86198f', border: '#f0abfc' },
+                    clothing_adjust_cool: { icon: '👕', equip: 'TENUE (CLO)', bg: '#ecfeff', color: '#155e75', border: '#67e8f9' },
+                    heating_boost_comfort:{ icon: '🌡️', equip: 'THERMOSTAT', bg: '#ffedd5', color: '#9a3412', border: '#fdba74' },
+                    heating_cut:          { icon: '🌡️', equip: 'ROBINET / THERM.', bg: '#dcfce7', color: '#166534', border: '#86efac' },
+                    bedroom_temp:         { icon: '🛏️', equip: 'CONSIGNE NUIT', bg: '#dcfce7', color: '#15803d', border: '#86efac' },
+                    floor_inertia:        { icon: '♨️', equip: 'PLANCHER CHAUFF.', bg: '#fee2e2', color: '#991b1b', border: '#fca5a5' },
+                    fan_on:               { icon: '💨', equip: 'BRASSEUR D\'AIR', bg: '#e0f2fe', color: '#075985', border: '#7dd3fc' },
+                    fan_destrat:          { icon: '🔄', equip: 'BRASSEUR PLAFOND', bg: '#fef3c7', color: '#92400e', border: '#fcd34d' },
+                    cooling_setpoint_eco: { icon: '❄️', equip: 'CLIMATISATION', bg: '#e0f2fe', color: '#0369a1', border: '#7dd3fc' }
+                };
+                return map[actionKey] || { icon: '⚙️', equip: 'ÉQUIPEMENT', bg: '#f1f5f9', color: '#334155', border: '#cbd5e1' };
+            }
+
+            // Calcul physique 2R2C unifié de l'impact unitaire (PMV + kWh + €) d'une action sur les vrais paramètres de la pièce
             function computeUnitImpactForAction(actionKey) {
                 let deltaPmv100 = 0.15;
                 if (engine.evaluateSimulatedPMV) {
                     const baseState = { ta, tr, vel, rh, met, clo: totalClo, reactivityFactor: 1.0 };
                     const simRes = engine.evaluateSimulatedPMV(baseState, [actionKey], envDataGlobal);
                     const rawImprovement = Math.abs(roomPmv) - Math.abs(simRes.pmv);
-                    deltaPmv100 = Math.max(0.08, parseFloat(Math.abs(rawImprovement || ( simRes.pmv - roomPmv )).toFixed(2)));
+                    deltaPmv100 = Math.max(0.08, parseFloat(Math.abs(rawImprovement || (simRes.pmv - roomPmv)).toFixed(2)));
                 }
 
-                const windowArea = parseFloat(zone?.windowArea) || (area * 0.15);
-                const uWindow = parseFloat(zone?.uWindow) || 2.2;
-                const deltaR = parseFloat(zone?.shutterDeltaR) || 0.18;
                 const etaGen = getGeneratorEfficiency(zone);
                 const costPerKwh = getEnergyCostPerKwh(zone);
+                const eerClim = 3.0;
                 const gSol = getSolarIrradiance();
+                const deltaTExt = Math.max(2.0, ta - envDataGlobal.t_ext);
                 let kwh100 = 0;
 
-                if (actionKey === 'shutter_close' || actionKey === 'anticipate_sun') {
-                    kwh100 = ((windowArea * gSol * 0.55 * 5) / 1000) / 3.0;
+                if (actionKey === 'sun_heat') {
+                    // Apport solaire réel des vitrages de la pièce sur un créneau moyen de 4h d'ensoleillement
+                    let solPowerW = 0;
+                    if (engine.calculateWindowSolarGainW) {
+                        solPowerW = engine.calculateWindowSolarGainW(zone, true, 0.75).totalW;
+                    } else {
+                        solPowerW = realWindowAreaM2 * gSol * 0.50;
+                    }
+                    kwh100 = ((Math.max(120, solPowerW) * 4.0) / 1000) / etaGen;
                 } else if (actionKey === 'shutter_close_night' || actionKey === 'thermal_curtain') {
-                    const uWithShutter = 1 / ((1 / uWindow) + deltaR);
-                    const deltaU = Math.max(0.25, uWindow - uWithShutter);
-                    const deltaT = Math.max(2, ta - envDataGlobal.t_ext);
-                    kwh100 = ((windowArea * deltaU * deltaT * 11) / 1000) / etaGen;
-                } else if (actionKey === 'sun_heat') {
-                    kwh100 = ((windowArea * gSol * 0.58 * 4.5) / 1000) / etaGen;
-                } else if (actionKey === 'bedroom_temp' || actionKey === 'heating_cut' || actionKey === 'buffer_door_close') {
-                    kwh100 = (area * 0.08) / etaGen;
-                } else if (actionKey === 'clothing_adjust_warm' || actionKey === 'clothing_adjust_cool') {
-                    // +0.25 Clo évite de surchauffer la pièce de +1.2°C pendant 6h
-                    kwh100 = (area * 0.065) / etaGen;
+                    // Réduction réelle des déperditions vitrées sur 11h de nuit grâce à la résistance additionnelle ΔR du volet/rideau
+                    const effDeltaH = Math.max(1.2, deltaHShuttersWPerK);
+                    kwh100 = ((effDeltaH * deltaTExt * 11.0) / 1000) / etaGen;
+                } else if (actionKey === 'shutter_close' || actionKey === 'anticipate_sun') {
+                    // Blocage des apports solaires indésirables en été sur 5h (équivalent froid évité avec EER = 3.0)
+                    let blockedSolW = realWindowAreaM2 * gSol * 0.52;
+                    kwh100 = ((Math.max(150, blockedSolW) * 5.0) / 1000) / eerClim;
+                } else if (actionKey === 'clothing_adjust_warm') {
+                    // +0.25 Clo évite de devoir surchauffer la pièce de +1.2°C pendant 6h d'occupation
+                    kwh100 = ((hTotalRoomWPerK * 1.2 * 6.0) / 1000) / etaGen;
+                } else if (actionKey === 'clothing_adjust_cool') {
+                    // -0.20 Clo évite d'abaisser la consigne de rafraîchissement de 1.2°C pendant 5h
+                    kwh100 = ((hTotalRoomWPerK * 1.2 * 5.0) / 1000) / eerClim;
+                } else if (actionKey === 'heating_cut') {
+                    // Abaissement de -1.0°C sur 8h (sobriété / valorisation de l'inertie chaude des parois)
+                    kwh100 = ((hTotalRoomWPerK * 1.0 * 8.0) / 1000) / etaGen;
+                } else if (actionKey === 'bedroom_temp') {
+                    // Réduit nocturne en chambre vers 17.5°C pendant 8h de nuit
+                    const deltaSetback = Math.min(3.0, Math.max(1.0, ta - 17.5));
+                    kwh100 = ((hTotalRoomWPerK * deltaSetback * 8.0) / 1000) / etaGen;
+                } else if (actionKey === 'heating_boost_comfort') {
+                    // Appoint actif de confort (+0.6°C pendant 4h) : gain de confort immédiat (+PMV) mais COÛT énergétique (-kWh / -€)
+                    kwh100 = -(((hTotalRoomWPerK * 0.6 * 4.0) / 1000) / etaGen);
+                } else if (actionKey === 'floor_inertia') {
+                    // Anticipation du déphasage de la dalle évitant une surchauffe de relance (+0.8°C sur 5h)
+                    kwh100 = ((hTotalRoomWPerK * 0.8 * 5.0) / 1000) / etaGen;
+                } else if (actionKey === 'open_win_humidity' || actionKey === 'vmc_boost') {
+                    // Aération flash maîtrisée (6 min avec minuteur) évitant les pertes d'une fenêtre laissée entrouverte (1.5 vol/h évité)
+                    kwh100 = ((0.34 * volume * 1.5 * deltaTExt) / 1000) / etaGen;
+                } else if (actionKey === 'vmc_reduce_cold') {
+                    // Retour de marche forcée à débit normal par grand froid sec (évite 0.45 vol/h de fuite d'air chaud sur 6h)
+                    kwh100 = ((0.34 * volume * 0.45 * deltaTExt * 6.0) / 1000) / etaGen;
                 } else if (actionKey === 'free_cooling') {
-                    const deltaT = Math.max(1, ta - envDataGlobal.t_ext);
-                    kwh100 = ((0.34 * 280 * deltaT * 2.5) / 1000) / 3.0;
-                } else if (actionKey === 'open_win_humidity' || actionKey === 'vmc_boost' || actionKey === 'open_door_humidity') {
-                    // Évite la surconsommation d'un air humide ou d'une fenêtre laissée entrouverte trop longtemps
-                    kwh100 = (area * 0.035) / etaGen;
-                } else if (actionKey === 'floor_inertia' || actionKey === 'heating_boost_comfort') {
-                    kwh100 = (area * 0.04) / etaGen;
+                    // Décharge thermique gratuite par l'air frais extérieur (200 m³/h sur 2.5h, équivalent clim EER 3.0)
+                    const deltaTCool = Math.max(1.5, ta - envDataGlobal.t_ext);
+                    kwh100 = ((0.34 * Math.max(120, volume * 4) * deltaTCool * 2.5) / 1000) / eerClim;
+                } else if (actionKey === 'fan_on') {
+                    // Brassage d'air (~25 W) évitant le recours à la climatisation pour -1.5°C ressenti sur 4h
+                    kwh100 = Math.max(0.15, (((hTotalRoomWPerK * 1.5 * 4.0) / 1000) / eerClim) - 0.10);
+                } else if (actionKey === 'fan_destrat') {
+                    // Destratification de l'air chaud sous plafond haut (>= 2.7m) rabattant +0.5°C vers la zone de vie sur 6h
+                    kwh100 = ((hTotalRoomWPerK * 0.5 * 6.0) / 1000) / etaGen;
+                } else if (actionKey === 'cooling_setpoint_eco') {
+                    // Consigne de climatisation maintenue à 26°C (ou coupure au profit du free-cooling) sur 5h
+                    kwh100 = ((hTotalRoomWPerK * 1.5 * 5.0) / 1000) / eerClim;
                 }
 
                 return {
@@ -536,7 +640,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
             }
 
-            // Helper unifié d'enregistrement avec cycle de vie, occurrence et dépréciation temporelle
+            // Helper unifié d'enregistrement avec cycle de vie, occurrence, dépréciation temporelle et visuel d'actionnable
             function pushRec(recData) {
                 const baseId = recData.id;
                 const occInfo = resolveOccurrenceForRec(baseId, recData.actionKey);
@@ -551,10 +655,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 const unitImpact = computeUnitImpactForAction(recData.actionKey);
+                const visualMeta = getActionableVisualMeta(recData.actionKey);
 
                 let appearedAt = Date.now();
                 if (lifecycleState.recos[finalId]) {
                     appearedAt = lifecycleState.recos[finalId].appearedAt || appearedAt;
+                    lifecycleState.recos[finalId].unitImpact = unitImpact;
+                    lifecycleState.recos[finalId].visualMeta = visualMeta;
                 } else {
                     lifecycleState.recos[finalId] = {
                         id: finalId,
@@ -574,7 +681,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         status: 'active',
                         nbVerres: recData.nbVerres || 0,
                         ventDurationMin: recData.ventDurationMin || 6,
-                        unitImpact: unitImpact
+                        unitImpact: unitImpact,
+                        visualMeta: visualMeta
                     };
                 }
 
@@ -588,20 +696,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     title: displayTitle,
                     appearedAt: appearedAt,
                     timeInfo: timeInfo,
-                    unitImpact: unitImpact
+                    unitImpact: unitImpact,
+                    visualMeta: visualMeta
                 });
             }
 
-            // --- NIVEAU 1 : ACTIONS IMMÉDIATES (< 1h) ---
+            // =========================================================================
+            // CATALOGUE D'ACTIONS SANS DOUBLON — 1 RÈGLE PAR ACTIONNABLE ÉQUIPÉ
+            // =========================================================================
 
-            // Aération différentielle unifiée avec le moteur Solstice
+            // --- ACTIONNABLE 1 : OUVRANTS DE FENÊTRE & VMC PILOTABLE (AÉRATION / FREE-COOLING) ---
             const vent = (engine.calculateDifferentialVentilation ? engine.calculateDifferentialVentilation(zone, roomData, envDataGlobal) : null) || {
                 status: (rh > 60 && deltaAh >= 0.4 && ahExt < ahInt) ? 'recommended_dry' : (ahExt >= ahInt ? 'blocked_humid' : 'comfort'),
                 verresTxt,
                 nbVerres,
                 mEau,
                 optimalDurationMin: (mainVentType === 'oscillante' || mainVentType === 'oscillo_battante' || mainVentType === 'partial') ? 12 : 6,
-                hasVmc,
+                hasVmc: hasActionableVmc,
                 canOpenWin: canOpenWindows
             };
 
@@ -611,114 +722,253 @@ document.addEventListener('DOMContentLoaded', function() {
             const effectiveNbVerres = vent.nbVerres || nbVerres;
             const effectiveMEau = vent.mEau !== undefined ? vent.mEau : mEau;
 
+            let windowActionEmitted = false;
+
             if (vent.status === 'urgent_dry' || vent.status === 'recommended_dry') {
                 if (canOpenWindows) {
-                    const titleText = isWetRoom ? `Purge à la source (${effectiveVerresTxt})` : `Aération flash ciblée (${effectiveVerresTxt})`;
-                    const actionText = isWetRoom 
-                        ? `L'humidité atteint ${rh} %. Ouvrez la fenêtre en grand ${ventDuration} (un minuteur vous préviendra de refermer) pour évacuer ${effectiveVerresTxt} sans refroidir les parois.`
-                        : `Ouvrez la fenêtre en grand ${ventDuration} (avec rappel automatique de fermeture) : vous évacuerez ${effectiveVerresTxt} sans entamer la chaleur des parois.`;
-                    pushRec({ 
-                        id: `${zoneId}_open_win_humidity`, 
-                        level: 1, 
-                        actionKey: 'open_win_humidity', 
-                        zoneId, 
-                        zoneName, 
-                        timing: 'immediate', 
-                        type: 'type-air', 
-                        title: titleText, 
-                        text: actionText, 
+                    windowActionEmitted = true;
+                    const cutHeatNote = (isHeatingSeasonActive && hasHeating && envDataGlobal.t_ext < 12)
+                        ? ` Pensez à baisser ${regDeviceLabel} pendant ces ${ventDuration}.`
+                        : '';
+                    const titleText = isWetRoom ? `Ouvrir la fenêtre ${ventDuration} — Purge vapeur (${effectiveVerresTxt})` : `Ouvrir la fenêtre ${ventDuration} — Aération flash (${effectiveVerresTxt})`;
+                    const actionText = `Humidité à ${rh} % (extérieur plus sec). Ouvrez en grand pendant ${ventDuration} (un minuteur vous notifiera de refermer) pour évacuer ${effectiveVerresTxt} sans refroidir vos parois.${cutHeatNote}`;
+                    pushRec({
+                        id: `${zoneId}_open_win_humidity`,
+                        level: 1,
+                        actionKey: 'open_win_humidity',
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-air',
+                        title: titleText,
+                        text: actionText,
                         impactWeight: 15,
                         nbVerres: effectiveNbVerres,
                         mEau: effectiveMEau,
                         ventDurationMin: ventDurationMin
                     });
-                } else if (hasVmc) {
-                    const titleText = isWetRoom ? `Boost VMC anti-humidité (${effectiveVerresTxt})` : `Boost VMC anti-humidité`;
-                    const actionText = `L'humidité atteint ${rh} % (air ext. asséchant). Passez la VMC en vitesse rapide pour extraire la vapeur d'eau (${effectiveVerresTxt}).`;
-                    pushRec({ 
-                        id: `${zoneId}_vmc_boost`, 
-                        level: 1, 
-                        actionKey: 'vmc_boost', 
-                        zoneId, 
-                        zoneName, 
-                        timing: 'immediate', 
-                        type: 'type-air', 
-                        title: titleText, 
-                        text: actionText, 
+                } else if (hasActionableVmc) {
+                    pushRec({
+                        id: `${zoneId}_vmc_boost`,
+                        level: 1,
+                        actionKey: 'vmc_boost',
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-air',
+                        title: `${vmcActionLabel} (${effectiveVerresTxt})`,
+                        text: `Humidité à ${rh} % dans cette pièce sans fenêtre ouvrable. Utilisez la VMC pour extraire ${effectiveVerresTxt}.`,
                         impactWeight: 15,
                         nbVerres: effectiveNbVerres,
                         mEau: effectiveMEau
                     });
                 }
-            } else if (vent.status === 'blocked_humid' && hasVmc && rh > 60) {
-                pushRec({ 
-                    id: `${zoneId}_vmc_boost`, 
-                    level: 1, 
-                    actionKey: 'vmc_boost', 
-                    zoneId, 
-                    zoneName, 
-                    timing: 'immediate', 
-                    type: 'type-air', 
-                    title: `Boost VMC anti-humidité (${effectiveVerresTxt})`, 
-                    text: `L'air extérieur est plus chargé en humidité (${ahExt.toFixed(1)} g/m³). Activez la VMC à la source pour évacuer la vapeur (${effectiveVerresTxt}) sans ouvrir les fenêtres.`, 
+            } else if (vent.status === 'blocked_humid' && hasActionableVmc && rh > 60) {
+                pushRec({
+                    id: `${zoneId}_vmc_boost`,
+                    level: 1,
+                    actionKey: 'vmc_boost',
+                    zoneId,
+                    zoneName,
+                    timing: 'immediate',
+                    type: 'type-air',
+                    title: `${vmcActionLabel} (${effectiveVerresTxt})`,
+                    text: `L'air extérieur est trop humide (${ahExt.toFixed(1)} g/m³) pour ouvrir les fenêtres. Extrayez la vapeur (${effectiveVerresTxt}) via la VMC.`,
                     impactWeight: 15,
                     nbVerres: effectiveNbVerres,
                     mEau: effectiveMEau
                 });
-            }
-
-            const isOutdoorHeatwaveThreat = tExtMaxDay > (ta + 1.5);
-            if (needsCooling && envDataGlobal.t_ext < ta && canOpenWindows && (isOutdoorHeatwaveThreat || ta > 23)) {
-                pushRec({ id: `${zoneId}_free_cooling`, level: 1, actionKey: 'free_cooling', zoneId, zoneName, timing: 'immediate', type: 'type-cool', title: 'Surventilation traversante (Free-cooling)', text: `Il fait plus frais dehors (${envDataGlobal.t_ext} °C). Ouvrez pour décharger l'air chaud.`, impactWeight: 20, ventDurationMin: 15 });
-            }
-
-            if (isHeatingSeasonActive && needsHeat && envDataGlobal.t_ext < 10 && (zone?.equipment?.heating?.system && zone.equipment.heating.system !== 'none') && canOpenWindows && (vent.status === 'urgent_dry' || vent.status === 'recommended_dry')) {
-                pushRec({ id: `${zoneId}_heating_cut_during_ventilation`, level: 1, actionKey: 'heating_cut', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Coupure du chauffage pendant l\'aération', text: `Coupez le chauffage dans cette pièce pendant les ${ventDuration} d'ouverture des fenêtres.`, impactWeight: 10 });
-            }
-
-            // Protection solaire d'été : uniquement sur les pièces dont les vitrages sont réellement exposés au soleil maintenant
-            if (needsCooling && isSunny && hasShutters && solarExp.isExposedNow) {
-                pushRec({ id: `${zoneId}_shutter_close`, level: 1, actionKey: 'shutter_close', zoneId, zoneName, timing: 'immediate', type: 'type-sun', title: `Bouclier solaire immédiat (${solarExp.exposedLabel})`, text: `Fermez les volets côté ${solarExp.exposedLabel} pour bloquer le rayonnement direct avant le vitrage.`, impactWeight: 25 });
-            }
-
-            if (needsCooling && isSunny && hasEastWestWin && (isMorning || isAfternoon) && solarExp.isExposedNow) {
-                pushRec({ id: `${zoneId}_targeted_orientation_shield`, level: 1, actionKey: 'shutter_close', zoneId, zoneName, timing: 'immediate', type: 'type-sun', title: 'Bouclier solaire orienté Est / Ouest', text: `Fermez les volets de la façade exposée au soleil rasant (${isMorning ? 'Est' : 'Ouest'}).`, impactWeight: 18 });
-            }
-
-            if (needsCooling && isSunny && hasRoofWin) {
-                pushRec({ id: `${zoneId}_roof_window_shield`, level: 1, actionKey: 'shutter_close', zoneId, zoneName, timing: 'immediate', type: 'type-sun', title: 'Protection prioritaire des fenêtres de toit', text: `Occultez les Velux : le rayonnement sous toiture est la cause principale de surchauffe.`, impactWeight: 22 });
-            }
-
-            // Chauffage solaire passif : UNIQUEMENT de jour, au soleil, et si la pièce possède un vitrage exposé au soleil à cette heure
-            if (needsHeat && isSunny && solarExp.isExposedNow && envDataGlobal.t_ext < ta) {
-                pushRec({ id: `${zoneId}_sun_heat`, level: 1, actionKey: 'sun_heat', zoneId, zoneName, timing: 'immediate', type: 'type-sun', title: `☀️ Chauffage solaire passif (${solarExp.exposedLabel})`, text: `Ouvrez grand les volets et rideaux côté ${solarExp.exposedLabel} pour laisser le soleil chauffer gratuitement vos parois.`, impactWeight: 20 });
-            }
-
-            // Bouclier thermique nocturne : déclenché dès le vrai coucher du soleil (sunsetHour) avec actionKey 'shutter_close_night' (augmente Tmr !)
-            if (needsHeat && isNight && hasShutters) {
-                pushRec({ id: `${zoneId}_winter_night_shutters`, level: 1, actionKey: 'shutter_close_night', zoneId, zoneName, timing: 'immediate', type: 'type-heat', title: `🌙 Bouclier thermique nocturne (dès ${sunsetHour}h)`, text: `Nuit tombée : fermez les volets pour couper la paroi froide du vitrage (+0.4°C de température radiante et -25% de pertes vitres).`, impactWeight: 18 });
-            }
-
-            if (needsHeat && isNight && hasInteriorCurtains && zone?.windows?.some(w => w.glass === 'single' || w.glass === 'double_old')) {
-                pushRec({ id: `${zoneId}_single_glass_thermal_curtain`, level: 1, actionKey: 'thermal_curtain', zoneId, zoneName, timing: 'immediate', type: 'type-heat', title: 'Rideau épais sur vitrage ancien (Nuit)', text: `Tirez les rideaux épais ce soir pour isoler la vitre froide et remonter la température radiante ressentie.`, impactWeight: 14 });
-            }
-
-            // Actionnables de secours en journée fraîche / grise (sans fermer les volets le jour pour préserver la lumière naturelle et le bien-être)
-            if (needsHeat && !isNight && (!isSunny || !solarExp.isExposedNow) && !isBuffer) {
+            } else if (isHeatingSeasonActive && hasActionableVmc && rh < 38 && envDataGlobal.t_ext < 8) {
+                // Nouvelle action pertinente sur VMC pilotable : éviter le sur-débit d'air froid et sec
+                const reduceVmcTitle = (vmcSys === 'trappe') ? 'Réduire la trappe VMC (Air sec & froid)' : 'Couper la marche forcée VMC (Débit normal)';
                 pushRec({
-                    id: `${zoneId}_clothing_adjust_warm`,
+                    id: `${zoneId}_vmc_reduce_cold`,
                     level: 1,
-                    actionKey: 'clothing_adjust_warm',
+                    actionKey: 'vmc_reduce_cold',
                     zoneId,
                     zoneName,
                     timing: 'immediate',
-                    type: 'type-heat',
-                    title: '🧥 Ajustement vestimentaire confort (+0.25 Clo)',
-                    text: `Ciel sans apport solaire sur cette pièce (${ta.toFixed(1)}°C, parois à ${tStruct.toFixed(1)}°C) : gardez les volets ouverts pour la lumière du jour et ajoutez une couche (pull fin / gilet) pour regagner +0.35 PMV sans surconsommer.`,
+                    type: 'type-eco',
+                    title: reduceVmcTitle,
+                    text: `L'air intérieur est déjà très sec (${rh} %) et il fait ${envDataGlobal.t_ext.toFixed(1)} °C dehors : repassez la VMC en débit minimal pour stopper les pertes d'air chaud.`,
                     impactWeight: 14
                 });
+            }
 
-                if (zone?.equipment?.heating?.system && zone.equipment.heating.system !== 'none' && roomPmv < -0.65) {
+            // Free-cooling sur ouvrants de fenêtre (uniquement si la fenêtre n'est pas déjà sollicitée par une aération flash, et sans doublon Niveau 1 / Niveau 3)
+            const isOutdoorHeatwaveThreat = tExtMaxDay > (ta + 1.5);
+            if (!windowActionEmitted && canOpenWindows && envDataGlobal.t_ext < (ta - 1.0)) {
+                if (needsCooling && (isOutdoorHeatwaveThreat || ta > 23.0)) {
+                    pushRec({
+                        id: `${zoneId}_free_cooling`,
+                        level: 1,
+                        actionKey: 'free_cooling',
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-cool',
+                        title: 'Ouvrir les fenêtres 15 min (Rafraîchissement gratuit)',
+                        text: `L'air extérieur est plus frais (${envDataGlobal.t_ext.toFixed(1)} °C contre ${ta.toFixed(1)} °C dedans). Ouvrez pour évacuer la chaleur gratuitement (avec rappel de fermeture).`,
+                        impactWeight: 20,
+                        ventDurationMin: 15
+                    });
+                } else if (!isHeatingSeasonActive && (tExtMaxDay >= 27.0 || tStruct >= 24.0) && envDataGlobal.t_ext < tStruct) {
+                    pushRec({
+                        id: `${zoneId}_heatwave_preventive_flush`,
+                        level: 3,
+                        actionKey: 'free_cooling',
+                        zoneId,
+                        zoneName,
+                        timing: 'strategic',
+                        type: 'type-cool',
+                        title: 'Sur-ventilation nocturne des parois (30 min)',
+                        text: `Chaleur annoncée (${tExtMaxDay.toFixed(0)} °C). Profitez de la fraîcheur extérieure (${envDataGlobal.t_ext.toFixed(1)} °C) pour décharger la masse de vos parois (${tStruct.toFixed(1)} °C).`,
+                        impactWeight: 24,
+                        ventDurationMin: 30
+                    });
+                }
+            }
+
+            // --- ACTIONNABLE 2 : VOLETS EXTÉRIEURS & RIDEAUX / STORES INTÉRIEURS (ZÉRO DOUBLON) ---
+            if (hasAnyShutterOrCurtain) {
+                const protName = hasExteriorShutters ? (hasInteriorCurtains ? 'les volets et rideaux' : 'les volets') : 'les rideaux / stores';
+
+                // Cas 2A : Journée ensoleillée en période fraîche -> Ouvrir en grand (fusionne Court Terme & Pré-charge 48h sans doublon)
+                if ((needsHeat || isHeatingSeasonActive) && isSunny && solarExp.isExposedNow && ta < 22.5 && envDataGlobal.t_ext < ta) {
+                    const prechargeNote = (tExtMinDay < 8.0)
+                        ? ` Cette recharge gratuite prépare aussi l'inertie de vos parois (${tStruct.toFixed(1)} °C) avant la nuit froide.`
+                        : '';
+                    pushRec({
+                        id: `${zoneId}_sun_heat`,
+                        level: 1,
+                        actionKey: 'sun_heat',
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-sun',
+                        title: `Ouvrir ${protName} côté ${solarExp.exposedLabel} (Soleil gratuit)`,
+                        text: `Vitrages exposés au soleil : ouvrez grand ${protName} côté ${solarExp.exposedLabel} pour chauffer gratuitement l'air et les parois.${prechargeNote}`,
+                        impactWeight: 20
+                    });
+                }
+                // Cas 2B : Nuit tombée en période fraîche -> Fermer pour créer le bouclier thermique nocturne (1 seule carte unifiée volets/rideaux)
+                else if ((needsHeat || isHeatingSeasonActive) && isNight && ta < 22.0) {
+                    const actKeyNight = hasExteriorShutters ? 'shutter_close_night' : 'thermal_curtain';
+                    pushRec({
+                        id: `${zoneId}_winter_night_shutters`,
+                        level: 1,
+                        actionKey: actKeyNight,
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-heat',
+                        title: `Fermer ${protName} pour la nuit (Bouclier isolant)`,
+                        text: `Nuit tombée (${envDataGlobal.t_ext.toFixed(1)} °C dehors) : fermez ${protName} pour couper l'effet paroi froide des vitres (+0,45 °C radiants) et réduire les pertes nocturnes.`,
+                        impactWeight: 18
+                    });
+                }
+                // Cas 2C : Surchauffe au soleil -> Fermer les protections côté soleil (fusionne façade + Est/Ouest + Velux en 1 seule action claire)
+                else if (needsCooling && isSunny && (solarExp.isExposedNow || hasRoofWin)) {
+                    const targetLabel = hasRoofWin
+                        ? (solarExp.exposedLabel ? `${solarExp.exposedLabel} & fenêtres de toit` : 'fenêtres de toit (Velux)')
+                        : solarExp.exposedLabel;
+                    pushRec({
+                        id: `${zoneId}_shutter_close`,
+                        level: 1,
+                        actionKey: 'shutter_close',
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-sun',
+                        title: `Fermer ${protName} côté ${targetLabel} (Anti-surchauffe)`,
+                        text: `Bloquez le rayonnement solaire direct sur vos vitrages (${targetLabel}) avant qu'il ne surchauffe la pièce (${ta.toFixed(1)} °C).`,
+                        impactWeight: 24
+                    });
+                }
+                // Cas 2D : Anticipation matin avant rotation du soleil sur Sud/Ouest en été
+                else if (needsCooling && isSunny && isMorning && solarExpDay.hasSouthOrWest && !solarExp.isExposedNow) {
+                    pushRec({
+                        id: `${zoneId}_anticipate_sun`,
+                        level: 2,
+                        actionKey: 'anticipate_sun',
+                        zoneId,
+                        zoneName,
+                        timing: 'anticipated',
+                        type: 'type-sun',
+                        title: `Anticiper la fermeture de ${protName} (Sud / Ouest)`,
+                        text: `Fermez ${protName} avant que le soleil ne tourne sur vos vitrages Sud/Ouest cet après-midi.`,
+                        impactWeight: 16
+                    });
+                }
+
+                // Rendez-vous programmé du soir : En journée de saison de chauffe, rappeler l'heure exacte de fermeture au coucher du soleil (Niveau 2)
+                if (isHeatingSeasonActive && !isNight) {
+                    pushRec({
+                        id: `${zoneId}_anticipate_night_shutters`,
+                        level: 2,
+                        actionKey: hasExteriorShutters ? 'shutter_close_night' : 'thermal_curtain',
+                        zoneId,
+                        zoneName,
+                        timing: 'anticipated',
+                        type: 'type-heat',
+                        title: `À ${sunsetHour}h00 : Fermer ${protName} dès le crépuscule`,
+                        text: `Rendez-vous thermique à ${sunsetHour}h00 (coucher du soleil) : verrouillez ${protName} pour piéger la chaleur de vos parois (${tStruct.toFixed(1)} °C) avant la chute nocturne.`,
+                        impactWeight: 15
+                    });
+                }
+            }
+
+            // --- ACTIONNABLE 3 : TENUE VESTIMENTAIRE (CLO) EN PIÈCE OCCUPÉE ---
+            if (!isBuffer) {
+                if (needsHeat && !isNight && (!isSunny || !solarExp.isExposedNow)) {
+                    pushRec({
+                        id: `${zoneId}_clothing_adjust_warm`,
+                        level: 1,
+                        actionKey: 'clothing_adjust_warm',
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-heat',
+                        title: 'Ajouter une couche vestimentaire (+0.25 Clo)',
+                        text: `Ressenti frais (${ta.toFixed(1)} °C, parois à ${tStruct.toFixed(1)} °C) sans soleil direct : gardez les volets ouverts pour la lumière naturelle et enfilez un pull fin ou gilet (+0,38 PMV immédiat, 0 € de chauffage).`,
+                        impactWeight: 15
+                    });
+                } else if (needsCooling && roomPmv > 0.40 && totalClo > 0.55) {
+                    pushRec({
+                        id: `${zoneId}_clothing_adjust_cool`,
+                        level: 1,
+                        actionKey: 'clothing_adjust_cool',
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-cool',
+                        title: 'Alléger la tenue vestimentaire (-0.20 Clo)',
+                        text: `Ambiance chaude (${ta.toFixed(1)} °C, PMV +${roomPmv.toFixed(2)}) : passez en tenue légère respirante pour regagner du confort immédiat sans dépenser d'énergie.`,
+                        impactWeight: 14
+                    });
+                }
+            }
+
+            // --- ACTIONNABLE 4 : CHAUFFAGE & RÉGULATION (THERMOSTAT, ROBINET THERMOSTATIQUE, PLANCHER) ---
+            if (hasHeating && !isBuffer) {
+                // Exclusivité mutuelle stricte : on ne propose jamais de monter et baisser le chauffage en même temps
+                if (isHeatingSeasonActive && (roomPmv > 0.30 || (reserve.chargeCalories >= 75 && roomPmv >= -0.15))) {
+                    const reasonTxt = (roomPmv > 0.30)
+                        ? `La pièce dépasse la neutralité thermique (${ta.toFixed(1)} °C, PMV +${roomPmv.toFixed(2)}).`
+                        : `Vos parois sont chargées en chaleur (${tStruct.toFixed(1)} °C, réserve ${reserve.chargeCalories} %).`;
+                    pushRec({
+                        id: `${zoneId}_heating_cut`,
+                        level: 1,
+                        actionKey: 'heating_cut',
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-eco',
+                        title: `Baisser ${regDeviceLabel} de -1 °C (Sobriété & Inertie)`,
+                        text: `${reasonTxt} Réduisez ${regDeviceLabel} d'un cran (-1 °C) pour économiser immédiatement sur le chauffage tout en restant confortable.`,
+                        impactWeight: 16
+                    });
+                } else if (needsHeat && roomPmv < -0.65 && (!isSunny || !solarExp.isExposedNow) && heatingSys !== 'floor') {
                     pushRec({
                         id: `${zoneId}_heating_boost_comfort`,
                         level: 1,
@@ -727,94 +977,106 @@ document.addEventListener('DOMContentLoaded', function() {
                         zoneName,
                         timing: 'immediate',
                         type: 'type-heat',
-                        title: '🌡️ Appoint ciblé thermostat / robinet (+0.5°C)',
-                        text: `Inconfort frais marqué (PMV ${roomPmv.toFixed(2)}) sans relais solaire : relevez légèrement le thermostat ou le robinet thermostatique pendant l'occupation de la pièce.`,
+                        title: `Monter ${regDeviceLabel} de +0,5 °C (Appoint confort)`,
+                        text: `Inconfort frais marqué (PMV ${roomPmv.toFixed(2)}) sans apport solaire : si l'ajout d'un vêtement ne suffit pas, relevez légèrement ${regDeviceLabel} pendant l'occupation.`,
                         impactWeight: 12
+                    });
+                }
+
+                // Niveau 2 : Plancher chauffant à forte inertie
+                if (isHeatingSeasonActive && needsHeat && heatingSys === 'floor') {
+                    pushRec({
+                        id: `${zoneId}_floor_inertia`,
+                        level: 2,
+                        actionKey: 'floor_inertia',
+                        zoneId,
+                        zoneName,
+                        timing: 'anticipated',
+                        type: 'type-heat',
+                        title: `Anticiper la consigne du plancher chauffant (Inertie dalle)`,
+                        text: `Dalle à fort déphasage : pilotez ${regDeviceLabel} 3h à l'avance sans surchauffer en pointe.`,
+                        impactWeight: 15
+                    });
+                }
+
+                // Niveau 2 : Consigne nocturne en chambre
+                if (isHeatingSeasonActive && Array.isArray(zone?.usages) && zone.usages.includes('bedroom') && ta > 18.2) {
+                    pushRec({
+                        id: `${zoneId}_bedroom_temp_drop`,
+                        level: 2,
+                        actionKey: 'bedroom_temp',
+                        zoneId,
+                        zoneName,
+                        timing: 'anticipated',
+                        type: 'type-eco',
+                        title: `Abaisser ${regDeviceLabel} à 17,5 °C pour la nuit`,
+                        text: `Chambre à ${ta.toFixed(1)} °C : réglez ${regDeviceLabel} sur 17,5 °C 1h avant le coucher pour un sommeil optimal et 8h d'économies nocturnes.`,
+                        impactWeight: 14
                     });
                 }
             }
 
-            if (isHeatingSeasonActive && roomPmv > 0.3 && zone?.equipment?.heating?.regulation?.includes('thermostatic_valve')) {
-                pushRec({ id: `${zoneId}_thermostatic_balancing`, level: 1, actionKey: 'heating_cut', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Équilibrage par robinet thermostatique', text: `Réduisez le robinet d'un cran dans cette pièce pour réorienter l'eau chaude vers les pièces froides.`, impactWeight: 12 });
+            // --- ACTIONNABLE 5 : BRASSEUR D'AIR / VENTILATEUR (ÉTÉ & DESTRATIFICATION HIVER) ---
+            if (hasFan) {
+                const fanLabel = (fanSys === 'plafond') ? 'le ventilateur de plafond' : 'le ventilateur mobile';
+                if (needsCooling) {
+                    pushRec({
+                        id: `${zoneId}_fan_on`,
+                        level: 1,
+                        actionKey: 'fan_on',
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-cool',
+                        title: `Activer ${fanLabel} (Gain ressenti -2 °C)`,
+                        text: `Le mouvement d'air (+0,25 m/s) rafraîchit immédiatement le ressenti cutané (-0,45 PMV) pour une consommation dérisoire (~25 W).`,
+                        impactWeight: 18
+                    });
+                } else if (isHeatingSeasonActive && needsHeat && fanSys === 'plafond' && height >= 2.7) {
+                    pushRec({
+                        id: `${zoneId}_fan_destrat`,
+                        level: 1,
+                        actionKey: 'fan_destrat',
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-heat',
+                        title: `Activer le ventilateur de plafond en mode Hiver (Destratification)`,
+                        text: `Plafond haut (${height.toFixed(1)} m) : faites tourner le brasseur à vitesse lente (sens inverse) pour rabattre la poche d'air chaud du plafond vers la zone de vie (+0,45 °C gagnés).`,
+                        impactWeight: 15
+                    });
+                }
             }
 
-            if (needsCooling && zone?.equipment?.fanSystem && zone.equipment.fanSystem !== 'aucun') {
-                pushRec({ id: `${zoneId}_fan_on`, level: 1, actionKey: 'fan_on', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: `Activer le brassage d'air (${zone.equipment.fanSystem})`, text: `Le flux d'air rafraîchit le ressenti cutané de 2 °C sans climatisation.`, impactWeight: 18 });
-            }
-
-            if (isHeatingSeasonActive && reserve.chargeCalories >= 75) {
-                pushRec({ id: `${zoneId}_high_calorie_stock_eco`, level: 1, actionKey: 'heating_cut', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Valorisation de l\'inertie chaude (Calories > 75 %)', text: `Les parois sont gorgées de chaleur (${reserve.chargeCalories} %). Baissez la consigne d'un degré.`, impactWeight: 16 });
-            }
-
-            // --- NIVEAU 2 : OPPORTUNISME 24H ---
-            if (needsCooling && isSunny && hasShutters && isMorning && solarExpDay.hasSouthOrWest) {
-                pushRec({ id: `${zoneId}_anticipate_sun`, level: 2, actionKey: 'anticipate_sun', zoneId, zoneName, timing: 'anticipated', type: 'type-sun', title: 'Occultation préventive du matin', text: `Fermez les volets dès 10h pour devancer le pic de chaleur de l'après-midi.`, impactWeight: 15 });
-            }
-
-            if (isHeatingSeasonActive && needsHeat && zone?.equipment?.heating?.system === 'floor') {
-                pushRec({ id: `${zoneId}_floor_inertia`, level: 2, actionKey: 'floor_inertia', zoneId, zoneName, timing: 'anticipated', type: 'type-heat', title: 'Anticipation plancher chauffant', text: `Relancez la consigne 3 heures à l'avance pour compenser la forte inertie de la dalle.`, impactWeight: 15 });
-            }
-
-            if (isHeatingSeasonActive && zone?.usages?.includes('bedroom') && needsHeat && isEvening) {
-                pushRec({ id: `${zoneId}_bedroom_temp_drop`, level: 2, actionKey: 'bedroom_temp', zoneId, zoneName, timing: 'anticipated', type: 'type-eco', title: 'Consigne nocturne en chambre (17 °C à 18 °C)', text: `Réglez le thermostat à 17-18 °C 1h avant le coucher.`, impactWeight: 12 });
-            }
-
-            // Anticipation de la fermeture des volets avant la tombée de la nuit (en journée de saison de chauffe)
-            if (isHeatingSeasonActive && needsHeat && !isNight && hasShutters) {
-                pushRec({
-                    id: `${zoneId}_anticipate_night_shutters`,
-                    level: 2,
-                    actionKey: 'shutter_close_night',
-                    zoneId,
-                    zoneName,
-                    timing: 'anticipated',
-                    type: 'type-heat',
-                    title: `🌅 Anticiper la fermeture des volets dès ${sunsetHour}h`,
-                    text: `Le soleil se couche vers ${sunsetHour}h : fermez les volets dès le crépuscule pour piéger la chaleur du jour dans vos parois (${tStruct.toFixed(1)}°C) avant la chute nocturne.`,
-                    impactWeight: 15
-                });
-            }
-
-            // --- NIVEAU 3 : STRATÉGIE MÉTÉO (48h-72h) ---
-            const surchauffeInterieure = (tStruct >= 24.0 || ta >= 24.0);
-            const vraieSurchauffeExterieure = (envDataGlobal.t_ext >= 22.0 && tExtMinDay >= 18.0);
-            const nuitsFraichesOuIntersaison = (tExtMinDay < 18.0 || envDataGlobal.t_ext < 19.0 || isHeatingSeasonActive);
-
-            if (surchauffeInterieure && vraieSurchauffeExterieure && !nuitsFraichesOuIntersaison && reserve.chargeFrigories < 35 && canOpenWindows) {
-                pushRec({ id: `${zoneId}_low_frigorie_stock`, level: 3, actionKey: 'free_cooling', zoneId, zoneName, timing: 'strategic', type: 'type-cool', title: 'Décharge nocturne prioritaire (Canicule)', text: `La structure est saturée en chaleur. Ouvrez les fenêtres cette nuit pour refroidir la masse des parois.`, impactWeight: 22, ventDurationMin: 30 });
-            }
-
-            // Stratégie 48h : Pré-charge solaire de la dalle avant vague de froid (uniquement sur les pièces ayant des ouvertures Sud/Est/Ouest)
-            if (isHeatingSeasonActive && isSunny && solarExpDay.hasSouthOrWest && (tExtMinDay < 8.0 || tExtMaxDay < 13.0)) {
-                pushRec({
-                    id: `${zoneId}_solar_precharge_cold_snap`,
-                    level: 3,
-                    actionKey: 'sun_heat',
-                    zoneId,
-                    zoneName,
-                    timing: 'strategic',
-                    type: 'type-sun',
-                    title: '🧱 Pré-charge solaire des parois (Anticipation 48h)',
-                    text: `Baisse de température annoncée. Laissez le soleil charger vos parois et sols tout l'après-midi pour stocker un maximum de calories gratuites avant la vague de fraîcheur.`,
-                    impactWeight: 20
-                });
-            }
-
-            // Stratégie 48h : Sur-ventilation nocturne profonde avant pic caniculaire
-            if (!isHeatingSeasonActive && tExtMaxDay >= 28.0 && envDataGlobal.t_ext < tStruct && canOpenWindows) {
-                pushRec({
-                    id: `${zoneId}_heatwave_preventive_flush`,
-                    level: 3,
-                    actionKey: 'free_cooling',
-                    zoneId,
-                    zoneName,
-                    timing: 'strategic',
-                    type: 'type-cool',
-                    title: '🌊 Sur-ventilation nocturne profonde (Anticipation pic chaud)',
-                    text: `Fortes chaleurs annoncées demain (${tExtMaxDay}°C). Faites circuler l'air nocturne (${envDataGlobal.t_ext}°C) pour refroidir la masse des parois (${tStruct.toFixed(1)}°C) et régénérer votre réserve de fraîcheur.`,
-                    impactWeight: 25,
-                    ventDurationMin: 30
-                });
+            // --- ACTIONNABLE 6 : CLIMATISATION / REFROIDISSEMENT ACTIF ---
+            if (hasCooling && !isHeatingSeasonActive && (needsCooling || ta >= 24.0)) {
+                if (envDataGlobal.t_ext < (ta - 1.0) && canOpenWindows) {
+                    pushRec({
+                        id: `${zoneId}_cooling_setpoint_eco`,
+                        level: 1,
+                        actionKey: 'cooling_setpoint_eco',
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-eco',
+                        title: `Couper la climatisation (Extérieur plus frais à ${envDataGlobal.t_ext.toFixed(1)} °C)`,
+                        text: `Il fait plus frais dehors que dedans (${ta.toFixed(1)} °C) : éteignez la climatisation et profitez du rafraîchissement naturel par les fenêtres.`,
+                        impactWeight: 18
+                    });
+                } else if (envDataGlobal.t_ext >= 25.0) {
+                    pushRec({
+                        id: `${zoneId}_cooling_setpoint_eco`,
+                        level: 1,
+                        actionKey: 'cooling_setpoint_eco',
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-eco',
+                        title: `Maintenir la consigne de climatisation à 26 °C`,
+                        text: `Évitez tout écart supérieur à 5-6 °C avec l'extérieur : régler la consigne sur 26 °C économise ~15 % d'électricité par degré.`,
+                        impactWeight: 15
+                    });
+                }
             }
 
             return recs;
@@ -924,8 +1186,112 @@ document.addEventListener('DOMContentLoaded', function() {
             renderCompletedCards(completedItems, containerCompleted, "Aucune action réalisée pour le moment.");
 
             renderActiveWindowTimers();
+            renderNotificationHub(pendingRecs);
             renderArbitrageCard(recs);
             updateMetrics(recs);
+        }
+
+        // ============================================================
+        // CENTRE DE NOTIFICATION DIRECT & ALERTES ÉQUIPEMENTS
+        // ============================================================
+        window.solsticeEnableActionNotifications = function() {
+            playWindowAlertChime();
+            if ('Notification' in window) {
+                Notification.requestPermission().then(perm => {
+                    if (perm === 'granted') {
+                        try {
+                            new Notification("🔔 SOLSTICE — Notifications Thermiques Activées", {
+                                body: "Vous serez alerté en direct dès qu'une action sur vos fenêtres, volets ou chauffage est recommandée."
+                            });
+                        } catch (e) {}
+                    }
+                    render();
+                });
+            }
+        };
+
+        function renderNotificationHub(pendingRecs) {
+            const hubEl = document.getElementById('live-reco-notification-hub');
+            if (!hubEl) return;
+
+            const immediateList = (pendingRecs || []).filter(r => r.level === 1);
+            const scheduledList = (pendingRecs || []).filter(r => r.level >= 2);
+
+            if (immediateList.length === 0) {
+                hubEl.innerHTML = `
+                    <div class="notif-hub-banner notif-hub-calm">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.5rem;">✅</span>
+                                <div>
+                                    <div style="font-weight: 800; color: #14532d; font-size: 0.98rem;">
+                                        Aucune manipulation immédiate requise sur vos équipements
+                                    </div>
+                                    <div style="font-size: 0.84rem; color: #166534; margin-top: 2px;">
+                                        ${scheduledList.length > 0 ? `${scheduledList.length} rendez-vous d'anticipation sont programmés plus bas (24h-48h).` : `Tous les équipements de vos pièces sont dans leur configuration optimale.`}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Résumé des actionnables à manipuler maintenant
+            const equipSummaryMap = new Map();
+            let totalImmediateEur = 0;
+            let avgImmediatePmv = 0;
+
+            immediateList.forEach(r => {
+                const vMeta = r.visualMeta || { icon: '⚙️', equip: 'ÉQUIPEMENT' };
+                const key = `${vMeta.icon} ${vMeta.equip}`;
+                if (!equipSummaryMap.has(key)) equipSummaryMap.set(key, new Set());
+                equipSummaryMap.get(key).add(r.zoneName);
+
+                const u = r.unitImpact || { deltaPmv100: 0.15, eur100: 0 };
+                const f = r.timeInfo ? r.timeInfo.factor : 1.0;
+                avgImmediatePmv += (u.deltaPmv100 * f);
+                if (u.eur100 > 0) totalImmediateEur += (u.eur100 * f);
+            });
+            avgImmediatePmv = avgImmediatePmv / Math.max(1, immediateList.length);
+
+            const equipPillsHtml = Array.from(equipSummaryMap.entries()).map(([eqName, roomsSet]) => {
+                const rArr = Array.from(roomsSet);
+                return `<span style="background: #ffffff; border: 1px solid #f59e0b; color: #92400e; font-size: 0.78rem; font-weight: 800; padding: 4px 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px;">
+                    <strong>${eqName}</strong> <span style="color: #475569; font-weight: 600;">(${rArr.join(', ')})</span>
+                </span>`;
+            }).join('');
+
+            const notifPerm = ('Notification' in window) ? Notification.permission : 'unsupported';
+            const notifBtnHtml = (notifPerm !== 'granted')
+                ? `<button type="button" onclick="window.solsticeEnableActionNotifications()" style="background: #0f172a; color: #ffffff; border: none; border-radius: 8px; padding: 7px 12px; font-weight: 800; font-size: 0.78rem; cursor: pointer; white-space: nowrap;">
+                    🔔 Activer alertes & son
+                   </button>`
+                : `<span style="font-size: 0.75rem; font-weight: 700; color: #15803d; background: #dcfce7; padding: 4px 9px; border-radius: 999px; border: 1px solid #86efac;">🔔 Alertes actives</span>`;
+
+            hubEl.innerHTML = `
+                <div class="notif-hub-banner notif-hub-active">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.65rem; line-height: 1;">🔔</span>
+                            <div>
+                                <div style="font-weight: 900; color: #78350f; font-size: 1.02rem;">
+                                    ${immediateList.length} action${immediateList.length > 1 ? 's' : ''} à réaliser maintenant dans votre habitat
+                                </div>
+                                <div style="font-size: 0.84rem; color: #92400e; margin-top: 2px;">
+                                    Potentiel immédiat : <strong>+${avgImmediatePmv.toFixed(2)} PMV</strong> de confort moyen ${totalImmediateEur > 0.01 ? `et <strong>+${totalImmediateEur.toFixed(2).replace('.', ',')} €</strong> d'économies` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        ${notifBtnHtml}
+                    </div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 4px;">
+                        <span style="font-size: 0.76rem; font-weight: 800; color: #78350f; text-transform: uppercase;">Actionnables sollicités :</span>
+                        ${equipPillsHtml}
+                    </div>
+                </div>
+            `;
         }
 
         // ============================================================
@@ -1142,17 +1508,23 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }
 
-        // Formatage du badge de gain combiné PMV & Financier selon le pourcentage de réactivité
+        // Formatage des badges visuels de gain (Confort PMV + Économie ou Coût financier honnête) selon le % de réactivité
         function formatGainBadgeHtml(unitImpact, factor, pct) {
             if (!unitImpact) return '';
-            const effPmv = (unitImpact.deltaPmv100 * factor).toFixed(2);
-            const effKwh = (unitImpact.kwh100 * factor).toFixed(2);
-            const effEur = (unitImpact.eur100 * factor).toFixed(2).replace('.', ',');
-            const parts = [];
-            if (parseFloat(effPmv) > 0) parts.push(`+${effPmv} PMV`);
-            if (parseFloat(effKwh) > 0.01) parts.push(`${effKwh} kWh (~${effEur} €)`);
-            if (parts.length === 0) return '';
-            return `<span class="tag-weight" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;" title="Gain de confort PMV et d'énergie pondéré par votre réactivité (${pct}%)">🎯 Gain (${pct}%) : ${parts.join(' • ')}</span>`;
+            const effPmvNum = unitImpact.deltaPmv100 * factor;
+            const effKwhNum = unitImpact.kwh100 * factor;
+            const effEurNum = unitImpact.eur100 * factor;
+
+            const pills = [];
+            if (effPmvNum > 0.01) {
+                pills.push(`<span class="impact-pill-pmv" title="Gain de confort thermique ressenti pondéré par votre réactivité (${pct}%)">🌡️ Confort (${pct}%) : +${effPmvNum.toFixed(2)} PMV</span>`);
+            }
+            if (effKwhNum > 0.01) {
+                pills.push(`<span class="impact-pill-eur-pos" title="Énergie et dépenses évitées grâce à cette action">💶 Économie : +${effEurNum.toFixed(2).replace('.', ',')} € (+${effKwhNum.toFixed(2)} kWh)</span>`);
+            } else if (effKwhNum < -0.01) {
+                pills.push(`<span class="impact-pill-eur-neg" title="Coût énergétique de cet appoint actif de confort">⚡ Coût appoint : -${Math.abs(effEurNum).toFixed(2).replace('.', ',')} € (-${Math.abs(effKwhNum).toFixed(2)} kWh)</span>`);
+            }
+            return pills.join('');
         }
 
         function renderGroupedCards(groupList, container, emptyText) {
@@ -1164,40 +1536,57 @@ document.addEventListener('DOMContentLoaded', function() {
 
             groupList.forEach(group => {
                 const totalRooms = group.items.length;
+                const firstItem = group.items[0];
+                const vMeta = firstItem?.visualMeta || lifecycleState.recos[firstItem?.id]?.visualMeta || {
+                    icon: '⚙️', equip: 'ÉQUIPEMENT', bg: '#f1f5f9', color: '#334155', border: '#cbd5e1'
+                };
+                const timingLabel = group.level === 1
+                    ? '🟢 À FAIRE MAINTENANT'
+                    : (group.level === 2 ? '🕒 ANTICIPATION 24H' : '📅 STRATÉGIE 48-72H');
 
                 // ============================================================
-                // CAS 1 : UNE SEULE PIÈCE CONCERNÉE (Carte unitaire directe)
+                // CAS 1 : UNE SEULE PIÈCE CONCERNÉE (Carte visuelle d'actionnable)
                 // ============================================================
                 if (totalRooms === 1) {
                     const item = group.items[0];
                     const tInfo = item.timeInfo || getActionTimeInfo(item, lifecycleState.recos[item.id]);
                     const uImp = item.unitImpact || lifecycleState.recos[item.id]?.unitImpact;
-                    const gainBadge = formatGainBadgeHtml(uImp, tInfo.factor, tInfo.percent);
+                    const gainPills = formatGainBadgeHtml(uImp, tInfo.factor, tInfo.percent);
+                    const btnActionText = (item.actionKey === 'open_win_humidity' || item.actionKey === 'free_cooling')
+                        ? `🪟 Ouvrir (${item.ventDurationMin || 6} min)`
+                        : `✅ Fait`;
 
                     const card = document.createElement('div');
                     card.className = `reco-card reco-card-single ${item.type || group.type || ''}`;
+                    card.style.cssText = "display: flex; align-items: stretch; gap: 14px;";
                     card.onclick = (e) => {
-                        if (e.target.tagName !== 'INPUT') {
+                        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
                             window.solsticeToggleSingle(item.id, e);
                         }
                     };
 
                     card.innerHTML = `
-                        <div style="padding-top: 2px;">
-                            <input type="checkbox" 
-                                   onchange="window.solsticeToggleSingle('${item.id}', event)" 
-                                   style="width: 20px; height: 20px; cursor: pointer; accent-color: #10B981;">
+                        <div class="actionable-visual-box" style="background: ${vMeta.bg}; color: ${vMeta.color}; border: 1px solid ${vMeta.border};">
+                            <span class="actionable-icon-big">${vMeta.icon}</span>
+                            <span class="actionable-name-tag">${vMeta.equip}</span>
                         </div>
-                        <div style="flex: 1;">
-                            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap;">
-                                <span class="level-badge level-${item.level}">Niveau ${item.level}</span>
-                                <span class="room-badge-bold">📍 ${item.zoneName}</span>
-                                <span class="badge-delay ${tInfo.delayClass}">⏱️ ${tInfo.elapsedText} • ${tInfo.percent}% (+${tInfo.currentPoints} pts)</span>
-                                ${gainBadge}
-                                ${item.occurrence > 1 ? `<span class="badge-occurrence">🔁 Interv. #${item.occurrence}</span>` : ''}
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; margin-bottom: 0.35rem;">
+                                <div style="display: flex; gap: 7px; align-items: center; flex-wrap: wrap;">
+                                    <span class="room-badge-bold">📍 ${item.zoneName}</span>
+                                    <span class="level-badge level-${item.level}">${timingLabel}</span>
+                                    <span class="badge-delay ${tInfo.delayClass}">⏱️ ${tInfo.elapsedText} • ${tInfo.percent}% (+${tInfo.currentPoints} pts)</span>
+                                    ${item.occurrence > 1 ? `<span class="badge-occurrence">🔁 Interv. #${item.occurrence}</span>` : ''}
+                                </div>
+                                <button type="button" class="btn-validate-direct" onclick="window.solsticeToggleSingle('${item.id}', event)">
+                                    ${btnActionText}
+                                </button>
                             </div>
-                            <div class="reco-title" style="margin-bottom: 0.25rem;">${item.title}</div>
+                            <div class="reco-title" style="margin-bottom: 0.25rem; font-size: 1.02rem;">${item.title}</div>
                             <div class="reco-text">${item.text}</div>
+                            <div class="impact-pills-row">
+                                ${gainPills}
+                            </div>
                         </div>
                     `;
 
@@ -1206,7 +1595,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 // ============================================================
-                // CAS 2 : PLUSIEURS PIÈCES CONCERNÉES (Carte groupée moderne)
+                // CAS 2 : PLUSIEURS PIÈCES CONCERNÉES (Carte groupée par Actionnable)
                 // ============================================================
                 const totalVerres = group.items.reduce((sum, item) => sum + (item.nbVerres || 0), 0);
                 const verresGroupTxt = `~${totalVerres} verre${totalVerres > 1 ? 's' : ''} d'eau au total`;
@@ -1215,29 +1604,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 let groupText = group.text;
 
                 if (group.actionKey === 'open_win_humidity') {
-                    groupTitle = `Aération flash ciblée (${totalRooms} pièces — ${verresGroupTxt})`;
+                    groupTitle = `Ouvrir les fenêtres (${totalRooms} pièces — ${verresGroupTxt})`;
                     groupText = `Ouvrez les fenêtres dans les ${totalRooms} pièces concernées (avec minuteur automatique de fermeture) : vous évacuerez ${verresGroupTxt} sans entamer la chaleur des parois.`;
                 } else if (group.actionKey === 'vmc_boost') {
-                    groupTitle = `Boost VMC anti-humidité (${totalRooms} pièces)`;
-                    groupText = `L'air extérieur est asséchant. Passez la VMC en vitesse rapide pour extraire la vapeur d'eau générée dans ces ${totalRooms} pièces.`;
-                } else if (group.actionKey === 'open_door_humidity') {
-                    groupTitle = `Aération indirecte / Ouvrir portes (${totalRooms} pièces)`;
-                    groupText = `Ouvrez les portes dans ces ${totalRooms} pièces vers des zones aérées pour chasser l'humidité accumulée.`;
+                    groupTitle = `Activer la VMC anti-humidité (${totalRooms} pièces)`;
+                    groupText = `Passez la VMC en extraction dans ces ${totalRooms} pièces pour évacuer la vapeur d'eau.`;
                 } else if (group.actionKey === 'shutter_close') {
-                    groupTitle = `Bouclier solaire immédiat (${totalRooms} pièces)`;
-                    groupText = `Fermez les volets dans les ${totalRooms} pièces exposées au soleil pour bloquer le rayonnement direct avant le vitrage.`;
-                } else if (group.actionKey === 'shutter_close_night') {
-                    groupTitle = `🌙 Bouclier thermique nocturne (${totalRooms} pièces)`;
-                    groupText = `Nuit tombée : fermez les volets dans ces ${totalRooms} pièces pour couper l'effet paroi froide des vitrages (+0.4°C radiants).`;
+                    groupTitle = `Fermer les protections solaires (${totalRooms} pièces exposées)`;
+                    groupText = `Fermez les volets ou stores dans les ${totalRooms} pièces au soleil pour bloquer le rayonnement direct avant le vitrage.`;
+                } else if (group.actionKey === 'shutter_close_night' || group.actionKey === 'thermal_curtain') {
+                    groupTitle = (group.level === 2)
+                        ? `À ${sunsetHour}h00 : Fermer les volets et rideaux (${totalRooms} pièces)`
+                        : `Fermer les volets et rideaux pour la nuit (${totalRooms} pièces)`;
+                    groupText = (group.level === 2)
+                        ? `Rendez-vous thermique au coucher du soleil (${sunsetHour}h00) : fermez les protections dans ces ${totalRooms} pièces pour piéger la chaleur des parois avant la nuit.`
+                        : `Nuit tombée : fermez les volets/rideaux dans ces ${totalRooms} pièces pour couper l'effet paroi froide des vitrages (+0,45 °C radiants).`;
                 } else if (group.actionKey === 'free_cooling') {
-                    groupTitle = `Surventilation traversante (${totalRooms} pièces)`;
-                    groupText = `Il fait plus frais dehors (${envDataGlobal.t_ext} °C). Ouvrez pour créer un courant d'air traversant entre ces ${totalRooms} pièces et décharger l'air chaud.`;
+                    groupTitle = `Ouvrir les fenêtres — Rafraîchissement gratuit (${totalRooms} pièces)`;
+                    groupText = `Il fait plus frais dehors (${envDataGlobal.t_ext.toFixed(1)} °C). Ouvrez dans ces ${totalRooms} pièces pour décharger l'air chaud.`;
                 } else if (group.actionKey === 'sun_heat') {
-                    groupTitle = `☀️ Chauffage solaire passif (${totalRooms} pièces exposées)`;
-                    groupText = `Ouvrez les protections dans ces ${totalRooms} pièces ensoleillées pour chauffer gratuitement vos parois.`;
+                    groupTitle = `Ouvrir les volets/rideaux au soleil (${totalRooms} pièces exposées)`;
+                    groupText = `Ouvrez grand les protections dans ces ${totalRooms} pièces ensoleillées pour chauffer gratuitement l'air et les parois.`;
                 } else if (group.actionKey === 'clothing_adjust_warm') {
-                    groupTitle = `🧥 Ajustement vestimentaire confort (+0.25 Clo — ${totalRooms} pièces)`;
-                    groupText = `Temps couvert sans apport solaire direct : gardez la lumière du jour (volets ouverts) et ajoutez une couche légère pour retrouver un PMV confortable sans surchauffer.`;
+                    groupTitle = `Ajouter une couche vestimentaire (+0.25 Clo — ${totalRooms} pièces)`;
+                    groupText = `Ciel sans soleil direct : gardez les volets ouverts pour la lumière du jour et ajoutez un pull fin ou gilet pour gagner +0,38 PMV sans surchauffer.`;
+                } else if (group.actionKey === 'heating_cut') {
+                    groupTitle = `Baisser le chauffage de -1 °C (${totalRooms} pièces)`;
+                    groupText = `Valorisez la chaleur déjà présente dans ces ${totalRooms} pièces en abaissant le thermostat ou robinet thermostatique d'un cran (-1 °C).`;
+                } else if (group.actionKey === 'heating_boost_comfort') {
+                    groupTitle = `Appoint ciblé thermostat / robinet +0,5 °C (${totalRooms} pièces)`;
+                    groupText = `Inconfort frais marqué sans relais solaire : relevez légèrement le thermostat ou robinet dans les pièces occupées.`;
                 }
 
                 const totalGroupCurrentPts = group.items.reduce((sum, item) => {
@@ -1265,7 +1661,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const earliestItem = group.items.slice().sort((a, b) => (a.appearedAt || 0) - (b.appearedAt || 0))[0];
                 const earliestInfo = earliestItem?.timeInfo || getActionTimeInfo(earliestItem, lifecycleState.recos[earliestItem?.id]);
-                const groupGainBadge = formatGainBadgeHtml(
+                const groupGainPills = formatGainBadgeHtml(
                     { deltaPmv100: avgGroupPmvGain, kwh100: sumGroupKwh, eur100: sumGroupEur },
                     1.0,
                     earliestInfo.percent
@@ -1273,39 +1669,47 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const card = document.createElement('div');
                 card.className = `reco-card ${group.type || ''}`;
-                card.style.cssText = "display: flex; flex-direction: column; width: 100%; box-sizing: border-box;";
+                card.style.cssText = "display: flex; align-items: stretch; gap: 14px; width: 100%; box-sizing: border-box;";
 
                 card.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 0.4rem; flex-wrap: wrap;">
-                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                            <span class="level-badge level-${group.level}">Niveau ${group.level}</span>
-                            <span class="badge-delay ${earliestInfo.delayClass}">⏱️ ${earliestInfo.elapsedText} • ${earliestInfo.percent}%</span>
-                            <span class="tag-weight">+${totalGroupCurrentPts} pts</span>
-                            ${groupGainBadge}
-                        </div>
-                        <button type="button" class="btn-group-toggle" onclick="window.solsticeToggleGroup('${group.groupKey}', true)">
-                            ⚡ Tout appliquer (${totalRooms})
-                        </button>
+                    <div class="actionable-visual-box" style="background: ${vMeta.bg}; color: ${vMeta.color}; border: 1px solid ${vMeta.border};">
+                        <span class="actionable-icon-big">${vMeta.icon}</span>
+                        <span class="actionable-name-tag">${vMeta.equip}</span>
                     </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 0.4rem; flex-wrap: wrap;">
+                            <div style="display: flex; gap: 7px; align-items: center; flex-wrap: wrap;">
+                                <span class="level-badge level-${group.level}">${timingLabel}</span>
+                                <span class="badge-delay ${earliestInfo.delayClass}">⏱️ ${earliestInfo.elapsedText} • ${earliestInfo.percent}% (+${totalGroupCurrentPts} pts)</span>
+                            </div>
+                            <button type="button" class="btn-validate-direct" onclick="window.solsticeToggleGroup('${group.groupKey}', true)">
+                                ⚡ Tout valider (${totalRooms} pièces)
+                            </button>
+                        </div>
 
-                    <div class="reco-title" style="margin-bottom: 0.25rem;">${groupTitle}</div>
-                    <div class="reco-text" style="margin-bottom: 0.6rem;">${groupText}</div>
+                        <div class="reco-title" style="margin-bottom: 0.25rem; font-size: 1.02rem;">${groupTitle}</div>
+                        <div class="reco-text" style="margin-bottom: 0.55rem;">${groupText}</div>
 
-                    <div class="room-chips-container">
-                        ${group.items.map(item => {
-                            const itInfo = item.timeInfo || getActionTimeInfo(item, lifecycleState.recos[item.id]);
-                            const chipVerres = item.nbVerres ? `~${item.nbVerres} verre${item.nbVerres > 1 ? 's' : ''}, ` : '';
-                            return `
-                                <button type="button" 
-                                        class="room-chip chip-pending" 
-                                        onclick="window.solsticeToggleSingle('${item.id}', event)"
-                                        title="Cliquer pour appliquer dans ${item.zoneName}">
-                                    <span class="chip-check">⬜</span>
-                                    <span class="chip-name">📍 ${item.zoneName}</span>
-                                    <span class="chip-pts">${chipVerres}+${itInfo.currentPoints} pts</span>
-                                </button>
-                            `;
-                        }).join('')}
+                        <div class="impact-pills-row" style="margin-bottom: 0.65rem;">
+                            ${groupGainPills}
+                        </div>
+
+                        <div class="room-chips-container">
+                            ${group.items.map(item => {
+                                const itInfo = item.timeInfo || getActionTimeInfo(item, lifecycleState.recos[item.id]);
+                                const chipVerres = item.nbVerres ? `~${item.nbVerres} verre${item.nbVerres > 1 ? 's' : ''}, ` : '';
+                                return `
+                                    <button type="button" 
+                                            class="room-chip chip-pending" 
+                                            onclick="window.solsticeToggleSingle('${item.id}', event)"
+                                            title="Cliquer pour valider dans ${item.zoneName}">
+                                        <span class="chip-check">⬜</span>
+                                        <span class="chip-name">📍 ${item.zoneName}</span>
+                                        <span class="chip-pts">${chipVerres}+${itInfo.currentPoints} pts</span>
+                                    </button>
+                                `;
+                            }).join('')}
+                        </div>
                     </div>
                 `;
 
@@ -1651,11 +2055,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // ============================================================
         function calculateFinancialImpact(allRecs) {
             let savedKwhDay = 0;
+            let savedEurDay = 0;
             let earnedPointsToday = 0;
 
             const selectedZone = zoneSelect ? zoneSelect.value : currentZoneId;
-            const isCoolingActive = (envDataGlobal.t_ext > 26 || tExtMaxDay > 27);
-            const gSol = getSolarIrradiance(); // W/m²
+            const defaultCostPerKwh = getEnergyCostPerKwh(houseConfig[selectedZone] || null);
 
             const completedItems = Object.values(lifecycleState.recos || {}).filter(item => item.status === 'completed');
 
@@ -1663,88 +2067,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 earnedPointsToday += (item.earnedPoints ?? item.basePoints ?? item.impactWeight ?? 15);
                 const reactivityFactor = (item.reactivityPercent !== undefined ? item.reactivityPercent / 100 : 1.0);
 
-                if (item.unitImpact && typeof item.unitImpact.kwh100 === 'number' && item.unitImpact.kwh100 > 0) {
-                    savedKwhDay += (item.unitImpact.kwh100 * reactivityFactor);
+                if (item.unitImpact && typeof item.unitImpact.kwh100 === 'number') {
+                    const itemKwh = item.unitImpact.kwh100 * reactivityFactor;
+                    const itemEur = (typeof item.unitImpact.eur100 === 'number')
+                        ? (item.unitImpact.eur100 * reactivityFactor)
+                        : (itemKwh * defaultCostPerKwh);
+                    savedKwhDay += itemKwh;
+                    savedEurDay += itemEur;
                     return;
                 }
-
-                const zoneConfig = houseConfig[item.zoneId] || {};
-                const roomName = item.zoneName;
-                const roomData = donneesHabitat[roomName] || { ta: 20, rh: 50 };
-                const ta = roomData.ta || 20;
-
-                const area = parseFloat(zoneConfig.area) || 15;
-                const windowArea = parseFloat(zoneConfig.windowArea) || (area * 0.15);
-                const uWindow = parseFloat(zoneConfig.uWindow) || 2.8;
-                const deltaR = parseFloat(zoneConfig.shutterDeltaR) || 0.15;
-                const etaGen = getGeneratorEfficiency(zoneConfig);
-                const eerClim = 3.0;
-
-                let dynamicKwh = 0.0;
-
-                // 1. Fermeture des volets / Protection solaire / Bouclier nocturne
-                if (item.actionKey === 'shutter_close' || item.actionKey === 'anticipate_sun' || item.actionKey === 'shutter_close_night' || item.actionKey === 'thermal_curtain') {
-                    if (isCoolingActive && (item.actionKey === 'shutter_close' || item.actionKey === 'anticipate_sun')) {
-                        const solEnergyKw = (windowArea * gSol * (0.65 - 0.05) * 6) / 1000;
-                        dynamicKwh = solEnergyKw / eerClim;
-                    } else {
-                        const uWithShutter = 1 / ((1 / uWindow) + deltaR);
-                        const deltaU = Math.max(0.25, uWindow - uWithShutter);
-                        const deltaT = Math.max(2, ta - envDataGlobal.t_ext);
-                        const thermalGain = (windowArea * deltaU * deltaT * 10) / 1000;
-                        dynamicKwh = thermalGain / etaGen;
-                    }
-                } 
-                // 2. Chauffage solaire passif en hiver
-                else if (item.actionKey === 'sun_heat') {
-                    if (isHeatingSeasonActive) {
-                        const solGainKw = (windowArea * gSol * 0.60 * 5) / 1000;
-                        dynamicKwh = solGainKw / etaGen;
-                    }
-                }
-                // 3. Consigne nocturne / Coupure du chauffage / Sobriété vestimentaire
-                else if (item.actionKey === 'bedroom_temp' || item.actionKey === 'heating_cut' || item.actionKey === 'buffer_door_close' || item.actionKey === 'clothing_adjust_warm') {
-                    if (isHeatingSeasonActive) {
-                        const uWall = parseFloat(zoneConfig.uWall) || 0.8;
-                        const wallArea = (Math.sqrt(area) * 4 * 2.5);
-                        const hTransm = (wallArea * uWall) + (windowArea * uWindow);
-                        const hVent = 0.34 * 45;
-                        const deltaConsigne = (item.actionKey === 'bedroom_temp') ? 2.0 : 1.2;
-                        
-                        const thermalSavedKw = ((hTransm + hVent) * deltaConsigne * 8) / 1000;
-                        dynamicKwh = thermalSavedKw / etaGen;
-                    }
-                }
-                // 4. Surventilation traversante (Free-cooling)
-                else if (item.actionKey === 'free_cooling') {
-                    if (isCoolingActive || ta > 23) {
-                        const deltaT = Math.max(0, ta - envDataGlobal.t_ext);
-                        const flowRate = 350;
-                        const thermalExtractedKw = (0.34 * flowRate * deltaT * 3) / 1000;
-                        dynamicKwh = thermalExtractedKw / eerClim;
-                    }
-                }
-                // 5. Purge VMC / Aération d'humidité / Ouverture porte Cave
-                else if (item.actionKey === 'vmc_boost' || item.actionKey === 'open_win_humidity' || item.actionKey === 'open_door_humidity') {
-                    if (isHeatingSeasonActive) {
-                        const deltaFlow = (item.actionKey === 'vmc_boost') ? 60 : (item.actionKey === 'open_door_humidity' ? 120 : 200);
-                        const deltaT = Math.max(0, ta - envDataGlobal.t_ext);
-                        const energyToHeatAir = (0.34 * deltaFlow * deltaT * 0.5) / 1000;
-                        dynamicKwh = energyToHeatAir / etaGen;
-                    }
-                }
-                // 6. Inertie et déphasage des dalles
-                else if (item.actionKey === 'floor_inertia' || item.actionKey === 'heating_boost_comfort') {
-                    if (isHeatingSeasonActive) {
-                        dynamicKwh = (area * 0.08) / etaGen;
-                    }
-                }
-
-                savedKwhDay += (dynamicKwh * reactivityFactor);
             });
 
-            const costPerKwh = getEnergyCostPerKwh(houseConfig[selectedZone] || null);
-            const savedEurDay = savedKwhDay * costPerKwh;
             return { savedKwhDay, savedEurDay, earnedPointsToday };
         }
 

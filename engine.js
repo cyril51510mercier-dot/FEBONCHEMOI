@@ -1089,7 +1089,7 @@ function calculateDifferentialVentilation(zoneConfig, roomData, envData) {
     const isOscillo = (winType === 'oscillante' || winType === 'oscillo_battante' || winType === 'partial');
     const optimalDurationMin = isOscillo ? 12 : 6;
     const canOpenWin = hasOpenableWindows(zoneConfig);
-    const hasVmc = zoneConfig?.equipment?.vmcSystem && zoneConfig.equipment.vmcSystem !== 'none' && zoneConfig.equipment.vmcSystem !== 'aucun';
+    const hasVmc = zoneConfig?.equipment?.vmcSystem === 'marche_forcee' || zoneConfig?.equipment?.vmcSystem === 'trappe';
 
     let status = 'comfort'; // 'urgent_dry', 'recommended_dry', 'blocked_humid', 'comfort', 'dry_air'
     let canVentilate = false;
@@ -1211,7 +1211,7 @@ function getRoomActionNudge(nomPiece, zoneConfig, roomData, envData) {
     const isNight = currentH < sunriseH || currentH >= sunsetH;
     const hasShutters = !zoneConfig?.windows || zoneConfig.windows.length === 0 || zoneConfig.windows.some(w => !w.shutter || w.shutter !== 'aucun');
     const canOpenWin = hasOpenableWindows(zoneConfig);
-    const hasVmcSys = zoneConfig?.equipment?.vmcSystem && zoneConfig.equipment.vmcSystem !== 'aucun' && zoneConfig.equipment.vmcSystem !== 'none';
+    const hasVmcSys = zoneConfig?.equipment?.vmcSystem === 'marche_forcee' || zoneConfig?.equipment?.vmcSystem === 'trappe';
 
     let badgeIcon = "✨";
     let badgeLabel = "Rien à faire";
@@ -3588,6 +3588,155 @@ function actualiserCockpitGlobal() {
         const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         timeEl.textContent = `(Calculé à ${timeStr})`;
     }
+
+    // 7. Bandeau de Notification & Visuel Direct des Actions à Réaliser (Cœur du guidage habitant)
+    updateLiveActionNotificationBanner(metrics);
+}
+
+function updateLiveActionNotificationBanner(metrics) {
+    if (!metrics || !Array.isArray(metrics.roomSnapshots)) return;
+
+    const effOut = getEffectiveOutdoorAir();
+    const envPayload = {
+        t_ext: effOut.tAir,
+        rh_ext: effOut.rhAir,
+        sun_status: effOut.hasDirectSun ? 'Clear' : sunshineStatus
+    };
+
+    const actionGroups = new Map();
+    metrics.roomSnapshots.forEach(snap => {
+        const zCfg = getZoneConfigByName(snap.name) || { name: snap.name, area: 15, height: 2.5 };
+        const rData = DONNEES_HABITAT[snap.name] || { ta: snap.ta, rh: snap.rh };
+        const nudge = getRoomActionNudge(snap.name, zCfg, rData, envPayload);
+        if (nudge && nudge.actionKey !== 'comfort' && nudge.actionKey !== 'outdoor' && nudge.badgeLabel !== 'Fait') {
+            if (!actionGroups.has(nudge.actionKey)) {
+                let equipName = "ÉQUIPEMENT";
+                let gainHint = "+0.25 PMV";
+                let colorBorder = "border-amber-500/50 bg-amber-950/35";
+                if (nudge.actionKey === 'open_win_humidity') {
+                    equipName = "🪟 FENÊTRE";
+                    gainHint = "Air sain • +0.12 PMV";
+                    colorBorder = "border-emerald-500/50 bg-emerald-950/35";
+                } else if (nudge.actionKey === 'vmc_boost') {
+                    equipName = "🌀 VMC";
+                    gainHint = "Extraction vapeur • +0.10 PMV";
+                    colorBorder = "border-teal-500/50 bg-teal-950/35";
+                } else if (nudge.actionKey === 'sun_heat') {
+                    equipName = "☀️ VOLETS / RIDEAUX";
+                    gainHint = "Chauffage solaire gratuit • +0.30 PMV";
+                    colorBorder = "border-amber-400/60 bg-amber-950/40";
+                } else if (nudge.actionKey === 'shutter_close') {
+                    equipName = "🛡️ VOLETS / RIDEAUX";
+                    gainHint = "Bouclier thermique • +0.22 PMV";
+                    colorBorder = "border-indigo-400/50 bg-indigo-950/40";
+                } else if (nudge.actionKey === 'free_cooling') {
+                    equipName = "🪟 FENÊTRES";
+                    gainHint = "Rafraîchissement gratuit • +0.35 PMV";
+                    colorBorder = "border-sky-400/50 bg-sky-950/40";
+                }
+                actionGroups.set(nudge.actionKey, {
+                    actionKey: nudge.actionKey,
+                    equipName,
+                    icon: nudge.badgeIcon,
+                    label: nudge.badgeLabel,
+                    tooltip: nudge.tooltip,
+                    gainHint,
+                    colorBorder,
+                    rooms: []
+                });
+            }
+            actionGroups.get(nudge.actionKey).rooms.push(snap.name);
+        }
+    });
+
+    // Si fraîcheur globale sans soleil et aucune action d'équipement sur une pièce, signaler l'actionnable Tenue / Thermostat
+    if (metrics.avgPMV < -0.35 && actionGroups.size === 0) {
+        const worstName = metrics.worstComfortRoom ? metrics.worstComfortRoom.name : "Pièces de vie";
+        actionGroups.set('clothing_adjust_warm', {
+            actionKey: 'clothing_adjust_warm',
+            equipName: "🧥 TENUE / THERMOSTAT",
+            icon: "🧥",
+            label: "Ajuster tenue (+0.25 Clo) ou appoint",
+            tooltip: "Corriger l'inconfort frais immédiat sans fermer les volets en journée.",
+            gainHint: "+0.35 PMV • Économie chauffage",
+            colorBorder: "border-sky-400/50 bg-sky-950/40",
+            rooms: [worstName]
+        });
+    }
+
+    const totalActionsCount = Array.from(actionGroups.values()).reduce((acc, g) => acc + g.rooms.length, 0);
+
+    const navBadge = document.getElementById('nav-action-badge');
+    if (navBadge) {
+        if (totalActionsCount > 0) {
+            navBadge.textContent = `🔔 ${totalActionsCount}`;
+            navBadge.classList.remove('hidden');
+        } else {
+            navBadge.classList.add('hidden');
+        }
+    }
+
+    const banner = document.getElementById('live-action-notification-bar');
+    if (!banner) return;
+
+    if (actionGroups.size === 0) {
+        banner.innerHTML = `
+            <div class="bg-emerald-950/35 border border-emerald-500/35 rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div class="flex items-center gap-2 text-emerald-200 font-bold">
+                    <span class="text-base">✅</span>
+                    <span>Aucune action urgente à réaliser en ce moment : vos équipements et votre confort sont alignés.</span>
+                </div>
+                <button onclick="voirToutesLesRecommandations()" class="bg-emerald-900/70 hover:bg-emerald-800 text-emerald-100 border border-emerald-500/40 rounded-xl px-3 py-1 text-[11px] font-bold cursor-pointer">
+                    📋 Voir les anticipations 24-48h →
+                </button>
+            </div>
+        `;
+        return;
+    }
+
+    const cardsHtml = Array.from(actionGroups.values()).slice(0, 3).map(g => {
+        const roomsStr = g.rooms.slice(0, 3).join(', ') + (g.rooms.length > 3 ? ` +${g.rooms.length - 3}` : '');
+        return `
+            <div onclick="voirToutesLesRecommandations()" class="rounded-xl border ${g.colorBorder} p-2.5 cursor-pointer hover:scale-[1.01] transition flex items-start justify-between gap-2.5">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1.5 flex-wrap mb-1">
+                        <span class="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-900/90 text-white border border-white/15">${g.equipName}</span>
+                        <span class="text-[10px] font-extrabold text-amber-300 truncate">📍 ${roomsStr}</span>
+                    </div>
+                    <div class="text-xs font-extrabold text-white leading-snug">${g.icon} ${g.label}</div>
+                    <div class="text-[11px] text-slate-300 mt-0.5 leading-snug line-clamp-1">${g.tooltip}</div>
+                </div>
+                <div class="shrink-0 flex flex-col items-end justify-between gap-1.5">
+                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 whitespace-nowrap">${g.gainHint}</span>
+                    <span class="text-[10px] font-bold text-amber-300 underline">Agir →</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    banner.innerHTML = `
+        <div class="bg-gradient-to-r from-amber-950/50 via-slate-900/95 to-slate-900/95 border-2 border-amber-500/50 rounded-2xl p-3 sm:p-3.5 shadow-lg">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-black text-xs animate-pulse">🔔</span>
+                    <div>
+                        <strong class="text-xs sm:text-sm font-black text-white">
+                            ${totalActionsCount} action${totalActionsCount > 1 ? 's' : ''} à réaliser maintenant sur vos équipements
+                        </strong>
+                        <span class="hidden sm:inline text-[11px] text-amber-200/90 ml-2">
+                            Cliquez sur une action pour la valider et suivre votre gain PMV & financier
+                        </span>
+                    </div>
+                </div>
+                <button onclick="voirToutesLesRecommandations()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl cursor-pointer shadow whitespace-nowrap">
+                    📋 Ouvrir le Plan d'Action (${totalActionsCount}) →
+                </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-${Math.min(3, actionGroups.size)} gap-2.5">
+                ${cardsHtml}
+            </div>
+        </div>
+    `;
 }
 
 function recalculerToutLeDashboard() { 
@@ -4144,21 +4293,29 @@ window.SolsticeEngine = {
             simTa = Math.max(tExt, simTa - 0.55 * rf);
             simTr -= 0.40 * rf;
         }
-        // 3. Brasseur d'air
+        // 3. Brasseur d'air (Été : rafraîchissement convectif | Hiver : destratification sous plafond haut)
         if (checkedActionKeys.includes('fan_on')) {
             simVel += 0.25 * rf;
         }
-        // 4. Purge humidité (aération flash ou VMC) : un air plus sec améliore le confort thermique
-        if (checkedActionKeys.includes('vmc_boost') || checkedActionKeys.includes('open_win_humidity') || checkedActionKeys.includes('open_door_humidity')) {
+        if (checkedActionKeys.includes('fan_destrat')) {
+            simTa += 0.45 * rf;
+            simTr += 0.20 * rf;
+        }
+        // 4. Purge humidité (aération flash ou VMC) & réduction VMC en air sec froid
+        if (checkedActionKeys.includes('vmc_boost') || checkedActionKeys.includes('open_win_humidity')) {
             simRh = Math.max(45, simRh - 6 * rf);
             if (isColdSituation) simTr += 0.10 * rf;
+        }
+        if (checkedActionKeys.includes('vmc_reduce_cold')) {
+            simTa += 0.25 * rf;
+            simRh = Math.min(50, simRh + 4 * rf);
         }
         // 5. Apports solaires gratuits (court terme et pré-charge 48h)
         if (checkedActionKeys.includes('sun_heat')) {
             simTr += 0.65 * rf;
             simTa += 0.25 * rf;
         }
-        // 6. Actionnables de confort de secours (Tenue Clo, Relance douce thermostat/plancher, Fermeture porte tampon)
+        // 6. Actionnables de confort & sobriété (Tenue Clo, Thermostat/Robinet, Plancher, Climatisation)
         if (checkedActionKeys.includes('clothing_adjust_warm')) {
             simClo += 0.25 * rf;
         }
@@ -4169,9 +4326,15 @@ window.SolsticeEngine = {
             simTa += 0.60 * rf;
             simTr += 0.35 * rf;
         }
-        if (checkedActionKeys.includes('buffer_door_close')) {
-            simTa += 0.20 * rf;
-            simTr += 0.15 * rf;
+        if (checkedActionKeys.includes('heating_cut')) {
+            if (baseState.ta > 21.0) {
+                simTa -= 0.45 * rf;
+            }
+        }
+        if (checkedActionKeys.includes('cooling_setpoint_eco')) {
+            if (baseState.ta < 24.5) {
+                simTa += 0.35 * rf;
+            }
         }
 
         const pmvSim = this.calculatePMV(simTa, simTr, simVel, simRh, baseState.met, simClo);
