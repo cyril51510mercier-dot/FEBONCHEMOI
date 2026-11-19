@@ -3848,6 +3848,7 @@ function fetchOneCallWeather(lat, lon, cityName = 'Reims') {
                     sunriseHour: new Date(data.current.sunrise * 1000).getHours(),
                     sunsetHour: new Date(data.current.sunset * 1000).getHours()
                 };
+                try { localStorage.setItem('SOLSTICE_EPHEMERIS', JSON.stringify(window.solsticeEphemeris)); } catch(e) {}
             }
 
             if (Array.isArray(data.hourly)) {
@@ -4097,6 +4098,12 @@ window.SolsticeEngine = {
     calculateMeanRadiantTemp: typeof calculateMeanRadiantTemp !== 'undefined' ? calculateMeanRadiantTemp : null,
     calculateAirVelocity: typeof calculateAirVelocity !== 'undefined' ? calculateAirVelocity : null,
     getBaseCloAndMet: typeof getBaseCloAndMet !== 'undefined' ? getBaseCloAndMet : null,
+    updateStructureTemperature: typeof updateStructureTemperature !== 'undefined' ? updateStructureTemperature : null,
+    calculateDynamicTau: typeof calculateDynamicTau !== 'undefined' ? calculateDynamicTau : null,
+    calculateStructureReserve: typeof calculateStructureReserve !== 'undefined' ? calculateStructureReserve : null,
+    calculateZone2R2CParams: typeof calculateZone2R2CParams !== 'undefined' ? calculateZone2R2CParams : null,
+    calculateWindowSolarGainW: typeof calculateWindowSolarGainW !== 'undefined' ? calculateWindowSolarGainW : null,
+    calculateDailyThermalBalance: typeof calculateDailyThermalBalance !== 'undefined' ? calculateDailyThermalBalance : null,
     evaluateSimulatedPMV: typeof evaluateSimulatedPMV !== 'undefined' ? evaluateSimulatedPMV : null,
     calculateAbsoluteHumidity: typeof calculateAbsoluteHumidity !== 'undefined' ? calculateAbsoluteHumidity : null,
     calculateDifferentialVentilation: typeof calculateDifferentialVentilation !== 'undefined' ? calculateDifferentialVentilation : null,
@@ -4110,28 +4117,62 @@ window.SolsticeEngine = {
         let simTr = baseState.tr;
         let simVel = baseState.vel;
         let simRh = baseState.rh;
+        let simClo = baseState.clo;
+        const rf = (baseState.reactivityFactor !== undefined && !isNaN(baseState.reactivityFactor)) ? baseState.reactivityFactor : 1.0;
+        const tExt = (envData && typeof envData.t_ext === 'number') ? envData.t_ext : 12;
+        const isColdSituation = (baseState.ta < 21.5 && tExt < baseState.ta);
 
+        // 1. Volets / Rideaux : distinction stricte entre protection solaire d'été et bouclier thermique d'hiver
+        if (checkedActionKeys.includes('shutter_close_night') || checkedActionKeys.includes('thermal_curtain')) {
+            simTr += 0.45 * rf;
+            simTa += 0.15 * rf;
+        }
         if (checkedActionKeys.includes('shutter_close') || checkedActionKeys.includes('anticipate_sun')) {
-            simTr -= 0.6;
-            simTa -= 0.2;
+            if (isColdSituation) {
+                simTr += 0.40 * rf;
+                simTa += 0.15 * rf;
+            } else {
+                simTr -= 0.60 * rf;
+                simTa -= 0.20 * rf;
+            }
         }
+        // 2. Surventilation / Free-cooling
         if (checkedActionKeys.includes('free_cooling')) {
-            simTa = Math.max(envData.t_ext, simTa - 0.5);
-            simTr -= 0.4;
+            simTa = Math.max(tExt, simTa - 0.55 * rf);
+            simTr -= 0.40 * rf;
         }
+        // 3. Brasseur d'air
         if (checkedActionKeys.includes('fan_on')) {
-            simVel += 0.25;
+            simVel += 0.25 * rf;
         }
-        if (checkedActionKeys.includes('vmc_boost') || checkedActionKeys.includes('open_win_humidity')) {
-            simRh = Math.max(45, simRh - 6);
+        // 4. Purge humidité (aération flash ou VMC) : un air plus sec améliore le confort thermique
+        if (checkedActionKeys.includes('vmc_boost') || checkedActionKeys.includes('open_win_humidity') || checkedActionKeys.includes('open_door_humidity')) {
+            simRh = Math.max(45, simRh - 6 * rf);
+            if (isColdSituation) simTr += 0.10 * rf;
         }
+        // 5. Apports solaires gratuits (court terme et pré-charge 48h)
         if (checkedActionKeys.includes('sun_heat')) {
-            simTr += 0.6;
-            simTa += 0.2;
+            simTr += 0.65 * rf;
+            simTa += 0.25 * rf;
+        }
+        // 6. Actionnables de confort de secours (Tenue Clo, Relance douce thermostat/plancher, Fermeture porte tampon)
+        if (checkedActionKeys.includes('clothing_adjust_warm')) {
+            simClo += 0.25 * rf;
+        }
+        if (checkedActionKeys.includes('clothing_adjust_cool')) {
+            simClo = Math.max(0.3, simClo - 0.20 * rf);
+        }
+        if (checkedActionKeys.includes('heating_boost_comfort') || checkedActionKeys.includes('floor_inertia')) {
+            simTa += 0.60 * rf;
+            simTr += 0.35 * rf;
+        }
+        if (checkedActionKeys.includes('buffer_door_close')) {
+            simTa += 0.20 * rf;
+            simTr += 0.15 * rf;
         }
 
-        const pmvSim = this.calculatePMV(simTa, simTr, simVel, simRh, baseState.met, baseState.clo);
-        return { pmv: pmvSim, simTa, simTr, simVel, simRh };
+        const pmvSim = this.calculatePMV(simTa, simTr, simVel, simRh, baseState.met, simClo);
+        return { pmv: pmvSim, simTa, simTr, simVel, simRh, simClo };
     },
 
     generateRecommendations(zone, zoneId, roomData, envData) {

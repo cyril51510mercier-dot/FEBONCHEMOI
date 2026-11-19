@@ -275,14 +275,58 @@ document.addEventListener('DOMContentLoaded', function() {
             profileIndicator.textContent = `Profil : ${activeProfile.label} (Tolérance PMV ±${activeProfile.maxDeltaPmv})`;
         }
 
-        const currentHour = new Date().getHours();
-        const isMorning = currentHour >= 6 && currentHour < 12;
-        const isAfternoon = currentHour >= 12 && currentHour < 18;
-        const isEvening = currentHour >= 17 && currentHour < 23;
-        const isNight = currentHour >= 21 || currentHour < 7;
+        const nowDate = new Date();
+        const currentHour = nowDate.getHours();
+        const currentMonth = nowDate.getMonth();
+        let savedEphem = window.solsticeEphemeris || null;
+        if (!savedEphem) {
+            try {
+                const rawEphem = localStorage.getItem('SOLSTICE_EPHEMERIS');
+                if (rawEphem) savedEphem = JSON.parse(rawEphem);
+            } catch (e) {}
+        }
+        const defaultSunriseByMonth = [8, 8, 7, 7, 6, 6, 6, 7, 7, 8, 8, 8];
+        const defaultSunsetByMonth  = [17, 18, 19, 20, 21, 21, 21, 20, 19, 18, 17, 17];
+        const sunriseHour = (savedEphem && typeof savedEphem.sunriseHour === 'number') ? savedEphem.sunriseHour : defaultSunriseByMonth[currentMonth];
+        const sunsetHour  = (savedEphem && typeof savedEphem.sunsetHour === 'number') ? savedEphem.sunsetHour : defaultSunsetByMonth[currentMonth];
+
+        const isNight = currentHour >= sunsetHour || currentHour < sunriseHour;
+        const isMorning = !isNight && currentHour >= sunriseHour && currentHour < 12;
+        const isAfternoon = !isNight && currentHour >= 12 && currentHour < sunsetHour;
+        const isEvening = currentHour >= (sunsetHour - 1) && currentHour < 23;
 
         const tExtMaxDay = envDataGlobal.t_ext_max || (envDataGlobal.t_ext + 3);
         const tExtMinDay = envDataGlobal.t_ext_min || (envDataGlobal.t_ext - 5);
+
+        // Vérifie si une pièce possède réellement au moins un vitrage exposé au soleil à l'heure actuelle (ou dans la journée)
+        function getZoneSolarExposure(zone, checkHour = currentHour, wholeAfternoon = false) {
+            if (!zone || !Array.isArray(zone.windows) || zone.windows.length === 0) {
+                return { isExposedNow: false, hasSouthOrWest: false, exposedLabel: '' };
+            }
+            const activeSectorsNow = checkHour < 11
+                ? ['E', 'SE', 'S']
+                : (checkHour <= 14 ? ['E', 'SE', 'S', 'SW'] : ['S', 'SW', 'W']);
+            const targetSectors = wholeAfternoon ? ['S', 'SE', 'SW', 'W'] : activeSectorsNow;
+
+            const matchingOrients = new Set();
+            let hasSouthOrWest = false;
+            zone.windows.forEach(w => {
+                if (!w) return;
+                const rawOr = w.orient || w.orientation || 'S';
+                const orients = Array.isArray(rawOr) ? rawOr : [rawOr];
+                orients.forEach(o => {
+                    const up = String(o).toUpperCase().trim();
+                    if (['S', 'SE', 'SW', 'W'].includes(up)) hasSouthOrWest = true;
+                    if (targetSectors.includes(up)) matchingOrients.add(up);
+                });
+            });
+
+            return {
+                isExposedNow: matchingOrients.size > 0,
+                hasSouthOrWest,
+                exposedLabel: Array.from(matchingOrients).join(' / ')
+            };
+        }
 
         // Irradiance solaire estimée (W/m²) selon statut météo
         function getSolarIrradiance() {
@@ -425,7 +469,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const roomPmv = engine.calculatePMV ? engine.calculatePMV(ta, tr, vel, rh, met, totalClo) : 0;
             const needsHeat = roomPmv < -0.4;
             const needsCooling = roomPmv > 0.4;
-            const isSunny = (envDataGlobal.sun_status || '').toLowerCase().includes('clear') || (envDataGlobal.sun_status || '').toLowerCase().includes('sun');
+            // La nuit, il n'y a jamais d'ensoleillement direct (évite de recommander d'ouvrir les volets au soleil à 18h en hiver)
+            const isSunny = !isNight && (
+                (envDataGlobal.sun_status || '').toLowerCase().includes('clear') ||
+                (envDataGlobal.sun_status || '').toLowerCase().includes('sun') ||
+                (envDataGlobal.delta_t_sun || 0) >= 3.0
+            );
+            const solarExp = getZoneSolarExposure(zone, currentHour, false);
+            const solarExpDay = getZoneSolarExposure(zone, currentHour, true);
 
             function hasOpenableWindows(z) {
                 if (!z || !Array.isArray(z.windows) || z.windows.length === 0) return false;
@@ -447,8 +498,57 @@ document.addEventListener('DOMContentLoaded', function() {
             const hasUnheatedDoor = zone?.hasBufferDoor || adj.hasBufferDoor || 
                                     [1, 2, 3, 4].some(i => adj[`wall${i}`] === 'unheated' && adj[`doorWall${i}`]);
 
-            const hasEastWestWin = zone?.windows?.some(w => ['E', 'W'].includes(w.orient));
+            const hasEastWestWin = zone?.windows?.some(w => ['E', 'W'].includes(w.orient || w.orientation));
             const hasRoofWin = zone?.windows?.some(w => w.tilt === 'inclinee');
+
+            // Calcul de l'impact unitaire d'une recommandation sur le PMV et sur l'énergie (kWh / €) à 100% de réactivité
+            function computeUnitImpactForAction(actionKey) {
+                let deltaPmv100 = 0.15;
+                if (engine.evaluateSimulatedPMV) {
+                    const baseState = { ta, tr, vel, rh, met, clo: totalClo, reactivityFactor: 1.0 };
+                    const simRes = engine.evaluateSimulatedPMV(baseState, [actionKey], envDataGlobal);
+                    const rawImprovement = Math.abs(roomPmv) - Math.abs(simRes.pmv);
+                    deltaPmv100 = Math.max(0.08, parseFloat(Math.abs(rawImprovement || ( simRes.pmv - roomPmv )).toFixed(2)));
+                }
+
+                const windowArea = parseFloat(zone?.windowArea) || (area * 0.15);
+                const uWindow = parseFloat(zone?.uWindow) || 2.2;
+                const deltaR = parseFloat(zone?.shutterDeltaR) || 0.18;
+                const etaGen = getGeneratorEfficiency(zone);
+                const costPerKwh = getEnergyCostPerKwh(zone);
+                const gSol = getSolarIrradiance();
+                let kwh100 = 0;
+
+                if (actionKey === 'shutter_close' || actionKey === 'anticipate_sun') {
+                    kwh100 = ((windowArea * gSol * 0.55 * 5) / 1000) / 3.0;
+                } else if (actionKey === 'shutter_close_night' || actionKey === 'thermal_curtain') {
+                    const uWithShutter = 1 / ((1 / uWindow) + deltaR);
+                    const deltaU = Math.max(0.25, uWindow - uWithShutter);
+                    const deltaT = Math.max(2, ta - envDataGlobal.t_ext);
+                    kwh100 = ((windowArea * deltaU * deltaT * 11) / 1000) / etaGen;
+                } else if (actionKey === 'sun_heat') {
+                    kwh100 = ((windowArea * gSol * 0.58 * 4.5) / 1000) / etaGen;
+                } else if (actionKey === 'bedroom_temp' || actionKey === 'heating_cut' || actionKey === 'buffer_door_close') {
+                    kwh100 = (area * 0.08) / etaGen;
+                } else if (actionKey === 'clothing_adjust_warm' || actionKey === 'clothing_adjust_cool') {
+                    // +0.25 Clo évite de surchauffer la pièce de +1.2°C pendant 6h
+                    kwh100 = (area * 0.065) / etaGen;
+                } else if (actionKey === 'free_cooling') {
+                    const deltaT = Math.max(1, ta - envDataGlobal.t_ext);
+                    kwh100 = ((0.34 * 280 * deltaT * 2.5) / 1000) / 3.0;
+                } else if (actionKey === 'open_win_humidity' || actionKey === 'vmc_boost' || actionKey === 'open_door_humidity') {
+                    // Évite la surconsommation d'un air humide ou d'une fenêtre laissée entrouverte trop longtemps
+                    kwh100 = (area * 0.035) / etaGen;
+                } else if (actionKey === 'floor_inertia' || actionKey === 'heating_boost_comfort') {
+                    kwh100 = (area * 0.04) / etaGen;
+                }
+
+                return {
+                    deltaPmv100: parseFloat(deltaPmv100.toFixed(2)),
+                    kwh100: parseFloat(kwh100.toFixed(2)),
+                    eur100: parseFloat((kwh100 * costPerKwh).toFixed(2))
+                };
+            }
 
             // Helper unifié d'enregistrement avec cycle de vie, occurrence et dépréciation temporelle
             function pushRec(recData) {
@@ -463,6 +563,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (occurrence > 1) {
                     displayTitle += ` (🔁 ${occurrence}ᵉ intervention)`;
                 }
+
+                const unitImpact = computeUnitImpactForAction(recData.actionKey);
 
                 let appearedAt = Date.now();
                 if (lifecycleState.recos[finalId]) {
@@ -484,7 +586,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         appearedAt: appearedAt,
                         completedAt: null,
                         status: 'active',
-                        nbVerres: recData.nbVerres || 0
+                        nbVerres: recData.nbVerres || 0,
+                        ventDurationMin: recData.ventDurationMin || 6,
+                        unitImpact: unitImpact
                     };
                 }
 
@@ -497,7 +601,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     occurrence: occurrence,
                     title: displayTitle,
                     appearedAt: appearedAt,
-                    timeInfo: timeInfo
+                    timeInfo: timeInfo,
+                    unitImpact: unitImpact
                 });
             }
 
@@ -514,7 +619,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 canOpenWin: canOpenWindows
             };
 
-            const ventDuration = `${vent.optimalDurationMin || 6} min`;
+            const ventDurationMin = vent.optimalDurationMin || 6;
+            const ventDuration = `${ventDurationMin} min`;
             const effectiveVerresTxt = vent.verresTxt || verresTxt;
             const effectiveNbVerres = vent.nbVerres || nbVerres;
             const effectiveMEau = vent.mEau !== undefined ? vent.mEau : mEau;
@@ -523,8 +629,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (canOpenWindows) {
                     const titleText = isWetRoom ? `Purge à la source (${effectiveVerresTxt})` : `Aération flash ciblée (${effectiveVerresTxt})`;
                     const actionText = isWetRoom 
-                        ? `L'humidité atteint ${rh} %. Ouvrez la fenêtre en grand ${ventDuration} pour évacuer ${effectiveVerresTxt} sans refroidir les parois.`
-                        : `Ouvrez la fenêtre en grand ${ventDuration} : vous évacuerez ${effectiveVerresTxt} sans entamer la chaleur des murs massifs.`;
+                        ? `L'humidité atteint ${rh} %. Ouvrez la fenêtre en grand ${ventDuration} (un minuteur vous préviendra de refermer) pour évacuer ${effectiveVerresTxt} sans refroidir les parois.`
+                        : `Ouvrez la fenêtre en grand ${ventDuration} (avec rappel automatique de fermeture) : vous évacuerez ${effectiveVerresTxt} sans entamer la chaleur des parois.`;
                     pushRec({ 
                         id: `${zoneId}_open_win_humidity`, 
                         level: 1, 
@@ -537,7 +643,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         text: actionText, 
                         impactWeight: 15,
                         nbVerres: effectiveNbVerres,
-                        mEau: effectiveMEau
+                        mEau: effectiveMEau,
+                        ventDurationMin: ventDurationMin
                     });
                 } else if (hasVmc) {
                     const titleText = isWetRoom ? `Boost VMC anti-humidité (${effectiveVerresTxt})` : `Boost VMC anti-humidité`;
@@ -557,7 +664,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         mEau: effectiveMEau
                     });
                 } else {
-                    // Pièce sans ouvrant direct vers l'extérieur et sans VMC (Cave, cellier, dégagement)
                     pushRec({
                         id: `${zoneId}_open_door_humidity`,
                         level: 1,
@@ -567,14 +673,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         timing: 'immediate',
                         type: 'type-air',
                         title: `🚪 Aération indirecte / Ouvrir porte (${effectiveVerresTxt})`,
-                        text: `Pièce sans ouvrant direct vers l'extérieur : ouvrez la porte vers une zone aérée pour chasser ${effectiveVerresTxt} et assainir la pièce tampon.`,
+                        text: `Pièce sans ouvrant direct vers l'extérieur : ouvrez la porte vers une zone aérée pour chasser ${effectiveVerresTxt} et assainir la pièce.`,
                         impactWeight: 15,
                         nbVerres: effectiveNbVerres,
                         mEau: effectiveMEau
                     });
                 }
             } else if (vent.status === 'blocked_humid' && hasVmc && rh > 60) {
-                // Air extérieur saturé mais présence de VMC dans une pièce humide
                 pushRec({ 
                     id: `${zoneId}_vmc_boost`, 
                     level: 1, 
@@ -593,18 +698,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const isOutdoorHeatwaveThreat = tExtMaxDay > (ta + 1.5);
             if (needsCooling && envDataGlobal.t_ext < ta && canOpenWindows && (isOutdoorHeatwaveThreat || ta > 23)) {
-                pushRec({ id: `${zoneId}_free_cooling`, level: 1, actionKey: 'free_cooling', zoneId, zoneName, timing: 'immediate', type: 'type-cool', title: 'Surventilation traversante (Free-cooling)', text: `Il fait plus frais dehors (${envDataGlobal.t_ext} °C). Ouvrez pour décharger l'air chaud.`, impactWeight: 20 });
+                pushRec({ id: `${zoneId}_free_cooling`, level: 1, actionKey: 'free_cooling', zoneId, zoneName, timing: 'immediate', type: 'type-cool', title: 'Surventilation traversante (Free-cooling)', text: `Il fait plus frais dehors (${envDataGlobal.t_ext} °C). Ouvrez pour décharger l'air chaud.`, impactWeight: 20, ventDurationMin: 15 });
             }
 
-            if (isHeatingSeasonActive && needsHeat && envDataGlobal.t_ext < 10 && (zone?.equipment?.heating?.system && zone.equipment.heating.system !== 'none') && canOpenWindows) {
-                pushRec({ id: `${zoneId}_heating_cut_during_ventilation`, level: 1, actionKey: 'heating_cut', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Coupure du chauffage pendant l\'aération', text: `Coupez le chauffage dans cette pièce pendant l'ouverture des fenêtres.`, impactWeight: 10 });
+            if (isHeatingSeasonActive && needsHeat && envDataGlobal.t_ext < 10 && (zone?.equipment?.heating?.system && zone.equipment.heating.system !== 'none') && canOpenWindows && (vent.status === 'urgent_dry' || vent.status === 'recommended_dry')) {
+                pushRec({ id: `${zoneId}_heating_cut_during_ventilation`, level: 1, actionKey: 'heating_cut', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Coupure du chauffage pendant l\'aération', text: `Coupez le chauffage dans cette pièce pendant les ${ventDuration} d'ouverture des fenêtres.`, impactWeight: 10 });
             }
 
-            if (needsCooling && isSunny && hasShutters) {
-                pushRec({ id: `${zoneId}_shutter_close`, level: 1, actionKey: 'shutter_close', zoneId, zoneName, timing: 'immediate', type: 'type-sun', title: 'Bouclier solaire immédiat', text: `Fermez les volets pour bloquer le rayonnement direct avant le vitrage.`, impactWeight: 25 });
+            // Protection solaire d'été : uniquement sur les pièces dont les vitrages sont réellement exposés au soleil maintenant
+            if (needsCooling && isSunny && hasShutters && solarExp.isExposedNow) {
+                pushRec({ id: `${zoneId}_shutter_close`, level: 1, actionKey: 'shutter_close', zoneId, zoneName, timing: 'immediate', type: 'type-sun', title: `Bouclier solaire immédiat (${solarExp.exposedLabel})`, text: `Fermez les volets côté ${solarExp.exposedLabel} pour bloquer le rayonnement direct avant le vitrage.`, impactWeight: 25 });
             }
 
-            if (needsCooling && isSunny && hasEastWestWin && (isMorning || isAfternoon)) {
+            if (needsCooling && isSunny && hasEastWestWin && (isMorning || isAfternoon) && solarExp.isExposedNow) {
                 pushRec({ id: `${zoneId}_targeted_orientation_shield`, level: 1, actionKey: 'shutter_close', zoneId, zoneName, timing: 'immediate', type: 'type-sun', title: 'Bouclier solaire orienté Est / Ouest', text: `Fermez les volets de la façade exposée au soleil rasant (${isMorning ? 'Est' : 'Ouest'}).`, impactWeight: 18 });
             }
 
@@ -612,16 +718,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 pushRec({ id: `${zoneId}_roof_window_shield`, level: 1, actionKey: 'shutter_close', zoneId, zoneName, timing: 'immediate', type: 'type-sun', title: 'Protection prioritaire des fenêtres de toit', text: `Occultez les Velux : le rayonnement sous toiture est la cause principale de surchauffe.`, impactWeight: 22 });
             }
 
-            if (needsHeat && isSunny && envDataGlobal.t_ext < ta) {
-                pushRec({ id: `${zoneId}_sun_heat`, level: 1, actionKey: 'sun_heat', zoneId, zoneName, timing: 'immediate', type: 'type-sun', title: 'Chauffage solaire passif', text: `Ouvrez les protections pour laisser le soleil chauffer gratuitement les parois.`, impactWeight: 20 });
+            // Chauffage solaire passif : UNIQUEMENT de jour, au soleil, et si la pièce possède un vitrage exposé au soleil à cette heure
+            if (needsHeat && isSunny && solarExp.isExposedNow && envDataGlobal.t_ext < ta) {
+                pushRec({ id: `${zoneId}_sun_heat`, level: 1, actionKey: 'sun_heat', zoneId, zoneName, timing: 'immediate', type: 'type-sun', title: `☀️ Chauffage solaire passif (${solarExp.exposedLabel})`, text: `Ouvrez grand les volets et rideaux côté ${solarExp.exposedLabel} pour laisser le soleil chauffer gratuitement vos parois.`, impactWeight: 20 });
             }
 
-            if (needsHeat && !isSunny && isNight) {
-                pushRec({ id: `${zoneId}_winter_night_shutters`, level: 1, actionKey: 'shutter_close', zoneId, zoneName, timing: 'immediate', type: 'type-sun', title: 'Bouclier thermique nocturne', text: `Fermez volets et rideaux dès la tombée du jour pour créer une lame d'air isolante.`, impactWeight: 12 });
+            // Bouclier thermique nocturne : déclenché dès le vrai coucher du soleil (sunsetHour) avec actionKey 'shutter_close_night' (augmente Tmr !)
+            if (needsHeat && isNight && hasShutters) {
+                pushRec({ id: `${zoneId}_winter_night_shutters`, level: 1, actionKey: 'shutter_close_night', zoneId, zoneName, timing: 'immediate', type: 'type-heat', title: `🌙 Bouclier thermique nocturne (dès ${sunsetHour}h)`, text: `Nuit tombée : fermez les volets pour couper la paroi froide du vitrage (+0.4°C de température radiante et -25% de pertes vitres).`, impactWeight: 18 });
             }
 
-            if (needsHeat && hasInteriorCurtains && zone?.windows?.some(w => w.glass === 'single' || w.glass === 'double_old')) {
-                pushRec({ id: `${zoneId}_single_glass_thermal_curtain`, level: 1, actionKey: 'shutter_close', zoneId, zoneName, timing: 'immediate', type: 'type-heat', title: 'Rideau épais sur vitrage ancien', text: `Tirez les rideaux épais le soir pour isoler la vitre froide et remonter la température radiante.`, impactWeight: 12 });
+            if (needsHeat && isNight && hasInteriorCurtains && zone?.windows?.some(w => w.glass === 'single' || w.glass === 'double_old')) {
+                pushRec({ id: `${zoneId}_single_glass_thermal_curtain`, level: 1, actionKey: 'thermal_curtain', zoneId, zoneName, timing: 'immediate', type: 'type-heat', title: 'Rideau épais sur vitrage ancien (Nuit)', text: `Tirez les rideaux épais ce soir pour isoler la vitre froide et remonter la température radiante ressentie.`, impactWeight: 14 });
+            }
+
+            // Actionnables de secours en journée fraîche / grise (sans fermer les volets le jour pour préserver la lumière naturelle et le bien-être)
+            if (needsHeat && !isNight && (!isSunny || !solarExp.isExposedNow) && !isBuffer) {
+                pushRec({
+                    id: `${zoneId}_clothing_adjust_warm`,
+                    level: 1,
+                    actionKey: 'clothing_adjust_warm',
+                    zoneId,
+                    zoneName,
+                    timing: 'immediate',
+                    type: 'type-heat',
+                    title: '🧥 Ajustement vestimentaire confort (+0.25 Clo)',
+                    text: `Ciel sans apport solaire sur cette pièce (${ta.toFixed(1)}°C, parois à ${tStruct.toFixed(1)}°C) : gardez les volets ouverts pour la lumière du jour et ajoutez une couche (pull fin / gilet) pour regagner +0.35 PMV sans surconsommer.`,
+                    impactWeight: 14
+                });
+
+                if (zone?.equipment?.heating?.system && zone.equipment.heating.system !== 'none' && roomPmv < -0.65) {
+                    pushRec({
+                        id: `${zoneId}_heating_boost_comfort`,
+                        level: 1,
+                        actionKey: 'heating_boost_comfort',
+                        zoneId,
+                        zoneName,
+                        timing: 'immediate',
+                        type: 'type-heat',
+                        title: '🌡️ Appoint ciblé thermostat / robinet (+0.5°C)',
+                        text: `Inconfort frais marqué (PMV ${roomPmv.toFixed(2)}) sans relais solaire : relevez légèrement le thermostat ou le robinet thermostatique pendant l'occupation de la pièce.`,
+                        impactWeight: 12
+                    });
+                }
             }
 
             if (isHeatingSeasonActive && roomPmv > 0.3 && zone?.equipment?.heating?.regulation?.includes('thermostatic_valve')) {
@@ -633,24 +772,40 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             if (!isBuffer && hasUnheatedDoor) {
-                pushRec({ id: `${zoneId}_buffer_door_close`, level: 1, actionKey: 'heating_cut', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Fermeture de la porte du local non chauffé', text: `Conservez la porte fermée avec le local non chauffé (garage/cellier) pour éviter les fuites thermiques.`, impactWeight: 12 });
+                pushRec({ id: `${zoneId}_buffer_door_close`, level: 1, actionKey: 'buffer_door_close', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Fermeture de la porte du local non chauffé', text: `Conservez la porte fermée avec le local non chauffé (garage/cellier) pour éviter les fuites thermiques.`, impactWeight: 12 });
             }
 
             if (isHeatingSeasonActive && reserve.chargeCalories >= 75) {
-                pushRec({ id: `${zoneId}_high_calorie_stock_eco`, level: 1, actionKey: 'heating_cut', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Valorisation de l\'inertie chaude (Calories > 75 %)', text: `Les murs sont gorgés de chaleur (${reserve.chargeCalories} %). Baissez la consigne d'un degré.`, impactWeight: 16 });
+                pushRec({ id: `${zoneId}_high_calorie_stock_eco`, level: 1, actionKey: 'heating_cut', zoneId, zoneName, timing: 'immediate', type: 'type-eco', title: 'Valorisation de l\'inertie chaude (Calories > 75 %)', text: `Les parois sont gorgées de chaleur (${reserve.chargeCalories} %). Baissez la consigne d'un degré.`, impactWeight: 16 });
             }
 
             // --- NIVEAU 2 : OPPORTUNISME 24H ---
-            if (needsCooling && isSunny && hasShutters && isMorning) {
+            if (needsCooling && isSunny && hasShutters && isMorning && solarExpDay.hasSouthOrWest) {
                 pushRec({ id: `${zoneId}_anticipate_sun`, level: 2, actionKey: 'anticipate_sun', zoneId, zoneName, timing: 'anticipated', type: 'type-sun', title: 'Occultation préventive du matin', text: `Fermez les volets dès 10h pour devancer le pic de chaleur de l'après-midi.`, impactWeight: 15 });
             }
 
             if (isHeatingSeasonActive && needsHeat && zone?.equipment?.heating?.system === 'floor') {
-                pushRec({ id: `${zoneId}_floor_inertia`, level: 2, actionKey: 'floor_inertia', zoneId, zoneName, timing: 'anticipated', type: 'type-heat', title: 'Anticipation plancher chauffant', text: `Relancez la consigne 3 heures à l'avance pour compenser la forte inertie.`, impactWeight: 15 });
+                pushRec({ id: `${zoneId}_floor_inertia`, level: 2, actionKey: 'floor_inertia', zoneId, zoneName, timing: 'anticipated', type: 'type-heat', title: 'Anticipation plancher chauffant', text: `Relancez la consigne 3 heures à l'avance pour compenser la forte inertie de la dalle.`, impactWeight: 15 });
             }
 
             if (isHeatingSeasonActive && zone?.usages?.includes('bedroom') && needsHeat && isEvening) {
                 pushRec({ id: `${zoneId}_bedroom_temp_drop`, level: 2, actionKey: 'bedroom_temp', zoneId, zoneName, timing: 'anticipated', type: 'type-eco', title: 'Consigne nocturne en chambre (17 °C à 18 °C)', text: `Réglez le thermostat à 17-18 °C 1h avant le coucher.`, impactWeight: 12 });
+            }
+
+            // Anticipation de la fermeture des volets avant la tombée de la nuit (en fin d'après-midi)
+            if (isHeatingSeasonActive && needsHeat && !isNight && currentHour >= (sunsetHour - 2) && hasShutters) {
+                pushRec({
+                    id: `${zoneId}_anticipate_night_shutters`,
+                    level: 2,
+                    actionKey: 'shutter_close_night',
+                    zoneId,
+                    zoneName,
+                    timing: 'anticipated',
+                    type: 'type-heat',
+                    title: `🌅 Préparer la fermeture des volets à ${sunsetHour}h`,
+                    text: `Le soleil se couche vers ${sunsetHour}h : fermez les volets dès le crépuscule pour piéger la chaleur du jour dans vos parois avant la chute nocturne.`,
+                    impactWeight: 15
+                });
             }
 
             // --- NIVEAU 3 : STRATÉGIE MÉTÉO (48h-72h) ---
@@ -659,11 +814,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const nuitsFraichesOuIntersaison = (tExtMinDay < 18.0 || envDataGlobal.t_ext < 19.0 || isHeatingSeasonActive);
 
             if (surchauffeInterieure && vraieSurchauffeExterieure && !nuitsFraichesOuIntersaison && reserve.chargeFrigories < 35 && canOpenWindows) {
-                pushRec({ id: `${zoneId}_low_frigorie_stock`, level: 3, actionKey: 'free_cooling', zoneId, zoneName, timing: 'strategic', type: 'type-cool', title: 'Décharge nocturne prioritaire (Canicule)', text: `La structure est saturée en chaleur. Ouvrez les fenêtres cette nuit pour refroidir la masse des murs.`, impactWeight: 22 });
+                pushRec({ id: `${zoneId}_low_frigorie_stock`, level: 3, actionKey: 'free_cooling', zoneId, zoneName, timing: 'strategic', type: 'type-cool', title: 'Décharge nocturne prioritaire (Canicule)', text: `La structure est saturée en chaleur. Ouvrez les fenêtres cette nuit pour refroidir la masse des parois.`, impactWeight: 22, ventDurationMin: 30 });
             }
 
-            // Stratégie 48h : Pré-charge solaire de la dalle avant vague de froid
-            if (isHeatingSeasonActive && isSunny && (tExtMinDay < 8.0 || tExtMaxDay < 13.0)) {
+            // Stratégie 48h : Pré-charge solaire de la dalle avant vague de froid (uniquement sur les pièces ayant des ouvertures Sud/Est/Ouest)
+            if (isHeatingSeasonActive && isSunny && solarExpDay.hasSouthOrWest && (tExtMinDay < 8.0 || tExtMaxDay < 13.0)) {
                 pushRec({
                     id: `${zoneId}_solar_precharge_cold_snap`,
                     level: 3,
@@ -672,8 +827,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     zoneName,
                     timing: 'strategic',
                     type: 'type-sun',
-                    title: '🧱 Pré-charge solaire de la dalle (Anticipation 48h)',
-                    text: `Baisse de température annoncée. Laissez le soleil darder les parois et sols tout l'après-midi pour stocker un maximum de calories gratuites avant la vague de fraîcheur.`,
+                    title: '🧱 Pré-charge solaire des parois (Anticipation 48h)',
+                    text: `Baisse de température annoncée. Laissez le soleil charger vos parois et sols tout l'après-midi pour stocker un maximum de calories gratuites avant la vague de fraîcheur.`,
                     impactWeight: 20
                 });
             }
@@ -689,8 +844,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     timing: 'strategic',
                     type: 'type-cool',
                     title: '🌊 Sur-ventilation nocturne profonde (Anticipation pic chaud)',
-                    text: `Fortes chaleurs annoncées demain (${tExtMaxDay}°C). Faites circuler l'air nocturne (${envDataGlobal.t_ext}°C) pour refroidir la masse des murs (${tStruct.toFixed(1)}°C) et régénérer votre réserve de fraîcheur.`,
-                    impactWeight: 25
+                    text: `Fortes chaleurs annoncées demain (${tExtMaxDay}°C). Faites circuler l'air nocturne (${envDataGlobal.t_ext}°C) pour refroidir la masse des parois (${tStruct.toFixed(1)}°C) et régénérer votre réserve de fraîcheur.`,
+                    impactWeight: 25,
+                    ventDurationMin: 30
                 });
             }
 
@@ -800,7 +956,21 @@ document.addEventListener('DOMContentLoaded', function() {
             completedItems.sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
             renderCompletedCards(completedItems, containerCompleted, "Aucune action réalisée pour le moment.");
 
+            renderActiveWindowTimers();
             updateMetrics(recs);
+        }
+
+        // Formatage du badge de gain combiné PMV & Financier selon le pourcentage de réactivité
+        function formatGainBadgeHtml(unitImpact, factor, pct) {
+            if (!unitImpact) return '';
+            const effPmv = (unitImpact.deltaPmv100 * factor).toFixed(2);
+            const effKwh = (unitImpact.kwh100 * factor).toFixed(2);
+            const effEur = (unitImpact.eur100 * factor).toFixed(2).replace('.', ',');
+            const parts = [];
+            if (parseFloat(effPmv) > 0) parts.push(`+${effPmv} PMV`);
+            if (parseFloat(effKwh) > 0.01) parts.push(`${effKwh} kWh (~${effEur} €)`);
+            if (parts.length === 0) return '';
+            return `<span class="tag-weight" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;" title="Gain de confort PMV et d'énergie pondéré par votre réactivité (${pct}%)">🎯 Gain (${pct}%) : ${parts.join(' • ')}</span>`;
         }
 
         function renderGroupedCards(groupList, container, emptyText) {
@@ -819,6 +989,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (totalRooms === 1) {
                     const item = group.items[0];
                     const tInfo = item.timeInfo || getActionTimeInfo(item, lifecycleState.recos[item.id]);
+                    const uImp = item.unitImpact || lifecycleState.recos[item.id]?.unitImpact;
+                    const gainBadge = formatGainBadgeHtml(uImp, tInfo.factor, tInfo.percent);
 
                     const card = document.createElement('div');
                     card.className = `reco-card reco-card-single ${item.type || group.type || ''}`;
@@ -839,6 +1011,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <span class="level-badge level-${item.level}">Niveau ${item.level}</span>
                                 <span class="room-badge-bold">📍 ${item.zoneName}</span>
                                 <span class="badge-delay ${tInfo.delayClass}">⏱️ ${tInfo.elapsedText} • ${tInfo.percent}% (+${tInfo.currentPoints} pts)</span>
+                                ${gainBadge}
                                 ${item.occurrence > 1 ? `<span class="badge-occurrence">🔁 Interv. #${item.occurrence}</span>` : ''}
                             </div>
                             <div class="reco-title" style="margin-bottom: 0.25rem;">${item.title}</div>
@@ -861,7 +1034,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (group.actionKey === 'open_win_humidity') {
                     groupTitle = `Aération flash ciblée (${totalRooms} pièces — ${verresGroupTxt})`;
-                    groupText = `Ouvrez les fenêtres dans les ${totalRooms} pièces concernées : vous évacuerez ${verresGroupTxt} sans entamer la chaleur des parois massives.`;
+                    groupText = `Ouvrez les fenêtres dans les ${totalRooms} pièces concernées (avec minuteur automatique de fermeture) : vous évacuerez ${verresGroupTxt} sans entamer la chaleur des parois.`;
                 } else if (group.actionKey === 'vmc_boost') {
                     groupTitle = `Boost VMC anti-humidité (${totalRooms} pièces)`;
                     groupText = `L'air extérieur est asséchant. Passez la VMC en vitesse rapide pour extraire la vapeur d'eau générée dans ces ${totalRooms} pièces.`;
@@ -870,13 +1043,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     groupText = `Ouvrez les portes dans ces ${totalRooms} pièces vers des zones aérées pour chasser l'humidité accumulée.`;
                 } else if (group.actionKey === 'shutter_close') {
                     groupTitle = `Bouclier solaire immédiat (${totalRooms} pièces)`;
-                    groupText = `Fermez les volets dans les ${totalRooms} pièces exposées pour bloquer le rayonnement direct avant le vitrage.`;
+                    groupText = `Fermez les volets dans les ${totalRooms} pièces exposées au soleil pour bloquer le rayonnement direct avant le vitrage.`;
+                } else if (group.actionKey === 'shutter_close_night') {
+                    groupTitle = `🌙 Bouclier thermique nocturne (${totalRooms} pièces)`;
+                    groupText = `Nuit tombée : fermez les volets dans ces ${totalRooms} pièces pour couper l'effet paroi froide des vitrages (+0.4°C radiants).`;
                 } else if (group.actionKey === 'free_cooling') {
                     groupTitle = `Surventilation traversante (${totalRooms} pièces)`;
                     groupText = `Il fait plus frais dehors (${envDataGlobal.t_ext} °C). Ouvrez pour créer un courant d'air traversant entre ces ${totalRooms} pièces et décharger l'air chaud.`;
                 } else if (group.actionKey === 'sun_heat') {
-                    groupTitle = `Chauffage solaire passif (${totalRooms} pièces)`;
-                    groupText = `Ouvrez les protections dans ces ${totalRooms} pièces pour laisser le rayonnement chauffer gratuitement les masses intérieures.`;
+                    groupTitle = `☀️ Chauffage solaire passif (${totalRooms} pièces exposées)`;
+                    groupText = `Ouvrez les protections dans ces ${totalRooms} pièces ensoleillées pour chauffer gratuitement vos parois.`;
+                } else if (group.actionKey === 'clothing_adjust_warm') {
+                    groupTitle = `🧥 Ajustement vestimentaire confort (+0.25 Clo — ${totalRooms} pièces)`;
+                    groupText = `Temps couvert sans apport solaire direct : gardez la lumière du jour (volets ouverts) et ajoutez une couche légère pour retrouver un PMV confortable sans surchauffer.`;
                 }
 
                 const totalGroupCurrentPts = group.items.reduce((sum, item) => {
@@ -884,8 +1063,31 @@ document.addEventListener('DOMContentLoaded', function() {
                     return sum + itInfo.currentPoints;
                 }, 0);
 
+                const avgGroupPmvGain = group.items.reduce((sum, item) => {
+                    const itInfo = item.timeInfo || getActionTimeInfo(item, lifecycleState.recos[item.id]);
+                    const uImp = item.unitImpact || lifecycleState.recos[item.id]?.unitImpact || { deltaPmv100: 0.15, kwh100: 0, eur100: 0 };
+                    return sum + (uImp.deltaPmv100 * itInfo.factor);
+                }, 0) / Math.max(1, totalRooms);
+
+                const sumGroupKwh = group.items.reduce((sum, item) => {
+                    const itInfo = item.timeInfo || getActionTimeInfo(item, lifecycleState.recos[item.id]);
+                    const uImp = item.unitImpact || lifecycleState.recos[item.id]?.unitImpact || { deltaPmv100: 0.15, kwh100: 0, eur100: 0 };
+                    return sum + (uImp.kwh100 * itInfo.factor);
+                }, 0);
+
+                const sumGroupEur = group.items.reduce((sum, item) => {
+                    const itInfo = item.timeInfo || getActionTimeInfo(item, lifecycleState.recos[item.id]);
+                    const uImp = item.unitImpact || lifecycleState.recos[item.id]?.unitImpact || { deltaPmv100: 0.15, kwh100: 0, eur100: 0 };
+                    return sum + (uImp.eur100 * itInfo.factor);
+                }, 0);
+
                 const earliestItem = group.items.slice().sort((a, b) => (a.appearedAt || 0) - (b.appearedAt || 0))[0];
                 const earliestInfo = earliestItem?.timeInfo || getActionTimeInfo(earliestItem, lifecycleState.recos[earliestItem?.id]);
+                const groupGainBadge = formatGainBadgeHtml(
+                    { deltaPmv100: avgGroupPmvGain, kwh100: sumGroupKwh, eur100: sumGroupEur },
+                    1.0,
+                    earliestInfo.percent
+                );
 
                 const card = document.createElement('div');
                 card.className = `reco-card ${group.type || ''}`;
@@ -896,7 +1098,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                             <span class="level-badge level-${group.level}">Niveau ${group.level}</span>
                             <span class="badge-delay ${earliestInfo.delayClass}">⏱️ ${earliestInfo.elapsedText} • ${earliestInfo.percent}%</span>
-                            <span class="tag-weight">+${totalGroupCurrentPts} pts (+${group.impactWeightPerRoom} pts / pièce)</span>
+                            <span class="tag-weight">+${totalGroupCurrentPts} pts</span>
+                            ${groupGainBadge}
                         </div>
                         <button type="button" class="btn-group-toggle" onclick="window.solsticeToggleGroup('${group.groupKey}', true)">
                             ⚡ Tout appliquer (${totalRooms})
@@ -951,6 +1154,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const delayTxt = formatElapsedTime(item.elapsedMs || ((item.elapsedMin || 0) * 60000));
                 const pts = item.earnedPoints ?? item.basePoints ?? item.impactWeight ?? 15;
                 const pct = item.reactivityPercent ?? 100;
+                const factor = pct / 100;
+                const gainBadge = formatGainBadgeHtml(item.unitImpact, factor, pct);
 
                 card.innerHTML = `
                     <div style="padding-top: 2px;">
@@ -966,6 +1171,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             ${item.occurrence > 1 ? `<span class="badge-occurrence">🔁 Interv. #${item.occurrence}</span>` : ''}
                             <span class="completed-meta">✅ Réalisé à ${compHour} • Délai : ${delayTxt} (${pct}%)</span>
                             <span class="tag-weight" style="background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3);">+${pts} pts</span>
+                            ${gainBadge}
                         </div>
                         <div class="reco-title" style="margin-bottom: 0.25rem; text-decoration: line-through; opacity: 0.85;">${item.title}</div>
                         <div class="reco-text" style="font-size: 0.82rem; color: #64748B;">${item.text}</div>
@@ -975,6 +1181,182 @@ document.addEventListener('DOMContentLoaded', function() {
                 container.appendChild(card);
             });
         }
+
+        // ============================================================
+        // MINUTEUR ACTIF DE FERMETURE DE FENÊTRE & NOTIFICATION
+        // ============================================================
+        function getActiveWindowTimers() {
+            try {
+                const raw = localStorage.getItem('SOLSTICE_WINDOW_TIMERS');
+                return raw ? JSON.parse(raw) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveActiveWindowTimers(timers) {
+            try {
+                localStorage.setItem('SOLSTICE_WINDOW_TIMERS', JSON.stringify(timers));
+            } catch (e) {}
+        }
+
+        function playWindowAlertChime() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+                const playTone = (freq, startOffset, duration) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, ctx.currentTime + startOffset);
+                    gain.gain.setValueAtTime(0.18, ctx.currentTime + startOffset);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startOffset + duration);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + startOffset);
+                    osc.stop(ctx.currentTime + startOffset + duration);
+                };
+                playTone(587.33, 0.0, 0.22); // Ré5
+                playTone(880.00, 0.25, 0.38); // La5
+            } catch (e) {}
+        }
+
+        function triggerWindowCloseNotification(timerObj) {
+            playWindowAlertChime();
+            if ('Notification' in window && Notification.permission === 'granted') {
+                try {
+                    new Notification(`🪟 SOLSTICE — Refermez la fenêtre (${timerObj.zoneName})`, {
+                        body: `Les ${timerObj.durationMin} min d'aération dans ${timerObj.zoneName} sont écoulées. Refermez maintenant pour préserver la chaleur de vos parois !`,
+                        icon: 'https://cdn-icons-png.flaticon.com/512/869/869869.png'
+                    });
+                } catch (e) {}
+            }
+        }
+
+        function startWindowCloseTimerForItem(item) {
+            if (!item || (item.actionKey !== 'open_win_humidity' && item.actionKey !== 'free_cooling')) return;
+            if ('Notification' in window && Notification.permission === 'default') {
+                try { Notification.requestPermission(); } catch (e) {}
+            }
+            const durationMin = item.ventDurationMin || (item.actionKey === 'free_cooling' ? 15 : 6);
+            const timers = getActiveWindowTimers();
+            timers[item.id] = {
+                id: item.id,
+                zoneName: item.zoneName || 'Pièce',
+                actionKey: item.actionKey,
+                durationMin: durationMin,
+                startedAt: Date.now(),
+                endsAt: Date.now() + (durationMin * 60 * 1000),
+                notified: false
+            };
+            saveActiveWindowTimers(timers);
+            renderActiveWindowTimers();
+        }
+
+        function removeWindowCloseTimerForId(id) {
+            const timers = getActiveWindowTimers();
+            if (timers[id]) {
+                delete timers[id];
+                saveActiveWindowTimers(timers);
+                renderActiveWindowTimers();
+            }
+        }
+
+        window.solsticeDismissWindowTimer = function(id) {
+            removeWindowCloseTimerForId(id);
+        };
+
+        window.solsticeTestWindowTimerAlert = function(id) {
+            const timers = getActiveWindowTimers();
+            if (timers[id]) {
+                timers[id].endsAt = Date.now() + 2000;
+                timers[id].notified = false;
+                saveActiveWindowTimers(timers);
+                renderActiveWindowTimers();
+            }
+        };
+
+        function renderActiveWindowTimers() {
+            const banner = document.getElementById('active-window-timers-banner');
+            if (!banner) return;
+            const timers = getActiveWindowTimers();
+            const keys = Object.keys(timers);
+            if (keys.length === 0) {
+                banner.style.display = 'none';
+                banner.innerHTML = '';
+                return;
+            }
+
+            const now = Date.now();
+            let updatedStore = false;
+
+            const cardsHtml = keys.map(k => {
+                const t = timers[k];
+                const remMs = t.endsAt - now;
+                const isExpired = remMs <= 0;
+
+                if (isExpired && !t.notified) {
+                    t.notified = true;
+                    updatedStore = true;
+                    triggerWindowCloseNotification(t);
+                }
+
+                if (isExpired) {
+                    return `
+                        <div style="background: #fef2f2; border: 2px solid #ef4444; border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.5rem;">🔔</span>
+                                <div>
+                                    <div style="font-weight: 800; color: #991b1b; font-size: 0.98rem;">
+                                        TEMPS D'AÉRATION ÉCOULÉ — 📍 ${t.zoneName}
+                                    </div>
+                                    <div style="font-size: 0.85rem; color: #b91c1c; margin-top: 2px;">
+                                        Les ${t.durationMin} min sont terminées : <strong>refermez la fenêtre maintenant</strong> pour conserver la chaleur de vos parois !
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" onclick="window.solsticeDismissWindowTimer('${t.id}')" style="background: #16a34a; color: white; border: none; border-radius: 8px; padding: 8px 14px; font-weight: 800; font-size: 0.85rem; cursor: pointer;">
+                                ✅ J'ai refermé la fenêtre
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    const totalSec = Math.ceil(remMs / 1000);
+                    const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                    const ss = String(totalSec % 60).padStart(2, '0');
+                    return `
+                        <div style="background: #f0f9ff; border: 1px solid #38bdf8; border-radius: 12px; padding: 12px 16px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.35rem;">🪟</span>
+                                <div>
+                                    <div style="font-weight: 800; color: #0369a1; font-size: 0.92rem;">
+                                        Aération en cours dans 📍 ${t.zoneName} — Refermez dans <span style="font-family: monospace; font-size: 1.05rem; background: #e0f2fe; padding: 2px 7px; border-radius: 6px; color: #0284c7;">${mm}:${ss}</span>
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: #0c4a6e; margin-top: 2px;">
+                                        Vous serez notifié automatiquement dès la fin du compte à rebours (${t.durationMin} min).
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <button type="button" onclick="window.solsticeTestWindowTimerAlert('${t.id}')" style="background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; border-radius: 6px; padding: 5px 10px; font-weight: 700; font-size: 0.75rem; cursor: pointer;" title="Tester l'alerte de fin de chrono dans 2 secondes">
+                                    🔔 Tester alerte (2s)
+                                </button>
+                                <button type="button" onclick="window.solsticeDismissWindowTimer('${t.id}')" style="background: #ffffff; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 10px; font-weight: 700; font-size: 0.75rem; cursor: pointer;">
+                                    ✕ Refermée
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+
+            if (updatedStore) saveActiveWindowTimers(timers);
+            banner.style.display = 'block';
+            banner.innerHTML = cardsHtml;
+        }
+
+        setInterval(renderActiveWindowTimers, 1000);
 
         window.solsticeToggleSingle = function(id, event) {
             if (event) {
@@ -994,6 +1376,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 item.completedAt = null;
                 item.earnedPoints = null;
                 item.reactivityPercent = null;
+                removeWindowCloseTimerForId(item.id);
 
                 // Nettoyer les occurrences actives ultérieures redondantes pour ce même baseId
                 const baseId = item.baseId || item.id.split('#')[0];
@@ -1013,6 +1396,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 item.reactivityPercent = timeInfo.percent;
                 item.elapsedMin = timeInfo.elapsedMin;
                 item.elapsedMs = timeInfo.elapsedMs;
+                startWindowCloseTimerForItem(item);
             }
 
             const completedMap = {};
@@ -1044,6 +1428,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         timing: rec.timing,
                         type: rec.type,
                         impactWeight: rec.impactWeight,
+                        ventDurationMin: rec.ventDurationMin || 6,
+                        unitImpact: rec.unitImpact,
                         appearedAt: rec.appearedAt || now, 
                         status: 'active' 
                     };
@@ -1058,11 +1444,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     item.reactivityPercent = timeInfo.percent;
                     item.elapsedMin = timeInfo.elapsedMin;
                     item.elapsedMs = timeInfo.elapsedMs;
+                    startWindowCloseTimerForItem(item);
                 } else {
                     item.status = 'active';
                     item.completedAt = null;
                     item.earnedPoints = null;
                     item.reactivityPercent = null;
+                    removeWindowCloseTimerForId(item.id);
                 }
             });
 
@@ -1093,6 +1481,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 earnedPointsToday += (item.earnedPoints ?? item.basePoints ?? item.impactWeight ?? 15);
                 const reactivityFactor = (item.reactivityPercent !== undefined ? item.reactivityPercent / 100 : 1.0);
 
+                if (item.unitImpact && typeof item.unitImpact.kwh100 === 'number' && item.unitImpact.kwh100 > 0) {
+                    savedKwhDay += (item.unitImpact.kwh100 * reactivityFactor);
+                    return;
+                }
+
                 const zoneConfig = houseConfig[item.zoneId] || {};
                 const roomName = item.zoneName;
                 const roomData = donneesHabitat[roomName] || { ta: 20, rh: 50 };
@@ -1108,14 +1501,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 let dynamicKwh = 0.0;
 
                 // 1. Fermeture des volets / Protection solaire / Bouclier nocturne
-                if (item.actionKey === 'shutter_close' || item.actionKey === 'anticipate_sun') {
-                    if (isCoolingActive) {
+                if (item.actionKey === 'shutter_close' || item.actionKey === 'anticipate_sun' || item.actionKey === 'shutter_close_night' || item.actionKey === 'thermal_curtain') {
+                    if (isCoolingActive && (item.actionKey === 'shutter_close' || item.actionKey === 'anticipate_sun')) {
                         const solEnergyKw = (windowArea * gSol * (0.65 - 0.05) * 6) / 1000;
                         dynamicKwh = solEnergyKw / eerClim;
-                    } else if (isHeatingSeasonActive) {
+                    } else {
                         const uWithShutter = 1 / ((1 / uWindow) + deltaR);
-                        const deltaU = uWindow - uWithShutter;
-                        const deltaT = Math.max(0, ta - envDataGlobal.t_ext);
+                        const deltaU = Math.max(0.25, uWindow - uWithShutter);
+                        const deltaT = Math.max(2, ta - envDataGlobal.t_ext);
                         const thermalGain = (windowArea * deltaU * deltaT * 10) / 1000;
                         dynamicKwh = thermalGain / etaGen;
                     }
@@ -1127,14 +1520,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         dynamicKwh = solGainKw / etaGen;
                     }
                 }
-                // 3. Consigne nocturne / Coupure du chauffage
-                else if (item.actionKey === 'bedroom_temp' || item.actionKey === 'heating_cut') {
+                // 3. Consigne nocturne / Coupure du chauffage / Sobriété vestimentaire
+                else if (item.actionKey === 'bedroom_temp' || item.actionKey === 'heating_cut' || item.actionKey === 'buffer_door_close' || item.actionKey === 'clothing_adjust_warm') {
                     if (isHeatingSeasonActive) {
                         const uWall = parseFloat(zoneConfig.uWall) || 0.8;
                         const wallArea = (Math.sqrt(area) * 4 * 2.5);
                         const hTransm = (wallArea * uWall) + (windowArea * uWindow);
                         const hVent = 0.34 * 45;
-                        const deltaConsigne = (item.actionKey === 'bedroom_temp') ? 2.0 : 1.5;
+                        const deltaConsigne = (item.actionKey === 'bedroom_temp') ? 2.0 : 1.2;
                         
                         const thermalSavedKw = ((hTransm + hVent) * deltaConsigne * 8) / 1000;
                         dynamicKwh = thermalSavedKw / etaGen;
@@ -1159,9 +1552,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
                 // 6. Inertie et déphasage des dalles
-                else if (item.actionKey === 'floor_inertia') {
+                else if (item.actionKey === 'floor_inertia' || item.actionKey === 'heating_boost_comfort') {
                     if (isHeatingSeasonActive) {
-                        dynamicKwh = (area * 0.12) / etaGen;
+                        dynamicKwh = (area * 0.08) / etaGen;
                     }
                 }
 
@@ -1217,17 +1610,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const selectedZone = zoneSelect ? zoneSelect.value : currentZoneId;
             const zonesMap = getAvailableZonesMap();
 
-            // Alignement strict avec le Tableau de Bord (engine.js)
+            // Alignement strict avec le Tableau de Bord (engine.js) + prise en compte de tStruct (2R2C)
             if (selectedZone === 'all') {
                 let totalVol = 0;
                 let weightedPmvInit = 0;
                 let weightedPmvSim = 0;
 
-                // 1. Prise en compte dynamique du toggle 'Inclure pièces tampons' du Tableau de Bord
                 const includeBuffer = localStorage.getItem('SOLSTICE_INCLUDE_BUFFER') !== 'false';
                 const scanData = (store.getScanData && store.getScanData()) || {};
 
-                // 2. Parcours direct des mesures réelles (comme calculateGlobalHabitatMetrics dans engine.js)
                 Object.keys(scanData).forEach(nomPiece => {
                     if (nomPiece === '__ENV__' || nomPiece === '__BUFFER_TOGGLE__') return;
                     const rData = scanData[nomPiece];
@@ -1240,7 +1631,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     const zId = Object.keys(houseConfig).find(k => houseConfig[k]?.name === nomPiece) || nomPiece.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
-                    // 3. Filtrage identique à engine.js
                     if (engine.isOutdoorZone ? engine.isOutdoorZone(nomPiece, zConfig) : isExteriorZone(zId, zConfig)) return;
                     if (!includeBuffer && (engine.isBufferZone ? engine.isBufferZone(nomPiece, zConfig) : isBufferZone(zId, zConfig))) return;
 
@@ -1250,21 +1640,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     const baseTa = rData.ta;
                     const baseRh = rData.rh ?? 50;
-                    const baseTr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(zConfig, baseTa) : baseTa;
+                    const tStruct = engine.updateStructureTemperature ? engine.updateStructureTemperature(nomPiece, baseTa) : baseTa;
+                    const baseTr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(zConfig, baseTa, tStruct) : baseTa;
                     const baseVel = engine.calculateAirVelocity ? engine.calculateAirVelocity(zConfig, nomPiece) : 0.1;
                     const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(zConfig) : { met: 1.2, totalClo: 1.0 };
 
                     const pmvI = engine.calculatePMV ? engine.calculatePMV(baseTa, baseTr, baseVel, baseRh, met, totalClo) : 0;
 
-                    // Actions cochées pour cette pièce
+                    // Actions cochées pour cette pièce et réactivité moyenne
                     const checkedActionKeys = [];
+                    let sumRf = 0;
                     Object.values(lifecycleState.recos || {}).forEach(item => {
                         if (item.status === 'completed' && (item.zoneId === zId || item.zoneName === nomPiece)) {
                             checkedActionKeys.push(item.actionKey);
+                            sumRf += ((item.reactivityPercent ?? 100) / 100);
                         }
                     });
+                    const avgRf = checkedActionKeys.length > 0 ? (sumRf / checkedActionKeys.length) : 1.0;
 
-                    const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: baseRh, met, clo: totalClo };
+                    const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: baseRh, met, clo: totalClo, reactivityFactor: avgRf };
                     const simRes = engine.evaluateSimulatedPMV ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal) : { pmv: pmvI };
 
                     totalVol += vol;
@@ -1286,18 +1680,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 const roomData = donneesHabitat[roomName] || { ta: 20, rh: 50 };
 
                 const baseTa = roomData.ta;
-                const baseTr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(targetZoneConfig, baseTa) : baseTa;
+                const tStruct = engine.updateStructureTemperature ? engine.updateStructureTemperature(roomName, baseTa) : baseTa;
+                const baseTr = engine.calculateMeanRadiantTemp ? engine.calculateMeanRadiantTemp(targetZoneConfig, baseTa, tStruct) : baseTa;
                 const baseVel = engine.calculateAirVelocity ? engine.calculateAirVelocity(targetZoneConfig, roomName) : 0.1;
                 const { met, totalClo } = engine.getBaseCloAndMet ? engine.getBaseCloAndMet(targetZoneConfig) : { met: 1.2, totalClo: 1.0 };
 
                 const checkedActionKeys = [];
+                let sumRf = 0;
                 Object.values(lifecycleState.recos || {}).forEach(item => {
                     if (item.status === 'completed' && (item.zoneId === selectedZone || item.zoneName === roomName)) {
                         checkedActionKeys.push(item.actionKey);
+                        sumRf += ((item.reactivityPercent ?? 100) / 100);
                     }
                 });
+                const avgRf = checkedActionKeys.length > 0 ? (sumRf / checkedActionKeys.length) : 1.0;
 
-                const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: roomData.rh, met, clo: totalClo };
+                const baseState = { ta: baseTa, tr: baseTr, vel: baseVel, rh: roomData.rh, met, clo: totalClo, reactivityFactor: avgRf };
                 const pmvInit = engine.calculatePMV ? engine.calculatePMV(baseTa, baseTr, baseVel, roomData.rh, met, totalClo) : 0;
                 const simulation = engine.evaluateSimulatedPMV ? engine.evaluateSimulatedPMV(baseState, checkedActionKeys, envDataGlobal) : { pmv: pmvInit };
 
