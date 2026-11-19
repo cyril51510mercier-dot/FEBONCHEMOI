@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SOLSTICE • Diagnostic & Suivi Thera-Aéraulique de l'Habitat</title>
+    <title>SOLSTICE • Synthèse Thermique & Confort de l'Habitat</title>
     
     <link rel="stylesheet" href="style.css">
     
@@ -45,26 +45,25 @@
         };
     </script>
 </head>
-<body style="background-color: #F1F5F9; font-family: system-ui, -apple-system, sans-serif; color: #0F172A; margin: 0; padding: 0;">
+<body style="background-color: #070B14; font-family: system-ui, -apple-system, sans-serif; color: #F1F5F9; margin: 0; padding: 0;">
 
-    <main class="dashboard-container" style="max-width: 1240px; margin: 14px auto; padding: 0 12px; display: flex; flex-direction: column; gap: 16px;">
+    <main class="dashboard-container" style="max-width: 1180px; margin: 14px auto; padding: 0 12px; display: flex; flex-direction: column; gap: 16px;">
         
         <!-- ============================================================== -->
-        <!-- MASTER CARD : COCKPIT HABITAT & SCÈNE ARCHITECTURALE V8.1     -->
+        <!-- MASTER CARD : COCKPIT ARCHITECTURAL & SYNTHÈSE UNIFIÉE V9.0    -->
         <!-- ============================================================== -->
-        <div class="w-full bg-[#0B101D] border border-slate-800 rounded-3xl p-3.5 sm:p-5 shadow-[0_20px_50px_rgba(0,0,0,0.6)] text-slate-100 flex flex-col gap-4">
+        <div class="w-full bg-[#0B101D] border border-slate-800/90 rounded-3xl p-3.5 sm:p-5 shadow-[0_24px_60px_rgba(0,0,0,0.75)] text-slate-100 flex flex-col gap-4">
             
-            <!-- 1. EN-TÊTE SUPÉRIEUR (TITRE AGRANDI & PHRASE SIMPLIFIÉE) -->
+            <!-- 1. EN-TÊTE SUPÉRIEUR -->
             <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
-                <!-- Identité Solstice (Police Agrandie) -->
                 <div class="flex items-center gap-3">
                     <span class="text-3xl sm:text-4xl drop-shadow">☀️</span>
                     <div>
                         <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white m-0 leading-tight">
-                            SOLSTICE <span class="text-[#D96B43] font-light text-xl sm:text-2xl">| Tableau de Bord</span>
+                            SOLSTICE <span class="text-[#D96B43] font-light text-xl sm:text-2xl">| Synthèse Habitat</span>
                         </h1>
-                        <p class="text-sm sm:text-base text-slate-300 m-0 mt-0.5 font-medium">
-                            Suivez en temps réel le confort et l'énergie de votre maison
+                        <p class="text-xs sm:text-sm text-slate-400 m-0 mt-0.5 font-medium">
+                            Jumeau numérique en temps réel — confort, inertie des parois et repères d'action
                         </p>
                     </div>
                 </div>
@@ -97,38 +96,43 @@
                 </div>
             </div>
 
-            <!-- 2. BANDEAU DE PERSONNALISATION ÉPURÉ (VILLE CLIQUABLE & PIÈCES TAMPONS) -->
-            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <!-- 2. BANDEAU DE CONTEXTE (LOCALISATION, TOP/FLOP PIÈCES & PIÈCES TAMPONS) -->
+            <div class="bg-slate-900/75 border border-slate-800/90 rounded-2xl p-2.5 sm:px-3.5 flex flex-wrap items-center justify-between gap-2.5 text-xs">
                 
-                <!-- Bloc A : Localisation avec clic sur ville pour éditer -->
-                <div class="flex flex-wrap items-center gap-2.5">
-                    <!-- Nom de ville cliquable -->
+                <!-- Bloc A : Localisation -->
+                <div class="flex flex-wrap items-center gap-2">
                     <div onclick="toggleCityInput()" class="font-bold text-slate-300 flex items-center gap-1.5 cursor-pointer hover:text-white transition group" title="Cliquer pour changer de ville">
                         <span class="text-sm">📍</span>
-                        <span id="summary-city-name" class="text-amber-400 font-black text-sm sm:text-base pb-0.5">Reims</span>
+                        <span id="summary-city-name" class="text-amber-400 font-black text-sm sm:text-base">Reims</span>
                         <span class="text-[11px] text-slate-400 group-hover:text-amber-300 transition">✏️</span>
                     </div>
 
-                    <!-- Champ de saisie dynamique (masqué par défaut) -->
                     <div id="city-input-group" class="hidden items-center gap-1 bg-slate-950 border border-amber-500/70 rounded-xl px-2 py-1 shadow-lg">
                         <input type="text" id="location" placeholder="Nom de ville..." aria-label="Ville" class="bg-transparent border-0 text-white text-xs outline-none w-28 placeholder:text-slate-500" onkeydown="if(event.key==='Enter') validerNouvelleVille()">
                         <button id="getWeatherButton" onclick="validerNouvelleVille()" class="bg-amber-500 text-slate-950 font-bold rounded-lg px-2 py-0.5 text-xs cursor-pointer hover:bg-amber-400">OK</button>
                         <button onclick="toggleCityInput(false)" class="text-slate-400 hover:text-white text-xs px-1 cursor-pointer">✕</button>
                     </div>
 
-                    <!-- Bouton Géolocaliser -->
-                    <button id="geoLocateButton" onclick="geolocaliserMeteo()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl px-2.5 py-1 text-[11px] font-semibold cursor-pointer">
+                    <button id="geoLocateButton" onclick="geolocaliserMeteo()" class="bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl px-2.5 py-1 text-[11px] font-semibold cursor-pointer">
                         📍 Géolocaliser
                     </button>
 
-                    <!-- Éléments techniques conservés pour compatibilité engine.js (masqués pour éviter toute redondance) -->
                     <span id="weatherSummary" style="display: none;"></span>
                     <span id="summary-weather-inline" style="display: none;"></span>
                 </div>
 
-                <!-- Bloc B : Interrupteur Pièces Tampons -->
-                <div class="flex items-center">
-                    <label class="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white transition font-medium select-none bg-slate-950/60 border border-slate-800 rounded-xl px-2.5 py-1">
+                <!-- Bloc B : Repères Pièces (PMV) & Pièces Tampons -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <div id="box-room-extremes" class="flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[11px]">
+                        <span id="badge-best-room" class="px-2.5 py-1 rounded-xl bg-emerald-950/75 border border-emerald-500/35 text-emerald-200 font-bold">
+                            🏆 Top confort : --
+                        </span>
+                        <span id="badge-worst-room" class="px-2.5 py-1 rounded-xl bg-amber-950/75 border border-amber-500/35 text-amber-200 font-bold">
+                            ⚠️ Point d'attention : --
+                        </span>
+                    </div>
+
+                    <label class="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white transition font-medium select-none bg-slate-950/70 border border-slate-800 rounded-xl px-2.5 py-1">
                         <input type="checkbox" id="include-buffer-checkbox" onchange="toggleIncludeBuffer(this.checked)" class="accent-[#D96B43] rounded cursor-pointer">
                         <span>Pièces tampons</span>
                     </label>
@@ -136,267 +140,312 @@
 
             </div>
 
-            <!-- 3. SCÈNE ARCHITECTURALE HD & ENCARTS ADAPTATIFS (MOBILE SANS CHEVAUCHEMENT) -->
-            <div class="relative w-full max-w-[940px] mx-auto bg-gradient-to-b from-[#0A1124] via-[#0E172F] to-[#070B18] border border-slate-800 rounded-3xl p-2 sm:p-4 overflow-hidden select-none">
+            <!-- 3. COUPE ARCHITECTURALE TECHNIQUE HD (JUMEAU NUMÉRIQUE PROFESSIONNEL) -->
+            <div class="relative w-full max-w-[980px] mx-auto bg-gradient-to-b from-[#070D19] via-[#0B1426] to-[#080E1A] border border-slate-800/90 rounded-3xl p-2 sm:p-4 overflow-hidden select-none shadow-inner">
                 
-                <!-- DESSIN ARCHITECTURAL VECTORIEL SVG (1000 x 600) -->
                 <div class="w-full">
-                    <svg viewBox="0 0 1000 600" class="w-full h-auto select-none" xmlns="http://www.w3.org/2000/svg">
+                    <svg viewBox="0 0 1000 560" class="w-full h-auto select-none" xmlns="http://www.w3.org/2000/svg">
                         <defs>
-                            <!-- Dégradé Ciel Réaliste & Doux -->
+                            <!-- Fond Atmosphérique Architectural Sombre & Sobre -->
                             <linearGradient id="skyAtmosphereGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stop-color="#E2EEF7" stop-opacity="0.95"/>
-                                <stop offset="70%" stop-color="#EDF4F9" stop-opacity="0.90"/>
-                                <stop offset="100%" stop-color="#F1F6FA" stop-opacity="0.85"/>
+                                <stop offset="0%" stop-color="#070C17" stop-opacity="1"/>
+                                <stop offset="65%" stop-color="#0D172A" stop-opacity="1"/>
+                                <stop offset="100%" stop-color="#0F1B30" stop-opacity="1"/>
                             </linearGradient>
 
-                            <!-- Lueur du Soleil -->
+                            <!-- Grille technique architecturale (Blueprint subtil) -->
+                            <pattern id="archBlueprintGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#38BDF8" stroke-width="0.6" stroke-opacity="0.06"/>
+                                <path d="M 200 0 L 0 0 0 200" fill="none" stroke="#38BDF8" stroke-width="0.9" stroke-opacity="0.1"/>
+                            </pattern>
+
+                            <!-- Lueur de l'astre céleste -->
                             <radialGradient id="sunHaloGrad" cx="50%" cy="50%" r="50%">
-                                <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.95"/>
-                                <stop offset="40%" stop-color="#FBBF24" stop-opacity="0.45"/>
-                                <stop offset="75%" stop-color="#EA580C" stop-opacity="0.15"/>
-                                <stop offset="100%" stop-color="#EDF4F9" stop-opacity="0"/>
+                                <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.75"/>
+                                <stop offset="45%" stop-color="#FBBF24" stop-opacity="0.25"/>
+                                <stop offset="100%" stop-color="#0D172A" stop-opacity="0"/>
                             </radialGradient>
 
-                            <!-- Cône solaire volumétrique -->
+                            <!-- Cône solaire volumétrique à travers les baies vitrées -->
                             <linearGradient id="solarLightCone" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.25"/>
-                                <stop offset="60%" stop-color="#FBBF24" stop-opacity="0.08"/>
+                                <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.20"/>
+                                <stop offset="60%" stop-color="#FBBF24" stop-opacity="0.06"/>
                                 <stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/>
                             </linearGradient>
 
-                            <!-- Motif Hachuré Isolant BEM (Signature Bleue Zig-zag) -->
-                            <pattern id="insulationHatch" width="12" height="12" patternUnits="userSpaceOnUse">
-                                <rect width="12" height="12" fill="#E0F2FE"/>
-                                <path d="M 0 6 L 6 0 M 6 12 L 12 6 M 0 12 L 12 0" stroke="#38BDF8" stroke-width="1.5"/>
+                            <!-- Motif Isolant Technique BEM (Hachures fines professionnelles sur fond ardoise) -->
+                            <pattern id="insulationHatch" width="10" height="10" patternUnits="userSpaceOnUse">
+                                <rect width="10" height="10" fill="#132038"/>
+                                <path d="M 0 10 L 10 0 M -2 2 L 2 -2 M 8 12 L 12 8" stroke="#38BDF8" stroke-width="1" stroke-opacity="0.38"/>
                             </pattern>
 
-                            <!-- Reflets Verriers Double Vitrage -->
+                            <!-- Dégradé verre architectural double/triple vitrage -->
                             <linearGradient id="glassReflection" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.30"/>
-                                <stop offset="35%" stop-color="#FFFFFF" stop-opacity="0.12"/>
-                                <stop offset="70%" stop-color="#0284C7" stop-opacity="0.05"/>
-                                <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.25"/>
+                                <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.45"/>
+                                <stop offset="50%" stop-color="#E0F2FE" stop-opacity="0.15"/>
+                                <stop offset="100%" stop-color="#0284C7" stop-opacity="0.40"/>
                             </linearGradient>
 
-                            <!-- Marqueurs Rayons & Flux Laser -->
-                            <marker id="mk-ray-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                                <path d="M 0 2 L 8 5 L 0 8 z" fill="#D97706"/>
-                            </marker>
-                            <marker id="mk-laser-orange" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <!-- Éclairage d'ambiance intérieur chaud (volumes habités) -->
+                            <radialGradient id="interiorAmbientWarm" cx="50%" cy="65%" r="65%">
+                                <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.13"/>
+                                <stop offset="60%" stop-color="#38BDF8" stop-opacity="0.04"/>
+                                <stop offset="100%" stop-color="#0F172A" stop-opacity="0"/>
+                            </radialGradient>
+
+                            <!-- Halo thermique du système de chauffage -->
+                            <radialGradient id="radiatorHeatGlow" cx="50%" cy="50%" r="55%">
+                                <stop offset="0%" stop-color="#F97316" stop-opacity="0.32"/>
+                                <stop offset="100%" stop-color="#F97316" stop-opacity="0"/>
+                            </radialGradient>
+
+                            <!-- Marqueurs des Vecteurs de Flux Thermiques -->
+                            <marker id="mk-laser-orange" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
                                 <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#F59E0B"/>
                             </marker>
-                            <marker id="mk-laser-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <marker id="mk-laser-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
                                 <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38BDF8"/>
                             </marker>
                         </defs>
 
-                        <!-- FOND GLOBAL EXTÉRIEUR (JARDIN & CIEL PÂLE MODERNE) -->
-                        <rect x="0" y="0" width="1000" height="600" fill="url(#skyAtmosphereGrad)"/>
+                        <!-- 1. FOND ARCHITECTURAL & GRILLE TECHNIQUE -->
+                        <rect x="0" y="0" width="1000" height="560" fill="url(#skyAtmosphereGrad)"/>
+                        <rect x="0" y="0" width="1000" height="505" fill="url(#archBlueprintGrid)"/>
 
-                        <!-- LIGNE DE SOL & TERRAIN -->
-                        <rect x="0" y="530" width="1000" height="70" fill="#E2E8F0"/>
-                        <line x1="0" y1="530" x2="1000" y2="530" stroke="#1E293B" stroke-width="2.5"/>
-                        <rect x="0" y="530" width="310" height="8" fill="#84CC16"/>
+                        <!-- Repères de cotation architecturale discrets -->
+                        <g stroke="#334155" stroke-width="0.8" opacity="0.55">
+                            <line x1="955" y1="60" x2="955" y2="505" stroke-dasharray="2 3"/>
+                            <line x1="948" y1="60" x2="962" y2="60"/>
+                            <line x1="948" y1="320" x2="962" y2="320"/>
+                            <line x1="948" y1="505" x2="962" y2="505"/>
+                        </g>
 
-                        <!-- CÔNE SOLAIRE VOLUMÉTRIQUE -->
-                        <polygon id="volumetric-cone" points="135,105 450,140 450,530 300,530" fill="url(#solarLightCone)"/>
+                        <!-- 2. SOL & PAYSAGE ARCHITECTURAL MINIMALISTE -->
+                        <rect x="0" y="505" width="1000" height="55" fill="#09101E"/>
+                        <!-- Strates géothermiques du sol -->
+                        <line x1="0" y1="518" x2="1000" y2="518" stroke="#1E293B" stroke-width="1" stroke-dasharray="6 6"/>
+                        <line x1="0" y1="534" x2="1000" y2="534" stroke="#1E293B" stroke-width="1" stroke-dasharray="3 8"/>
+                        <!-- Ligne d'horizon terrain naturel -->
+                        <line x1="0" y1="505" x2="1000" y2="505" stroke="#334155" stroke-width="2"/>
+                        <line x1="0" y1="505" x2="310" y2="505" stroke="#10B981" stroke-width="2" stroke-opacity="0.45"/>
 
-                        <!-- ASTRE CÉLESTE (SOLEIL VECTORIEL CHAUD PARFAITEMENT DÉGAGÉ) -->
+                        <!-- Silhouette végétale architecturale épurée (style coupe d'architecte CAD) -->
+                        <g id="garden-vegetation" opacity="0.65">
+                            <!-- Arbre architectural géométrique -->
+                            <polygon points="105,275 142,365 125,365 148,430 62,430 85,365 68,365" fill="#0F292A" stroke="#10B981" stroke-width="1.2" stroke-opacity="0.55"/>
+                            <line x1="105" y1="335" x2="105" y2="505" stroke="#475569" stroke-width="2.5" stroke-linecap="round"/>
+                            <line x1="105" y1="385" x2="122" y2="368" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/>
+                            <line x1="105" y1="405" x2="88" y2="388" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/>
+                            <!-- Haie basse géométrique -->
+                            <rect x="175" y="485" width="95" height="20" rx="10" fill="#0F292A" stroke="#10B981" stroke-width="1" stroke-opacity="0.4"/>
+                        </g>
+
+                        <!-- 3. CÔNE SOLAIRE & ASTRE CÉLESTE -->
+                        <polygon id="volumetric-cone" points="135,98 470,140 520,505 310,505" fill="url(#solarLightCone)"/>
                         <g class="sun-glow-anim">
-                            <circle cx="135" cy="105" r="70" fill="url(#sunHaloGrad)" id="svg-sky-corona"/>
-                            <circle cx="135" cy="105" r="26" fill="#F59E0B" stroke="#FEF08A" stroke-width="2.5" id="svg-sky-core"/>
-                        </g>
-
-
-
-                        <!-- ARBRE ET VÉGÉTATION STYLISÉE -->
-                        <g id="garden-vegetation">
-                            <line x1="115" y1="410" x2="115" y2="530" stroke="#1E293B" stroke-width="4.5" stroke-linecap="round"/>
-                            <line x1="115" y1="460" x2="135" y2="435" stroke="#1E293B" stroke-width="3" stroke-linecap="round"/>
-                            <ellipse cx="115" cy="370" rx="48" ry="66" fill="#65A30D" stroke="#1E293B" stroke-width="2.5"/>
-                            <ellipse cx="105" cy="355" rx="32" ry="46" fill="#84CC16" fill-opacity="0.35"/>
-                            <circle cx="80" cy="530" r="22" fill="#4D7C0F" stroke="#1E293B" stroke-width="2"/>
-                            <circle cx="150" cy="530" r="26" fill="#65A30D" stroke="#1E293B" stroke-width="2"/>
-                            <circle cx="115" cy="530" r="20" fill="#4D7C0F" stroke="#1E293B" stroke-width="2"/>
+                            <circle cx="135" cy="98" r="64" fill="url(#sunHaloGrad)" id="svg-sky-corona"/>
+                            <circle cx="135" cy="98" r="22" fill="#F59E0B" stroke="#FDE68A" stroke-width="1.8" id="svg-sky-core"/>
                         </g>
 
                         <!-- ============================================================== -->
-                        <!-- LA MAISON EN COUPE ARCHITECTURALE (2 ÉTAGES AVEC TOIT EN PENTE) -->
+                        <!-- 4. STRUCTURE ARCHITECTURALE DU BÂTIMENT (COUPE TECHNIQUE 2R2C) -->
                         <!-- ============================================================== -->
-                        
-                        <!-- 1. ENVELOPPE ISOLÉE CONTINUE BEM (COUCHE CYAN HACHURÉE) -->
+
+                        <!-- 4.1 Volumes Intérieurs (Fond Ardoise Profond & Halo Thermique) -->
+                        <!-- R+1 Gauche -->
+                        <polygon points="334,225 635,88 635,318 334,318" fill="#0E1729" stroke="#1E293B" stroke-width="1"/>
+                        <!-- R+1 Droite -->
+                        <polygon points="635,88 906,218 906,318 635,318" fill="#0C1424" stroke="#1E293B" stroke-width="1"/>
+                        <!-- RDC Gauche -->
+                        <rect x="334" y="336" width="301" height="169" fill="#0E1729" stroke="#1E293B" stroke-width="1"/>
+                        <!-- RDC Droite -->
+                        <rect x="635" y="336" width="271" height="169" fill="#0C1424" stroke="#1E293B" stroke-width="1"/>
+                        <!-- Lueur thermique ambiante intérieure -->
+                        <polygon points="334,225 635,88 906,218 906,505 334,505" fill="url(#interiorAmbientWarm)"/>
+
+                        <!-- Grille structurelle intérieure subtile -->
+                        <polygon points="334,225 635,88 906,218 906,505 334,505" fill="url(#archBlueprintGrid)" opacity="0.6"/>
+
+                        <!-- 4.2 Dalles & Refends Internes (Masse Thermique Interne) -->
+                        <!-- Plancher intermédiaire porteur (Dalle béton R+1) -->
+                        <rect x="334" y="318" width="572" height="18" fill="#1E293B" stroke="#475569" stroke-width="1.5"/>
+                        <line x1="340" y1="327" x2="900" y2="327" stroke="#64748B" stroke-width="0.8" stroke-dasharray="8 4"/>
+                        <!-- Refend porteur central -->
+                        <rect x="631" y="88" width="8" height="417" fill="#1E293B" stroke="#475569" stroke-width="1.2"/>
+
+                        <!-- 4.3 Enveloppe Isolée Continue BEM (Parois Lourdes & Isolation) -->
                         <g id="bem-insulation-envelope">
-                            <!-- Dalle de fondation isolée -->
-                            <rect x="310" y="530" width="620" height="22" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="floor-heavy"/>
-                            
-                            <!-- Mur droit isolé continu -->
-                            <rect x="906" y="210" width="24" height="320" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="wall-heavy-r"/>
-                            
-                            <!-- Toiture pente droite isolée -->
-                            <polygon points="635,60 930,210 906,222 635,84" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2"/>
-                            
-                            <!-- Toiture pente gauche isolée -->
-                            <polygon points="635,60 310,210 334,222 635,84" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="roof-structure"/>
-                            
-                            <!-- Allège gauche supérieure isolée -->
-                            <rect x="310" y="210" width="24" height="28" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="wall-tl"/>
-                            
-                            <!-- Allège gauche inférieure isolée -->
-                            <rect x="310" y="505" width="24" height="25" fill="url(#insulationHatch)" stroke="#1E293B" stroke-width="2" id="wall-bl"/>
+                            <!-- Dalle basse sur terre-plein isolé -->
+                            <rect x="310" y="505" width="620" height="22" fill="url(#insulationHatch)" stroke="#38BDF8" stroke-width="1.8" stroke-opacity="0.8" id="floor-heavy"/>
+                            <!-- Paroi lourde extérieure droite -->
+                            <rect x="906" y="202" width="24" height="303" fill="url(#insulationHatch)" stroke="#38BDF8" stroke-width="1.8" stroke-opacity="0.8" id="wall-heavy-r"/>
+                            <!-- Versant toiture droite isolé -->
+                            <polygon points="635,54 930,202 906,216 635,82" fill="url(#insulationHatch)" stroke="#38BDF8" stroke-width="1.8" stroke-opacity="0.8"/>
+                            <!-- Versant toiture gauche isolé -->
+                            <polygon points="635,54 310,202 334,216 635,82" fill="url(#insulationHatch)" stroke="#38BDF8" stroke-width="1.8" stroke-opacity="0.8" id="roof-structure"/>
+                            <!-- Allège haute gauche -->
+                            <rect x="310" y="202" width="24" height="26" fill="url(#insulationHatch)" stroke="#38BDF8" stroke-width="1.8" stroke-opacity="0.8" id="wall-tl"/>
+                            <!-- Meneau intermédiaire façade gauche -->
+                            <rect x="310" y="318" width="24" height="18" fill="url(#insulationHatch)" stroke="#38BDF8" stroke-width="1.5" stroke-opacity="0.8"/>
+                            <!-- Allège basse gauche -->
+                            <rect x="310" y="482" width="24" height="23" fill="url(#insulationHatch)" stroke="#38BDF8" stroke-width="1.8" stroke-opacity="0.8" id="wall-bl"/>
                         </g>
 
-                        <!-- 2. PANNEAUX SOLAIRES PHOTOVOLTAÏQUES (SUR PENTE GAUCHE) -->
+                        <!-- Couverture architecturale & Capteurs Solaires en Toiture -->
                         <g id="solar-panels-roof">
-                            <polygon points="410,165 580,85 575,73 405,153" fill="#0F172A" stroke="#0284C7" stroke-width="2"/>
-                            <line x1="450" y1="145" x2="445" y2="133" stroke="#38BDF8" stroke-width="1.2"/>
-                            <line x1="490" y1="125" x2="485" y2="113" stroke="#38BDF8" stroke-width="1.2"/>
-                            <line x1="530" y1="105" x2="525" y2="93" stroke="#38BDF8" stroke-width="1.2"/>
-                            <!-- Rive de toit zinc anthracite -->
-                            <polygon points="635,52 935,205 930,210 635,58 305,205 300,200" fill="#1E293B"/>
+                            <polygon points="635,47 936,198 930,202 635,54 310,202 304,198" fill="#334155" stroke="#64748B" stroke-width="1"/>
+                            <!-- Panneaux solaires intégrés -->
+                            <polygon points="400,154 585,68 581,59 396,145" fill="#091326" stroke="#38BDF8" stroke-width="1.4"/>
+                            <line x1="445" y1="133" x2="441" y2="124" stroke="#38BDF8" stroke-width="0.9" stroke-opacity="0.6"/>
+                            <line x1="490" y1="112" x2="486" y2="103" stroke="#38BDF8" stroke-width="0.9" stroke-opacity="0.6"/>
+                            <line x1="535" y1="91" x2="531" y2="82" stroke="#38BDF8" stroke-width="0.9" stroke-opacity="0.6"/>
                         </g>
 
-                        <!-- 3. VOLUMES INTÉRIEURS DES 4 PIÈCES -->
-                        
-                        <!-- R+1 Gauche : Mezzanine / Bureau Haut -->
-                        <polygon points="334,238 635,95 635,330 334,330" fill="#FFFBEB" stroke="#1E293B" stroke-width="1.5"/>
-                        <!-- R+1 Droite : Chambre Parentale -->
-                        <polygon points="635,95 906,230 906,330 635,330" fill="#F8FAFC" stroke="#1E293B" stroke-width="1.5"/>
-                        
-                        <!-- RDC Gauche : Salon / Séjour Lumineux -->
-                        <rect x="334" y="350" width="301" height="180" fill="#FEF3C7" stroke="#1E293B" stroke-width="1.5"/>
-                        <!-- RDC Droite : Espace Bureau & Chauffage -->
-                        <rect x="635" y="350" width="271" height="180" fill="#F8FAFC" stroke="#1E293B" stroke-width="1.5"/>
+                        <!-- 4.4 Menuiseries Vitrées Haute Performance (Double/Triple Vitrage) -->
+                        <!-- Baie R+1 -->
+                        <rect x="317" y="228" width="10" height="90" fill="url(#glassReflection)" stroke="#38BDF8" stroke-width="1.5"/>
+                        <line x1="322" y1="228" x2="322" y2="318" stroke="#E0F2FE" stroke-width="0.7" stroke-opacity="0.6"/>
+                        <!-- Baie RDC -->
+                        <rect x="317" y="336" width="10" height="146" fill="url(#glassReflection)" stroke="#38BDF8" stroke-width="1.5"/>
+                        <line x1="322" y1="336" x2="322" y2="482" stroke="#E0F2FE" stroke-width="0.7" stroke-opacity="0.6"/>
 
-                        <!-- Plancher intermédiaire (RDC / R+1) -->
-                        <rect x="334" y="330" width="572" height="20" fill="#E2E8F0" stroke="#1E293B" stroke-width="2"/>
-                        <!-- Mur de refend central -->
-                        <line x1="635" y1="95" x2="635" y2="530" stroke="#1E293B" stroke-width="2.5"/>
+                        <!-- ============================================================== -->
+                        <!-- 5. AMÉNAGEMENT INTÉRIEUR FILAIRE ARCHITECTURAL (STYLE CAD)     -->
+                        <!-- ============================================================== -->
 
-                        <!-- 4. MENUISERIES VITRÉES -->
-                        <!-- Baie supérieure R+1 (Double Vitrage Fixe) -->
-                        <rect x="326" y="238" width="8" height="92" fill="#38BDF8" fill-opacity="0.2" stroke="#1E293B" stroke-width="2"/>
-                        <polygon points="326,245 334,239 334,285 326,300" fill="url(#glassReflection)"/>
-
-                        <!-- Baie inférieure RDC -->
-                        <rect x="326" y="350" width="8" height="155" fill="#38BDF8" fill-opacity="0.15" stroke="#1E293B" stroke-width="2"/>
-                        <polygon points="326,360 334,354 334,420 326,440" fill="url(#glassReflection)"/>
-
-                        <!-- 5. MOBILIER ÉPURÉ & RADIATEUR D'ÉMISSION THERMIQUE -->
-                        <!-- R+1 Mezzanine : Bureau & Ordinateur -->
-                        <g id="mezzanine-furniture">
-                            <rect x="420" y="295" width="70" height="6" fill="#1E293B" rx="1"/>
-                            <line x1="430" y1="301" x2="430" y2="330" stroke="#1E293B" stroke-width="2"/>
-                            <line x1="480" y1="301" x2="480" y2="330" stroke="#1E293B" stroke-width="2"/>
-                            <rect x="445" y="282" width="20" height="13" fill="#64748B" rx="1"/>
-                            <path d="M 505 290 L 515 290 L 515 310 L 500 310 L 500 330 M 515 310 L 515 330" stroke="#1E293B" stroke-width="2" fill="none"/>
+                        <!-- R+1 Gauche : Espace Bureau Minimaliste -->
+                        <g id="mezzanine-furniture" opacity="0.75">
+                            <rect x="415" y="284" width="76" height="4" fill="#334155" stroke="#64748B" stroke-width="1" rx="1"/>
+                            <line x1="424" y1="288" x2="424" y2="318" stroke="#475569" stroke-width="1.8"/>
+                            <line x1="482" y1="288" x2="482" y2="318" stroke="#475569" stroke-width="1.8"/>
+                            <!-- Écran fin architectural -->
+                            <rect x="442" y="266" width="24" height="14" fill="#0F172A" stroke="#38BDF8" stroke-width="1.2" stroke-opacity="0.7" rx="1.5"/>
+                            <line x1="454" y1="280" x2="454" y2="284" stroke="#64748B" stroke-width="1.8"/>
+                            <!-- Siège ergonomique -->
+                            <path d="M 505 276 L 512 276 L 512 298 L 496 298 M 504 298 L 504 318 M 496 318 L 512 318" stroke="#475569" stroke-width="1.6" fill="none" stroke-linecap="round"/>
                         </g>
 
-                        <!-- R+1 Chambre : Lit & Lampe de Chevet -->
-                        <g id="bedroom-furniture">
-                            <rect x="710" y="305" width="85" height="25" fill="#38BDF8" fill-opacity="0.5" stroke="#1E293B" stroke-width="2" rx="3"/>
-                            <rect x="795" y="285" width="8" height="45" fill="#1E293B" rx="1"/>
-                            <rect x="765" y="300" width="25" height="12" fill="#FFFFFF" stroke="#1E293B" stroke-width="1.5" rx="2"/>
-                            <rect x="815" y="310" width="22" height="20" fill="#CBD5E1" stroke="#1E293B" stroke-width="1.5"/>
-                            <circle cx="826" cy="303" r="5" fill="#F59E0B"/>
+                        <!-- R+1 Droite : Suite / Chambre en Lignes Épurées -->
+                        <g id="bedroom-furniture" opacity="0.75">
+                            <!-- Cadre de lit architectural -->
+                            <rect x="705" y="296" width="96" height="22" fill="#1E293B" stroke="#475569" stroke-width="1.4" rx="2"/>
+                            <rect x="710" y="288" width="68" height="9" fill="#0F172A" stroke="#38BDF8" stroke-width="1" stroke-opacity="0.45" rx="2"/>
+                            <rect x="780" y="284" width="16" height="12" fill="#334155" stroke="#64748B" stroke-width="1" rx="2"/>
+                            <rect x="798" y="272" width="5" height="46" fill="#334155" stroke="#64748B" stroke-width="1" rx="1"/>
+                            <!-- Chevet & luminaire suspendu -->
+                            <rect x="814" y="298" width="22" height="20" fill="#1E293B" stroke="#475569" stroke-width="1.2" rx="1"/>
+                            <line x1="825" y1="180" x2="825" y2="275" stroke="#475569" stroke-width="1"/>
+                            <circle cx="825" cy="278" r="4.5" fill="#F59E0B" fill-opacity="0.85"/>
                         </g>
 
-                        <!-- RDC Salon : Canapé Convivial, Plante, Lampadaire et OCCUPANT -->
+                        <!-- RDC Gauche : Séjour Contemporain & Silhouette Humaine Ergonomique -->
                         <g id="living-furniture">
-                            <rect x="470" y="475" width="115" height="45" fill="#FDBA74" stroke="#1E293B" stroke-width="2" rx="4"/>
-                            <rect x="480" y="455" width="95" height="20" fill="#FB923C" stroke="#1E293B" stroke-width="2" rx="3"/>
-                            <rect x="460" y="470" width="15" height="40" fill="#EA580C" stroke="#1E293B" stroke-width="2" rx="2"/>
-                            <rect x="580" y="470" width="15" height="40" fill="#EA580C" stroke="#1E293B" stroke-width="2" rx="2"/>
-                            <!-- Plante verte -->
-                            <path d="M 360 505 L 370 505 L 368 525 L 362 525 Z" fill="#D97706" stroke="#1E293B" stroke-width="1.5"/>
-                            <ellipse cx="365" cy="490" rx="8" ry="14" fill="#65A30D"/>
-                            <ellipse cx="356" cy="495" rx="7" ry="10" fill="#84CC16"/>
-                            <ellipse cx="374" cy="495" rx="7" ry="10" fill="#84CC16"/>
-                            <!-- Lampadaire -->
-                            <line x1="605" y1="425" x2="605" y2="525" stroke="#1E293B" stroke-width="2"/>
-                            <polygon points="595,425 615,425 620,445 590,445" fill="#FBBF24" stroke="#1E293B" stroke-width="1.5"/>
-                            
-                            <!-- SILHOUETTE VECTORIELLE DE L'OCCUPANT DANS LA MAISON (CLO) -->
-                            <g id="human-occupant" transform="translate(415, 440)">
-                                <circle cx="10" cy="8" r="7.5" fill="#FDBA74" stroke="#1E293B" stroke-width="1.8"/>
-                                <rect x="3" y="17" width="14" height="28" rx="3" fill="#D96B43" stroke="#1E293B" stroke-width="1.8"/>
-                                <path d="M 3 22 L -2 34 M 17 22 L 21 32" stroke="#1E293B" stroke-width="1.8" stroke-linecap="round"/>
-                                <path d="M 6 45 L 6 85 M 14 45 L 14 85" stroke="#1E293B" stroke-width="2.2" stroke-linecap="round"/>
+                            <!-- Canapé contemporain bas en coupe -->
+                            <g opacity="0.85">
+                                <rect x="465" y="472" width="122" height="26" fill="#1E293B" stroke="#475569" stroke-width="1.5" rx="3"/>
+                                <rect x="474" y="456" width="104" height="17" fill="#162238" stroke="#64748B" stroke-width="1.2" rx="3"/>
+                                <rect x="462" y="464" width="12" height="34" fill="#334155" stroke="#64748B" stroke-width="1.2" rx="2"/>
+                                <rect x="578" y="464" width="12" height="34" fill="#334155" stroke="#64748B" stroke-width="1.2" rx="2"/>
+                                <line x1="472" y1="498" x2="472" y2="505" stroke="#64748B" stroke-width="2"/>
+                                <line x1="580" y1="498" x2="580" y2="505" stroke="#64748B" stroke-width="2"/>
+                            </g>
+                            <!-- Lampadaire architectural minimaliste -->
+                            <g opacity="0.75">
+                                <line x1="606" y1="415" x2="606" y2="505" stroke="#475569" stroke-width="1.8"/>
+                                <line x1="598" y1="505" x2="614" y2="505" stroke="#64748B" stroke-width="2"/>
+                                <polygon points="596,408 616,408 620,420 592,420" fill="#1E293B" stroke="#F59E0B" stroke-width="1.2" stroke-opacity="0.8"/>
+                            </g>
+
+                            <!-- Silhouette Occupant Vectorielle Moderne (Proportionnée & Professionnelle) -->
+                            <g id="human-occupant" transform="translate(405, 412)">
+                                <!-- Halo thermique corporel subtil -->
+                                <ellipse cx="14" cy="46" rx="22" ry="42" fill="#F59E0B" fill-opacity="0.08"/>
+                                <!-- Tête -->
+                                <circle cx="14" cy="11" r="7.5" fill="#1E293B" stroke="#F59E0B" stroke-width="1.8"/>
+                                <!-- Buste ergonomique -->
+                                <path d="M 5 24 C 5 20, 23 20, 23 24 L 25 54 C 25 57, 22 58, 20 58 L 8 58 C 6 58, 3 57, 3 54 Z" fill="#1E293B" stroke="#F59E0B" stroke-width="1.8"/>
+                                <!-- Jambes -->
+                                <path d="M 9 58 L 8 91 M 19 58 L 20 91" stroke="#94A3B8" stroke-width="2.6" stroke-linecap="round"/>
                             </g>
                         </g>
 
-                        <!-- RDC Bureau & Radiateur à Ailettes -->
+                        <!-- RDC Droite : Espace Repas & Émetteur Thermique (Radiateur Design) -->
                         <g id="radiator-heating-group" class="anim-radiator-heating">
-                            <rect x="860" y="470" width="36" height="50" fill="#FFFFFF" stroke="#1E293B" stroke-width="2" rx="2"/>
-                            <line x1="867" y1="470" x2="867" y2="520" stroke="#94A3B8" stroke-width="2"/>
-                            <line x1="874" y1="470" x2="874" y2="520" stroke="#94A3B8" stroke-width="2"/>
-                            <line x1="881" y1="470" x2="881" y2="520" stroke="#94A3B8" stroke-width="2"/>
-                            <line x1="888" y1="470" x2="888" y2="520" stroke="#94A3B8" stroke-width="2"/>
-                            <rect x="670" y="485" width="70" height="6" fill="#1E293B"/>
-                            <line x1="680" y1="491" x2="680" y2="530" stroke="#1E293B" stroke-width="2"/>
-                            <line x1="730" y1="491" x2="730" y2="530" stroke="#1E293B" stroke-width="2"/>
-                            <path d="M 755 480 L 765 480 L 765 500 L 750 500 L 750 530" stroke="#1E293B" stroke-width="2" fill="none"/>
-                            <line x1="705" y1="350" x2="705" y2="400" stroke="#1E293B" stroke-width="1.5"/>
-                            <path d="M 695 400 Q 705 390 715 400 Z" fill="#F59E0B" stroke="#1E293B" stroke-width="1.5"/>
+                            <!-- Halo de rayonnement du radiateur -->
+                            <circle cx="875" cy="472" r="42" fill="url(#radiatorHeatGlow)"/>
+                            <!-- Émetteur thermique vertical / radiateur architectural -->
+                            <rect x="858" y="448" width="34" height="48" fill="#1E293B" stroke="#F59E0B" stroke-width="1.6" stroke-opacity="0.85" rx="3"/>
+                            <line x1="866" y1="453" x2="866" y2="491" stroke="#FDBA74" stroke-width="1.3" stroke-opacity="0.7"/>
+                            <line x1="875" y1="453" x2="875" y2="491" stroke="#FDBA74" stroke-width="1.3" stroke-opacity="0.7"/>
+                            <line x1="884" y1="453" x2="884" y2="491" stroke="#FDBA74" stroke-width="1.3" stroke-opacity="0.7"/>
+                            <!-- Table & suspension filaires -->
+                            <g opacity="0.75">
+                                <rect x="678" y="468" width="84" height="4" fill="#334155" stroke="#64748B" stroke-width="1" rx="1"/>
+                                <line x1="688" y1="472" x2="688" y2="505" stroke="#475569" stroke-width="1.8"/>
+                                <line x1="752" y1="472" x2="752" y2="505" stroke="#475569" stroke-width="1.8"/>
+                                <line x1="720" y1="336" x2="720" y2="392" stroke="#475569" stroke-width="1.2"/>
+                                <path d="M 708 396 Q 720 384 732 396 Z" fill="#1E293B" stroke="#F59E0B" stroke-width="1.2" stroke-opacity="0.8"/>
+                            </g>
                         </g>
 
-                        <!-- 6. FLUX THERMIQUES LASER 2R2C -->
-                        <!-- Flux Rapide Direct : Vitrages & VMC <-> Air Extérieur (Fenêtre R+1 gauche, y = 270) -->
+                        <!-- ============================================================== -->
+                        <!-- 6. VECTEURS DE FLUX THERMIQUES 2R2C (LASERS HAUTE PRÉCISION)   -->
+                        <!-- ============================================================== -->
+                        <!-- Flux Rapide Direct : Vitrages & VMC <-> Air Extérieur (y = 270) -->
                         <g id="flux-laser-ext-group">
-                            <path id="flux-laser-ext-halo" d="M 310 270 L 190 270" stroke="#38BDF8" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
-                            <path id="flux-laser-ext-line" d="M 310 270 L 190 270" stroke="#38BDF8" stroke-width="4" fill="none" class="flow-laser laser-blue" marker-end="url(#mk-laser-blue)"/>
+                            <path id="flux-laser-ext-halo" d="M 310 270 L 190 270" stroke="#38BDF8" stroke-width="9" stroke-opacity="0.22" fill="none" stroke-linecap="round"/>
+                            <path id="flux-laser-ext-line" d="M 310 270 L 190 270" stroke="#38BDF8" stroke-width="3.5" fill="none" class="flow-laser laser-blue" marker-end="url(#mk-laser-blue)"/>
                         </g>
-                        <!-- Flux Lent Enveloppe Opaque : Parois Lourdes <-> Air Extérieur (Toiture/Mur droit externe, y = 150) -->
+                        <!-- Flux Lent Enveloppe Opaque : Parois <-> Air Extérieur (y = 150) -->
                         <g id="flux-laser-opaque-ext-group">
-                            <path id="flux-laser-opaque-ext-halo" d="M 820 150 L 945 150" stroke="#38BDF8" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
-                            <path id="flux-laser-opaque-ext-line" d="M 820 150 L 945 150" stroke="#38BDF8" stroke-width="4" fill="none" class="flow-laser laser-blue" marker-end="url(#mk-laser-blue)"/>
+                            <path id="flux-laser-opaque-ext-halo" d="M 820 150 L 945 150" stroke="#38BDF8" stroke-width="9" stroke-opacity="0.22" fill="none" stroke-linecap="round"/>
+                            <path id="flux-laser-opaque-ext-line" d="M 820 150 L 945 150" stroke="#38BDF8" stroke-width="3.5" fill="none" class="flow-laser laser-blue" marker-end="url(#mk-laser-blue)"/>
                         </g>
-                        <!-- Flux Convectif Interne : Parois Lourdes <-> Air Intérieur (Mur droit R+1, y = 270) -->
+                        <!-- Flux Convectif Interne : Parois <-> Air Intérieur (y = 270) -->
                         <g id="flux-laser-wall-group">
-                            <path id="flux-laser-wall-halo" d="M 902 270 L 785 270" stroke="#F59E0B" stroke-width="10" stroke-opacity="0.25" fill="none" stroke-linecap="round"/>
-                            <path id="flux-laser-wall-line" d="M 902 270 L 785 270" stroke="#F59E0B" stroke-width="4" fill="none" class="flow-laser laser-orange" marker-end="url(#mk-laser-orange)"/>
+                            <path id="flux-laser-wall-halo" d="M 902 270 L 785 270" stroke="#F59E0B" stroke-width="9" stroke-opacity="0.22" fill="none" stroke-linecap="round"/>
+                            <path id="flux-laser-wall-line" d="M 902 270 L 785 270" stroke="#F59E0B" stroke-width="3.5" fill="none" class="flow-laser laser-orange" marker-end="url(#mk-laser-orange)"/>
                         </g>
 
                     </svg>
                 </div>
 
                 <!-- ============================================================== -->
-                <!-- ============================================================== -->
-                <!-- TÉLÉMÉTRIE INTÉGRÉE DIRECTEMENT SUR LE DESSIN (SANS ENCARTS) -->
+                <!-- TÉLÉMÉTRIE HUD INTÉGRÉE SUR LE JUMEAU NUMÉRIQUE                -->
                 <!-- ============================================================== -->
                 <div class="absolute inset-0 pointer-events-none select-none">
                     
-                    <!-- 1. EXTÉRIEUR (DIRECTEMENT SUR LE PAYSAGE À GAUCHE) -->
-                    <div class="absolute top-[48%] left-[2%] sm:left-[3%] pointer-events-auto flex flex-col gap-0.5 sm:gap-1 text-xs">
+                    <!-- 1. EXTÉRIEUR (SUR LE PAYSAGE À GAUCHE) -->
+                    <div class="absolute top-[52%] left-[2%] sm:left-[3%] pointer-events-auto flex flex-col gap-0.5 sm:gap-1 text-xs">
                         <div class="flex items-center gap-1">
-                            <span class="bg-black/65 border border-sky-400/40 px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-xs font-black uppercase tracking-wider text-sky-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm">
+                            <span class="bg-slate-950/85 border border-sky-400/40 px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-xs font-black uppercase tracking-wider text-sky-400 backdrop-blur-xs flex items-center gap-1 w-fit shadow-md">
                                 <span>🌍</span> <span class="hidden sm:inline">Extérieur</span><span class="sm:hidden">Ext.</span>
                             </span>
-                            <span class="hidden sm:flex bg-black/60 border border-sky-400/40 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] text-sky-200 font-bold backdrop-blur-xs items-center gap-1 shadow-sm">
+                            <span class="hidden sm:flex bg-slate-950/80 border border-sky-400/35 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] text-sky-200 font-bold backdrop-blur-xs items-center gap-1 shadow-sm">
                                 <span id="txt-ext-emoji">☀️</span>
                                 <span id="txt-ext-label">--</span>
                             </span>
                         </div>
                         <div class="flex items-baseline gap-1.5">
                             <strong class="text-base sm:text-2xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" id="txt-ext-temp">-- °C</strong>
-                            <span class="hidden sm:inline bg-black/55 px-1.5 py-0.5 rounded-md border border-white/15 text-[9px] sm:text-[10px] text-slate-200 drop-shadow">
+                            <span class="hidden sm:inline bg-slate-950/75 px-1.5 py-0.5 rounded-md border border-slate-700/70 text-[9px] sm:text-[10px] text-slate-200">
                                 💧 <span id="txt-ext-rh" class="text-slate-100 font-bold">-- %</span> | <span id="txt-ext-ah" class="text-sky-300 font-bold">-- g/m³</span>
                             </span>
                         </div>
-                        <div class="hidden sm:inline-flex items-center gap-1 bg-black/55 border border-amber-500/30 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] text-slate-200 w-fit drop-shadow">
+                        <div class="hidden sm:inline-flex items-center gap-1 bg-slate-950/75 border border-amber-500/30 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] text-slate-200 w-fit">
                             <span class="text-slate-300">🧺 Séchage :</span>
                             <strong class="text-amber-300 font-black" id="txt-ext-drying">--/10</strong>
                         </div>
                     </div>
 
-                    <!-- 1.1 APPORTS SOLAIRES (SOUS L'ASTRE SOLAIRE DANS LE FAISCEAU) -->
-                    <div class="absolute top-[24%] left-[10%] sm:left-[12%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-amber-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
+                    <!-- 1.1 APPORTS SOLAIRES (SOUS L'ASTRE SOLAIRE) -->
+                    <div class="absolute top-[25%] left-[10%] sm:left-[12%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-slate-950/85 border border-amber-400/45 px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-amber-300">☀️ Solaire</span>
                         <strong class="font-black text-amber-400" id="txt-flux-solar-val">+0.00 °C/h</strong>
                     </div>
 
-                    <!-- 2. FLUX DIRECT RAPIDE : VITRAGES & VMC <-> EXTÉRIEUR (À LA FENÊTRE R+1) -->
-                    <div class="absolute top-[41%] left-[11%] sm:left-[14%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-sky-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
+                    <!-- 2. FLUX DIRECT RAPIDE : VITRAGES & VMC <-> EXTÉRIEUR -->
+                    <div class="absolute top-[42%] left-[11%] sm:left-[14%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-slate-950/85 border border-sky-400/45 px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-slate-300" id="txt-flux-ext-tag">❄️ Vitres & VMC</span>
                         <strong class="font-black text-sky-300" id="txt-flux-ext-val">-- °C/h</strong>
                     </div>
@@ -404,41 +453,41 @@
                     <!-- 3. ENCART PAROIS (EN HAUT À DROITE DU TOIT SUR LE DESSIN) -->
                     <div class="absolute top-[6%] sm:top-[7%] right-[3%] sm:right-auto sm:left-[64%] pointer-events-auto flex flex-col gap-1 text-xs">
                         <div class="flex items-center gap-1.5">
-                            <span class="bg-black/65 border border-amber-500/40 px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-xs font-black uppercase tracking-wider text-amber-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm" title="Température moyenne de la masse des parois (murs, sols, plafonds)">
+                            <span class="bg-slate-950/85 border border-amber-500/45 px-2 py-0.5 rounded-md text-[9px] sm:text-xs font-black uppercase tracking-wider text-amber-400 backdrop-blur-xs flex items-center gap-1 w-fit shadow-md" title="Température moyenne de la masse des parois (murs, sols, plafonds)">
                                 <span>🧱</span> <span>Parois :</span> <strong class="text-amber-300 font-black text-xs sm:text-sm ml-0.5" id="txt-wall-temp">-- °C</strong>
                             </span>
                         </div>
                     </div>
 
-                    <!-- 3.1 FLUX LENT ENVELOPPE OPAQUE : PAROIS LOURDES <-> EXTÉRIEUR (SUR L'ENVELOPPE EXTÉRIEURE DROITE) -->
-                    <div class="absolute top-[23%] right-[3%] sm:right-[6%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-sky-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
+                    <!-- 3.1 FLUX LENT ENVELOPPE OPAQUE : PAROIS <-> EXTÉRIEUR -->
+                    <div class="absolute top-[23%] right-[3%] sm:right-[6%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-slate-950/85 border border-sky-400/45 px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-slate-300" id="txt-flux-opaque-ext-tag">❄️ Parois → Ext.</span>
                         <strong class="font-black text-sky-300" id="txt-flux-opaque-ext-val">-- °C/h</strong>
                     </div>
 
-                    <!-- 4. FLUX CONVECTIF INTERNE : PAROIS LOURDES <-> AIR INTÉRIEUR (AU MUR DROIT R+1) -->
-                    <div class="absolute top-[41%] right-[3%] sm:right-[11%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-black/75 border border-amber-400/40 px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
+                    <!-- 4. FLUX CONVECTIF INTERNE : PAROIS <-> AIR INTÉRIEUR -->
+                    <div class="absolute top-[42%] right-[3%] sm:right-[11%] -translate-y-1/2 pointer-events-auto flex items-center gap-1 bg-slate-950/85 border border-amber-400/45 px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] backdrop-blur-xs shadow-md">
                         <span class="font-bold text-slate-300" id="txt-flux-wall-tag">🔥 Parois → Air</span>
                         <strong class="font-black text-amber-300" id="txt-flux-wall-val">-- °C/h</strong>
                     </div>
 
-                    <!-- 5. AIR INTÉRIEUR (AU CŒUR DU VOLUME DE LA MAISON, AU-DESSUS DU PLANCHER R+1) -->
-                    <div class="absolute top-[28%] sm:top-[29%] left-[44%] sm:left-[46%] pointer-events-auto flex flex-col gap-0.5 sm:gap-1 text-xs">
+                    <!-- 5. AIR INTÉRIEUR (AU CŒUR DU VOLUME DE LA MAISON) -->
+                    <div class="absolute top-[27%] sm:top-[28%] left-[42%] sm:left-[44%] pointer-events-auto flex flex-col gap-0.5 sm:gap-1 text-xs">
                         <div class="flex items-center gap-1.5">
-                            <span class="bg-black/65 border border-emerald-500/40 px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-xs font-black uppercase tracking-wider text-emerald-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm">
+                            <span class="bg-slate-950/85 border border-emerald-500/45 px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-xs font-black uppercase tracking-wider text-emerald-400 backdrop-blur-xs flex items-center gap-1 w-fit shadow-md">
                                 <span>🌬️</span> <span class="hidden sm:inline">Air Intérieur</span><span class="sm:hidden">Intérieur</span>
                             </span>
-                            <span id="txt-pmv-badge" class="hidden sm:inline text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-400/50 text-emerald-200">
+                            <span id="txt-pmv-badge" class="hidden sm:inline text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-emerald-950/85 border border-emerald-400/50 text-emerald-200">
                                 Confort Idéal
                             </span>
                         </div>
                         <div class="flex items-baseline gap-1.5">
-                            <strong class="text-base sm:text-xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" id="txt-in-temp">-- °C</strong>
-                            <span class="hidden sm:inline bg-black/55 px-1.5 py-0.5 rounded-md border border-white/15 text-[9px] sm:text-[10px] text-slate-200 drop-shadow">
+                            <strong class="text-base sm:text-2xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" id="txt-in-temp">-- °C</strong>
+                            <span class="hidden sm:inline bg-slate-950/75 px-1.5 py-0.5 rounded-md border border-slate-700/70 text-[9px] sm:text-[10px] text-slate-200">
                                 💧 <span id="txt-in-rh" class="text-slate-100 font-bold">-- %</span> | <span id="txt-in-ah" class="text-sky-300 font-bold">-- g/m³</span>
                             </span>
                         </div>
-                        <div class="hidden sm:inline-flex items-center gap-1 bg-black/55 border border-amber-500/30 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] text-slate-200 w-fit drop-shadow">
+                        <div class="hidden sm:inline-flex items-center gap-1 bg-slate-950/75 border border-amber-500/30 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] text-slate-200 w-fit">
                             <span class="text-slate-300">🧺 Séchage int. :</span>
                             <strong class="text-amber-300 font-black" id="txt-in-drying">--/10</strong>
                         </div>
@@ -446,19 +495,19 @@
                         <span id="box-hud-ventilation" style="display: none;"></span>
                     </div>
 
-                    <!-- 6. TENUE DE L'OCCUPANT (CLO) (AU REZ-DE-CHAUSSÉE DANS LE SALON - DESKTOP UNIQUEMENT) -->
-                    <div class="hidden sm:flex absolute bottom-[4%] sm:bottom-[6%] left-[32%] sm:left-[33%] pointer-events-auto flex-col gap-1 text-xs">
-                        <span class="bg-black/65 border border-amber-500/40 px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-400 backdrop-blur-xs drop-shadow flex items-center gap-1 w-fit shadow-sm">
+                    <!-- 6. TENUE DE L'OCCUPANT (CLO) (AU REZ-DE-CHAUSSÉE DANS LE SALON - DESKTOP) -->
+                    <div class="hidden sm:flex absolute bottom-[9%] left-[34%] pointer-events-auto flex-col gap-1 text-xs">
+                        <span class="bg-slate-950/85 border border-amber-500/45 px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-400 backdrop-blur-xs flex items-center gap-1 w-fit shadow-md">
                             <span>🧍</span> Tenue de l'occupant
                         </span>
-                        <div class="flex items-center gap-1 bg-black/65 border border-amber-500/30 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] backdrop-blur-xs w-fit shadow-sm">
+                        <div class="flex items-center gap-1 bg-slate-950/80 border border-amber-500/35 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] backdrop-blur-xs w-fit shadow-sm">
                             <strong class="text-amber-300 font-black"><span id="currentCloValue">1.00</span> Clo</strong>
                             <span class="text-slate-300 text-[8px] sm:text-[9px]" id="currentCloDesc">(Chemise & pull)</span>
                         </div>
                         <div class="flex items-center gap-1">
-                            <button onclick="adjustClothing(-0.2)" class="bg-black/75 hover:bg-black/95 text-slate-200 border border-white/20 rounded-md px-1.5 py-0.5 text-[8px] sm:text-[9px] font-bold cursor-pointer" title="Alléger tenue (-0.2 Clo)">−0.2</button>
-                            <button onclick="adjustClothing(0.2)" class="bg-black/75 hover:bg-black/95 text-slate-200 border border-white/20 rounded-md px-1.5 py-0.5 text-[8px] sm:text-[9px] font-bold cursor-pointer" title="Couvrir tenue (+0.2 Clo)">+0.2</button>
-                            <button onclick="resetClothing()" class="bg-black/75 hover:bg-black/95 text-slate-400 border border-white/20 rounded-md px-1 py-0.5 text-[8px] sm:text-[9px] cursor-pointer" title="Réinitialiser saison">🔄</button>
+                            <button onclick="adjustClothing(-0.2)" class="bg-slate-950/85 hover:bg-slate-900 text-slate-200 border border-slate-700 rounded-md px-2 py-0.5 text-[9px] font-bold cursor-pointer" title="Alléger tenue (-0.2 Clo)">−0.2</button>
+                            <button onclick="adjustClothing(0.2)" class="bg-slate-950/85 hover:bg-slate-900 text-slate-200 border border-slate-700 rounded-md px-2 py-0.5 text-[9px] font-bold cursor-pointer" title="Couvrir tenue (+0.2 Clo)">+0.2</button>
+                            <button onclick="resetClothing()" class="bg-slate-950/85 hover:bg-slate-900 text-slate-400 border border-slate-700 rounded-md px-1.5 py-0.5 text-[9px] cursor-pointer" title="Réinitialiser saison">↺</button>
                         </div>
                     </div>
 
@@ -466,8 +515,8 @@
 
             </div>
 
-            <!-- 3.1 CARTES DE SYNTHÈSE DÉDIÉES MOBILE (LISIBLES, AÉRÉES ET TACTILES) -->
-            <div class="grid grid-cols-2 gap-2 mt-2.5 mb-3 sm:hidden select-none">
+            <!-- 3.1 CARTES DE SYNTHÈSE DÉDIÉES MOBILE (EXTÉRIEUR, INTÉRIEUR & OCCUPANT) -->
+            <div class="grid grid-cols-2 gap-2 mt-1 sm:hidden select-none">
                 <!-- Carte 1 : Extérieur -->
                 <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between shadow-sm">
                     <div class="flex items-center justify-between mb-1">
@@ -531,129 +580,22 @@
                 </div>
             </div>
 
-            <!-- 4. BILAN THERMIQUE DU JOUR : BALANCE DES FLUX & BILAN PASSIF SUR 24H CÔTE-À-CÔTE -->
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+            <!-- ============================================================== -->
+            <!-- 4. PANNEAU UNIFIÉ : DIAGNOSTIC, BILAN 24H & ACTIONS IMMÉDIATES -->
+            <!-- ============================================================== -->
+            <div class="bg-gradient-to-b from-slate-900/95 to-slate-950/95 border border-slate-800 rounded-2xl p-3.5 sm:p-5 flex flex-col gap-4 shadow-inner">
                 
-                <!-- COLONNE GAUCHE : BALANCE DES FLUX EN DIRECT (LG:COL-SPAN-6) -->
-                <div class="lg:col-span-6 bg-slate-950/90 border border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-inner flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between mb-1 pb-1 border-b border-slate-800">
-                            <span class="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-1.5">
-                                <span>⚖️</span> Balance des Flux en Direct
-                            </span>
-                            <span class="text-[10px] text-amber-300 font-semibold bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-500/30">
-                                En Direct (°C/h)
-                            </span>
-                        </div>
-                        <p class="text-[10px] text-slate-400 m-0 mb-2.5">
-                            Ce qui réchauffe et ce qui refroidit votre air intérieur en ce moment (puissance en W au survol)
-                        </p>
-                    </div>
-
-                    <div class="my-auto bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 space-y-2.5">
-                        <!-- Décomposition des 3 flux élémentaires aboutissant à la Tendance Nette -->
-                        <div class="grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
-                            <div class="bg-amber-950/30 border border-amber-500/30 rounded-lg p-1.5 flex flex-col">
-                                <span class="text-[9px] text-amber-300/90 font-semibold uppercase tracking-wider">☀️ Solaire</span>
-                                <strong id="txt-flux-solar-detail" class="text-xs sm:text-sm font-black text-amber-400">+0.00 °C/h</strong>
-                            </div>
-                            <div class="bg-slate-800/60 border border-slate-700/60 rounded-lg p-1.5 flex flex-col" title="Échange convectif entre les parois (murs, sols, plafonds) et l'air intérieur">
-                                <span class="text-[9px] text-slate-300/90 font-semibold uppercase tracking-wider">🧱 Parois ↔ Air</span>
-                                <strong id="txt-flux-wall-detail" class="text-xs sm:text-sm font-black text-slate-200">±0.00 °C/h</strong>
-                            </div>
-                            <div class="bg-sky-950/30 border border-sky-500/30 rounded-lg p-1.5 flex flex-col">
-                                <span class="text-[9px] text-sky-300/90 font-semibold uppercase tracking-wider">❄️ Vitres & VMC</span>
-                                <strong id="txt-flux-loss-detail" class="text-xs sm:text-sm font-black text-sky-400">-0.00 °C/h</strong>
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="flex justify-between items-center text-[10px] font-bold mb-1">
-                                <span class="text-amber-400">☀️ Ce qui chauffe</span>
-                                <span class="text-sky-400">❄️ Ce qui refroidit</span>
-                            </div>
-                            <div class="thermal-balance-track">
-                                <div id="balance-bar-gain" class="h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-500" style="width: 50%;"></div>
-                                <div id="balance-bar-loss" class="h-full bg-gradient-to-r from-sky-500 to-blue-600 transition-all duration-500" style="width: 50%;"></div>
-                                <div id="balance-needle" class="balance-needle-marker" style="left: 50%;" title="Équilibre instantané"></div>
-                            </div>
-                        </div>
-
-                        <!-- Bandeau du Verdict en français clair -->
-                        <div id="balance-verdict-box" class="rounded-lg p-2.5 border bg-sky-950/35 border-sky-500/35 transition-colors duration-300">
-                            <div class="flex items-center justify-between">
-                                <span id="txt-balance-verdict-title" class="text-[10px] sm:text-xs font-extrabold uppercase tracking-wide text-sky-300">
-                                    🔵 Tendance : Refroidissement
-                                </span>
-                                <strong id="txt-kw-flux" class="text-xs sm:text-sm font-black text-sky-300">-- °C/h</strong>
-                            </div>
-                            <p id="txt-balance-verdict-desc" class="text-[10px] text-slate-300 m-0 mt-1 leading-snug">
-                                L'air intérieur cède plus de chaleur qu'il n'en reçoit : la température tend à baisser doucement sans chauffage.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- COLONNE DROITE : BILAN PASSIF SUR 24H (EFFORT DE CHAUFFE & RÉVEIL 07H, LG:COL-SPAN-6) -->
-                <div class="lg:col-span-6 bg-slate-950/90 border border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-inner flex flex-col justify-between">
-                    <div class="flex items-center justify-between mb-2.5 pb-1.5 border-b border-slate-800">
-                        <span class="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-1.5">
-                            <span>📊</span> Bilan passif sur 24h
-                        </span>
-                    </div>
-
-                    <!-- Les 2 indicateurs synthétiques majeurs (sans courbe complexe) -->
-                    <div class="my-auto flex flex-col gap-3">
-                        <div id="box-heating-effort" class="rounded-xl bg-amber-950/30 border border-amber-500/35 p-3 transition-colors">
-                            <div class="flex items-center justify-between gap-2">
-                                <span id="txt-heating-effort-title" class="text-xs font-extrabold text-amber-200">🔥 Effort de chauffe requis (sur 24h)</span>
-                                <span id="txt-heating-effort-val" class="text-sm sm:text-base font-black text-amber-400">-- kWh</span>
-                            </div>
-                            <p id="txt-heating-effort-desc" class="text-[11px] text-slate-300 m-0 mt-1 leading-snug">
-                                Calcul du besoin de compensation thermique sur la journée...
-                            </p>
-                        </div>
-
-                        <div id="box-wakeup-forecast" class="rounded-xl bg-purple-950/30 border border-purple-500/35 p-3 transition-colors">
-                            <div class="flex items-center justify-between gap-2">
-                                <span class="text-xs font-extrabold text-purple-200">🌅 Réveil demain 07h (sans chauffer)</span>
-                                <span id="txt-wakeup-summary-val" class="text-xs sm:text-sm font-black text-purple-300">--.- °C</span>
-                            </div>
-                            <p id="txt-wakeup-summary-desc" class="text-[11px] text-slate-300 m-0 mt-1 leading-snug">
-                                Simulation nocturne de l'air et des parois jusqu'à 07h00...
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Éléments masqués conservés pour compatibilité engine.js -->
-                    <span id="txt-kwh-passed" style="display: none;"></span>
-                    <span id="txt-kw-flux-display" style="display: none;"></span>
-                    <span id="txt-kwh-final" style="display: none;"></span>
-                    <span id="chart-txt-flux" style="display: none;"></span>
-                </div>
-
-            </div>
-
-            <!-- 5. SYNTHÈSE EN MOTS SIMPLES, FOCUS PIÈCES (PMV) & 3 ACTIONS PRIORITAIRES DU MOMENT -->
-            <div class="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col gap-3">
-                <!-- 5.1 Résumé narratif global -->
-                <div class="flex items-start gap-2.5">
-                    <span class="text-xl mt-0.5 shrink-0">💬</span>
-                    <div class="text-xs sm:text-sm flex-1">
-                        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                            <strong class="text-white font-bold">Ce qui se passe en ce moment :</strong>
-                            <!-- Focus Pièces extrêmes (basé sur le PMV) + Lien vers la page Détail Pièces -->
-                            <div id="box-room-extremes" class="flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[11px]">
-                                <span id="badge-best-room" class="px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 font-bold">
-                                    🏆 Top confort : --
-                                </span>
-                                <span id="badge-worst-room" class="px-2 py-0.5 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-200 font-bold">
-                                    ⚠️ Point d'attention : --
-                                </span>
-                                <a href="pieces.html" class="px-2.5 py-0.5 rounded-full bg-sky-950/90 hover:bg-sky-900 border border-sky-400/50 text-sky-200 font-extrabold no-underline transition flex items-center gap-1">
-                                    <span>🏡</span> <span>Voir toutes les pièces →</span>
-                                </a>
-                            </div>
+                <!-- 4.1 En-tête narratif global -->
+                <div class="flex items-start gap-3">
+                    <span class="text-xl sm:text-2xl mt-0.5 shrink-0">🧭</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                            <strong class="text-sm sm:text-base text-white font-extrabold tracking-tight">
+                                Diagnostic & évolution thermique de votre maison
+                            </strong>
+                            <a href="pieces.html" class="px-2.5 py-0.5 rounded-full bg-sky-950/90 hover:bg-sky-900 border border-sky-400/40 text-sky-200 text-[11px] font-bold no-underline transition flex items-center gap-1">
+                                <span>🏡</span> <span>Voir le détail par pièce →</span>
+                            </a>
                         </div>
                         <p class="text-slate-300 leading-relaxed text-xs sm:text-[13px] m-0" id="txt-summary">
                             Chargement des données de l'habitat en cours...
@@ -661,47 +603,104 @@
                     </div>
                 </div>
 
-                <!-- 5.2 Les 3 Repères d'Action Immédiate (Volets, Lessive, Habillement) -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-2.5 border-t border-slate-800/90">
-                    <!-- Action 1 : Volets & Vitrages (selon heure et orientation des pièces) -->
-                    <div id="card-prio-shutters" class="rounded-xl bg-slate-950/80 border border-slate-800 p-2.5 flex items-start gap-2">
-                        <span id="ico-prio-shutters" class="text-base mt-0.5 shrink-0">🪟</span>
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center justify-between gap-1">
-                                <span class="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">Volets & Vitrages</span>
-                                <span id="badge-prio-shutters" class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">--</span>
-                            </div>
-                            <strong id="txt-prio-shutters-title" class="text-xs font-extrabold text-white block mt-0.5">--</strong>
-                            <p id="txt-prio-shutters-desc" class="text-[10px] text-slate-400 m-0 mt-0.5 leading-snug">--</p>
+                <!-- 4.2 Les 3 Repères Temporels (TEXTE 1 : Tendance Actuelle | TEXTE 2 : Effort de Chauffe 24h | TEXTE 3 : Réveil 07h) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-slate-800/90">
+                    
+                    <!-- TEXTE 1 : Tendance en direct (°C/h) -->
+                    <div id="balance-verdict-box" class="rounded-xl bg-sky-950/30 border border-sky-500/35 p-3 transition-colors">
+                        <div class="flex items-center justify-between gap-2">
+                            <span id="txt-balance-verdict-title" class="text-xs font-extrabold text-sky-200">
+                                🔵 Tendance : Refroidissement
+                            </span>
+                            <strong id="txt-kw-flux" class="text-sm sm:text-base font-black text-sky-400">-- °C/h</strong>
                         </div>
+                        <p id="txt-balance-verdict-desc" class="text-[11px] text-slate-300 m-0 mt-1.5 leading-snug">
+                            Analyse de l'équilibre thermique instantané en cours...
+                        </p>
                     </div>
 
-                    <!-- Action 2 : Lessive (Où étendre maintenant ?) -->
-                    <div id="card-prio-laundry" class="rounded-xl bg-slate-950/80 border border-slate-800 p-2.5 flex items-start gap-2">
-                        <span id="ico-prio-laundry" class="text-base mt-0.5 shrink-0">🧺</span>
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center justify-between gap-1">
-                                <span class="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">Séchage Lessive</span>
-                                <span id="badge-prio-laundry" class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">--</span>
-                            </div>
-                            <strong id="txt-prio-laundry-title" class="text-xs font-extrabold text-white block mt-0.5">--</strong>
-                            <p id="txt-prio-laundry-desc" class="text-[10px] text-slate-400 m-0 mt-0.5 leading-snug">--</p>
+                    <!-- TEXTE 2 : Effort de chauffe requis (sur 24h) -->
+                    <div id="box-heating-effort" class="rounded-xl bg-amber-950/30 border border-amber-500/35 p-3 transition-colors">
+                        <div class="flex items-center justify-between gap-2">
+                            <span id="txt-heating-effort-title" class="text-xs font-extrabold text-amber-200">
+                                🔥 Effort de chauffe requis (sur 24h)
+                            </span>
+                            <span id="txt-heating-effort-val" class="text-sm sm:text-base font-black text-amber-400">-- kWh</span>
                         </div>
+                        <p id="txt-heating-effort-desc" class="text-[11px] text-slate-300 m-0 mt-1.5 leading-snug">
+                            Calcul du besoin de compensation thermique sur la journée...
+                        </p>
                     </div>
 
-                    <!-- Action 3 : Habillement (Comment atteindre le confort PMV idéal ?) -->
-                    <div id="card-prio-clothing" class="rounded-xl bg-slate-950/80 border border-slate-800 p-2.5 flex items-start gap-2">
-                        <span id="ico-prio-clothing" class="text-base mt-0.5 shrink-0">👕</span>
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center justify-between gap-1">
-                                <span class="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">Tenue & Confort</span>
-                                <span id="badge-prio-clothing" class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">--</span>
+                    <!-- TEXTE 3 : Réveil demain 07h (sans chauffer) -->
+                    <div id="box-wakeup-forecast" class="rounded-xl bg-purple-950/30 border border-purple-500/35 p-3 transition-colors">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-extrabold text-purple-200">
+                                🌅 Réveil demain 07h (sans chauffer)
+                            </span>
+                            <span id="txt-wakeup-summary-val" class="text-xs sm:text-sm font-black text-purple-300">--.- °C</span>
+                        </div>
+                        <p id="txt-wakeup-summary-desc" class="text-[11px] text-slate-300 m-0 mt-1.5 leading-snug">
+                            Simulation nocturne de l'air et des parois jusqu'à 07h00...
+                        </p>
+                    </div>
+
+                </div>
+
+                <!-- 4.3 Les 3 Repères d'Action Immédiate (Volets, Séchage Lessive, Tenue & Confort) -->
+                <div class="pt-3 border-t border-slate-800/90">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <span>🎯</span> Vos 3 repères pratiques du moment
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <!-- Action 1 : Volets & Vitrages -->
+                        <div id="card-prio-shutters" class="rounded-xl bg-slate-950/85 border border-slate-800/90 p-3 flex items-start gap-2.5">
+                            <span id="ico-prio-shutters" class="text-lg mt-0.5 shrink-0">🪟</span>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center justify-between gap-1">
+                                    <span class="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">Volets & Vitrages</span>
+                                    <span id="badge-prio-shutters" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">--</span>
+                                </div>
+                                <strong id="txt-prio-shutters-title" class="text-xs font-extrabold text-white block mt-1">--</strong>
+                                <p id="txt-prio-shutters-desc" class="text-[11px] text-slate-400 m-0 mt-0.5 leading-snug">--</p>
                             </div>
-                            <strong id="txt-prio-clothing-title" class="text-xs font-extrabold text-white block mt-0.5">--</strong>
-                            <p id="txt-prio-clothing-desc" class="text-[10px] text-slate-400 m-0 mt-0.5 leading-snug">--</p>
+                        </div>
+
+                        <!-- Action 2 : Séchage Lessive -->
+                        <div id="card-prio-laundry" class="rounded-xl bg-slate-950/85 border border-slate-800/90 p-3 flex items-start gap-2.5">
+                            <span id="ico-prio-laundry" class="text-lg mt-0.5 shrink-0">🧺</span>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center justify-between gap-1">
+                                    <span class="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">Séchage Lessive</span>
+                                    <span id="badge-prio-laundry" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">--</span>
+                                </div>
+                                <strong id="txt-prio-laundry-title" class="text-xs font-extrabold text-white block mt-1">--</strong>
+                                <p id="txt-prio-laundry-desc" class="text-[11px] text-slate-400 m-0 mt-0.5 leading-snug">--</p>
+                            </div>
+                        </div>
+
+                        <!-- Action 3 : Tenue & Confort -->
+                        <div id="card-prio-clothing" class="rounded-xl bg-slate-950/85 border border-slate-800/90 p-3 flex items-start gap-2.5">
+                            <span id="ico-prio-clothing" class="text-lg mt-0.5 shrink-0">👕</span>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center justify-between gap-1">
+                                    <span class="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">Tenue & Confort</span>
+                                    <span id="badge-prio-clothing" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">--</span>
+                                </div>
+                                <strong id="txt-prio-clothing-title" class="text-xs font-extrabold text-white block mt-1">--</strong>
+                                <p id="txt-prio-clothing-desc" class="text-[11px] text-slate-400 m-0 mt-0.5 leading-snug">--</p>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Éléments masqués conservés pour compatibilité engine.js -->
+                <span id="txt-kwh-passed" style="display: none;"></span>
+                <span id="txt-kw-flux-display" style="display: none;"></span>
+                <span id="txt-kwh-final" style="display: none;"></span>
+                <span id="chart-txt-flux" style="display: none;"></span>
             </div>
 
         </div>
@@ -709,12 +708,12 @@
     </main>
 
     <!-- Pied de Page -->
-    <footer style="text-align: center; padding: 18px; font-size: 0.8rem; color: #94A3B8; border-top: 1px solid #E2E8F0; margin-top: 16px;">
-        <p style="margin: 0;">Solstice Engine v3.6 • Modélisation Dynamique 2R2C / ISO 7730 / EN ISO 52016-1</p>
+    <footer style="text-align: center; padding: 18px; font-size: 0.8rem; color: #64748B; margin-top: 8px;">
+        <p style="margin: 0;">Solstice Engine v3.7 • Modélisation Dynamique 2R2C / ISO 7730 / EN ISO 52016-1</p>
     </footer>
 
     <!-- Scripts Solstice -->
-    <script src="engine.js?v=3.6" defer></script>
+    <script src="engine.js?v=3.7" defer></script>
     <script>
         function voirToutesLesRecommandations() {
             sessionStorage.setItem('currentZoneId', 'all');

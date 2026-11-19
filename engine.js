@@ -3107,28 +3107,28 @@ function actualiserCockpitGlobal() {
     if (verdictBox) {
         verdictBox.title = netTooltip;
         if (netRate < -0.05) {
-            verdictBox.className = "mt-2 rounded-lg bg-sky-950/35 border border-sky-500/30 px-2.5 py-2 transition-colors";
+            verdictBox.className = "rounded-xl bg-sky-950/30 border border-sky-500/35 p-3 transition-colors";
             if (verdictTitle) {
                 verdictTitle.textContent = "🔵 Tendance : Refroidissement";
-                verdictTitle.className = "text-[10px] sm:text-[11px] font-extrabold text-sky-300";
+                verdictTitle.className = "text-xs font-extrabold text-sky-200";
             }
-            if (txtKwFlux) txtKwFlux.className = "text-xs sm:text-sm font-black text-sky-400";
+            if (txtKwFlux) txtKwFlux.className = "text-sm sm:text-base font-black text-sky-400";
             if (verdictDesc) {
                 if (fluxWallKw < -0.05 && depEnveloppeKw > 0.05) {
                     verdictDesc.textContent = `Sans chauffage actif, l'air cède des calories aux vitrages/VMC et recharge vos parois plus fraîches (${netWatts} W au total).`;
                 } else if (fluxWallKw > 0.05) {
-                    verdictDesc.textContent = `Vos murs restituent +${wallRate.toFixed(2)} °C/h (+${wallWatts} W) pour amortir les pertes extérieures (-${depRate.toFixed(2)} °C/h).`;
+                    verdictDesc.textContent = `Vos parois restituent +${wallRate.toFixed(2)} °C/h (+${wallWatts} W) pour amortir les pertes extérieures (-${depRate.toFixed(2)} °C/h).`;
                 } else {
                     verdictDesc.textContent = `Les pertes vers l'extérieur (${extTemp.toFixed(1)}°C dehors) l'emportent sur les apports actuels (${netWatts} W).`;
                 }
             }
         } else if (netRate > 0.05) {
-            verdictBox.className = "mt-2 rounded-lg bg-amber-950/35 border border-amber-500/30 px-2.5 py-2 transition-colors";
+            verdictBox.className = "rounded-xl bg-amber-950/30 border border-amber-500/35 p-3 transition-colors";
             if (verdictTitle) {
                 verdictTitle.textContent = "🟠 Tendance : Réchauffement naturel";
-                verdictTitle.className = "text-[10px] sm:text-[11px] font-extrabold text-amber-300";
+                verdictTitle.className = "text-xs font-extrabold text-amber-200";
             }
-            if (txtKwFlux) txtKwFlux.className = "text-xs sm:text-sm font-black text-amber-400";
+            if (txtKwFlux) txtKwFlux.className = "text-sm sm:text-base font-black text-amber-400";
             if (verdictDesc) {
                 if (solGainKw > 0.15) {
                     verdictDesc.textContent = `Les apports solaires (+${solRate.toFixed(2)} °C/h) dépassent les déperditions et réchauffent naturellement votre intérieur (+${netWatts} W).`;
@@ -3137,12 +3137,12 @@ function actualiserCockpitGlobal() {
                 }
             }
         } else {
-            verdictBox.className = "mt-2 rounded-lg bg-emerald-950/35 border border-emerald-500/30 px-2.5 py-2 transition-colors";
+            verdictBox.className = "rounded-xl bg-emerald-950/30 border border-emerald-500/35 p-3 transition-colors";
             if (verdictTitle) {
                 verdictTitle.textContent = "🟢 Tendance : Équilibre stable";
-                verdictTitle.className = "text-[10px] sm:text-[11px] font-extrabold text-emerald-300";
+                verdictTitle.className = "text-xs font-extrabold text-emerald-200";
             }
-            if (txtKwFlux) txtKwFlux.className = "text-xs sm:text-sm font-black text-emerald-400";
+            if (txtKwFlux) txtKwFlux.className = "text-sm sm:text-base font-black text-emerald-400";
             if (verdictDesc) {
                 verdictDesc.textContent = `Ce qui chauffe compense exactement ce qui refroidit : votre température intérieure reste stable (${netWatts >= 0 ? '+' : ''}${netWatts} W).`;
             }
@@ -3541,42 +3541,31 @@ function actualiserCockpitGlobal() {
         }
     }
 
-    // 6.3 Texte de synthèse narratif
+    // 6.3 Texte de synthèse narratif (cohérent et complémentaire avec Tendance, Effort 24h et Réveil 07h)
     const txtSummary = document.getElementById('txt-summary');
     if (txtSummary) {
         let synthese = "";
         const tAir = metrics.avgTemp.toFixed(1);
-        const tExt = outdoorTemp.toFixed(1);
-        const absWallRateStr = Math.abs(wallRate).toFixed(2);
+        const tExt = extTemp.toFixed(1);
+        const tParois = metrics.avgTStruct.toFixed(1);
 
         if (fluxWallKw > 0.08) {
-            if (isColdOrHeatingSeason) {
-                const autoText = globalReserve.autonomyDetail || (globalReserve.autonomyText ? `Bouclier thermique : ${globalReserve.autonomyText}.` : "elles soutiennent la température intérieure sans surconsommation.");
-                synthese = `Dehors il fait ${tExt}°C, et votre intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}). Vos parois massives restituent leur chaleur emmagasinée (+${absWallRateStr} °C/h) : ${autoText}`;
-            } else if (isWarmSeason) {
-                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois chaudes déchargent leur chaleur accumulée (+${absWallRateStr} °C/h) dans l'air intérieur : surventilez dès que la fraîcheur extérieure le permet.`;
-            } else {
-                synthese = `Dehors il fait ${tExt}°C, et votre intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}). Vos parois massives restituent doucement leur chaleur (+${absWallRateStr} °C/h) pour stabiliser le confort.`;
-            }
+            synthese = `Dehors il fait ${tExt}°C, votre air intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}) et vos parois à ${tParois}°C jouent leur rôle de bouclier en restituant leur chaleur.`;
         } else if (fluxWallKw < -0.08) {
-            if (isColdOrHeatingSeason) {
-                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives à ${metrics.avgTStruct.toFixed(1)}°C absorbent une partie de la chaleur de l'air (-${absWallRateStr} °C/h) : elles rechargent votre bouclier d'inertie pour amortir le froid extérieur.`;
-            } else if (isWarmSeason) {
-                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives absorbent activement la chaleur (-${absWallRateStr} °C/h) pour amortir la hausse de température et préserver votre fraîcheur.`;
-            } else {
-                synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C. Vos parois massives absorbent les calories (-${absWallRateStr} °C/h) pour équilibrer la température ambiante.`;
-            }
+            synthese = `Dehors il fait ${tExt}°C, votre air intérieur est à ${tAir}°C (${pmvLabel.toLowerCase()}) et vos parois à ${tParois}°C emmagasinent une partie des calories ambiantes.`;
         } else {
-            synthese = `Dehors il fait ${tExt}°C, votre intérieur est à ${tAir}°C avec des parois en équilibre à ${metrics.avgTStruct.toFixed(1)}°C (0.00 °C/h entre murs et air). ${globalReserve.autonomyDetail || ''}`;
+            synthese = `Dehors il fait ${tExt}°C, votre air intérieur (${tAir}°C, ${pmvLabel.toLowerCase()}) et vos parois (${tParois}°C) sont en parfait équilibre thermique.`;
         }
 
         if (metrics.avgRH > 58 && deltaAhGlobal >= 0.5) {
-            synthese += " 💡 Conseil aération : ouvrez 5 à 7 min en grand pour évacuer l'humidité sans refroidir vos parois massives.";
+            synthese += ` 💡 Aération conseillée (${metrics.avgRH}% HR) : ouvrez 5 à 7 min en grand pour évacuer l'humidité vers l'extérieur plus sec sans refroidir vos parois.`;
         } else if (metrics.avgRH >= 58 && deltaAhGlobal < 0.2) {
-            synthese += " ⚠️ Conseil aération : l'air extérieur est saturé en vapeur d'eau, évitez d'aérer longuement pour ne pas humidifier vos parois.";
+            synthese += ` ⚠️ Aération déconseillée (${metrics.avgRH}% HR) : l'air extérieur est chargé d'humidité, gardez les fenêtres fermées.`;
+        } else {
+            synthese += ` 🌬️ Qualité d'air : hygrométrie intérieure saine (${metrics.avgRH}% HR), aucune aération corrective n'est requise en ce moment.`;
         }
         txtSummary.textContent = synthese;
-        txtSummary.title = `Détail des puissances instantanées : Solaire +${solWatts} W | Murs↔Air ${wallWatts >= 0 ? '+' : ''}${wallWatts} W | Vitres & VMC -${depWatts} W | Parois↔Ext. -${depOpaqueWatts} W | Solde net air : ${netWatts >= 0 ? '+' : ''}${netWatts} W`;
+        txtSummary.title = `Détail des puissances instantanées : Solaire +${solWatts} W | Parois↔Air ${wallWatts >= 0 ? '+' : ''}${wallWatts} W | Vitres & VMC -${depWatts} W | Parois↔Ext. -${depOpaqueWatts} W | Solde net air : ${netWatts >= 0 ? '+' : ''}${netWatts} W`;
     }
 
     // Horodatage du calcul
