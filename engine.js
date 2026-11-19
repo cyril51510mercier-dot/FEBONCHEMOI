@@ -2049,7 +2049,8 @@ function calculateStructureReserve(tStruct, tAir, totalVolumeM3 = 100, tauReel =
         : (totalVolumeM3 * 3.0);
     const fluxPowerKw = (hCiEffectiveWPerK * deltaFlux) / 1000;
     const fluxWatts = Math.round(fluxPowerKw * 1000);
-    const cEffAirKwhPerK = Math.max(0.15, totalVolumeM3 * 0.0035);
+    // Capacité thermique horaire couplée 2R2C (Air + inertie active des parois mobilisée sur 1h : ~ 19 Wh/(K·m³))
+    const cEffAirKwhPerK = Math.max(0.40, totalVolumeM3 * 0.019);
     const fluxRateDegPerH = fluxPowerKw / cEffAirKwhPerK;
     const absRateStr = Math.abs(fluxRateDegPerH).toFixed(2);
 
@@ -2537,7 +2538,7 @@ function mettreAJourTuile(nomPiece) {
     }
 
     const roomVolM3 = (parseFloat(zoneConfig.area) || 15) * (parseFloat(zoneConfig.height) || 2.5);
-    const cEffRoomKwhPerK = Math.max(0.05, roomVolM3 * 0.0035);
+    const cEffRoomKwhPerK = Math.max(0.20, roomVolM3 * 0.019);
     const roomWallRate = (energyBalance.fluxWallKw || 0) / cEffRoomKwhPerK;
     const roomNetRate = (energyBalance.puissanceNetteKw || 0) / cEffRoomKwhPerK;
 
@@ -2855,13 +2856,18 @@ function actualiserCockpitGlobal() {
     }
 
     // ============================================================
-    // 4. FLUX THERMIQUES EN °C/h (AVEC PUISSANCE W / kW AU SURVOL)
+    // 4. FLUX THERMIQUES EN °C/h (COUPLAGE HORAIRE 2R2C AIR + PAROIS, W AU SURVOL)
     // ============================================================
-    // Capacité thermique horaire effective de l'ambiance (air + mobilier léger + peau superficielle) : ~ 3.5 Wh/(K·m³)
     const totalVolM3 = metrics.totalVolumeM3 || 150;
-    const cEffAirKwhPerK = Math.max(0.15, totalVolM3 * 0.0035);
-    // Capacité thermique horaire de la masse lourde des parois : ~ 22 Wh/(K·m³)
+    // Capacité thermique de la masse lourde des parois : ~ 22 Wh/(K·m³)
     const cMassTotalKwhPerK = Math.max(0.80, totalVolM3 * 0.022);
+    // Sur un pas de temps d'1 heure, le nœud Air (constante de temps propre ~15 min) est couplé aux parois via H_ci :
+    // la variation réelle en °C/h de l'ambiance intérieure sollicite la capacité couplée Air + Parois (~19 à 21 Wh/(K·m³))
+    const hCiCoupling = Math.max(80, metrics.totalHCiWPerK || (totalVolM3 * 3.0));
+    const hRapCoupling = Math.max(15, metrics.totalHRapideWPerK || (totalVolM3 * 0.35));
+    const hOpCoupling = Math.max(15, metrics.totalHOpaqueWPerK || (totalVolM3 * 0.35));
+    const massCouplingFactor1h = hCiCoupling / (hCiCoupling + hRapCoupling + hOpCoupling);
+    const cEffAirKwhPerK = Math.max(0.50, (totalVolM3 * 0.0035) + (cMassTotalKwhPerK * massCouplingFactor1h));
 
     // 4.1 Apports Solaires via les vitrages
     const solGainKw = metrics.totalGainsSolairesKw || 0;
@@ -3382,9 +3388,11 @@ function actualiserCockpitGlobal() {
     const txtWakeupSummaryDesc = document.getElementById('txt-wakeup-summary-desc');
     if (boxWakeupForecast && txtWakeupSummaryVal && txtWakeupSummaryDesc) {
         const signDeltaWake = deltaWakeupAir >= 0 ? '+' : '';
+        const avgNightRate = deltaWakeupAir / Math.max(1, hoursTo07h);
+        const signNightRate = avgNightRate >= 0 ? '+' : '';
         txtWakeupSummaryVal.textContent = `Air ~${wakeupAirTemp.toFixed(1)}°C · Parois ~${wakeupWallTemp.toFixed(1)}°C`;
-        txtWakeupSummaryDesc.textContent = `Évolution naturelle d'ici 07h : ${signDeltaWake}${deltaWakeupAir.toFixed(1)}°C sur l'air (nuit à ${minExtNight07.toFixed(1)}°C dehors, amortie par vos parois).`;
-        boxWakeupForecast.title = `Simulation 2R2C sur ${hoursTo07h}h sans chauffage actif : l'air passera de ${metrics.avgTemp.toFixed(1)}°C à ~${wakeupAirTemp.toFixed(1)}°C et vos parois (murs, sols, plafonds) à ~${wakeupWallTemp.toFixed(1)}°C.`;
+        txtWakeupSummaryDesc.textContent = `Évolution naturelle sur ${hoursTo07h}h : ${signDeltaWake}${deltaWakeupAir.toFixed(1)}°C (soit ${signNightRate}${avgNightRate.toFixed(2)} °C/h en moyenne, nuit à ${minExtNight07.toFixed(1)}°C amortie par vos parois).`;
+        boxWakeupForecast.title = `Simulation 2R2C sur ${hoursTo07h}h sans chauffage actif : l'air passera de ${metrics.avgTemp.toFixed(1)}°C à ~${wakeupAirTemp.toFixed(1)}°C (${signNightRate}${avgNightRate.toFixed(2)} °C/h en moyenne) et vos parois à ~${wakeupWallTemp.toFixed(1)}°C.`;
     }
 
     const radiatorGroup = document.getElementById('radiator-heating-group');
