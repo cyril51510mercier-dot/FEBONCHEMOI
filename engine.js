@@ -1716,7 +1716,7 @@ function calculateDailyThermalBalance(zoneConfig, ta, tStructOpt = null) {
     }
 
     const params = calculateZone2R2CParams(zoneConfig);
-    const { hRapide, hOpaque, hTotal, hCi, tauHours, fSolAir, fSolMass } = params;
+    const { hRapide, hOpaque, hTotal, hCi, cAirWhPerK, cMassWhPerK, tauHours, fSolAir, fSolMass } = params;
 
     const now = new Date();
     const currentHour = now.getHours();
@@ -1878,6 +1878,8 @@ function calculateDailyThermalBalance(zoneConfig, ta, tStructOpt = null) {
         hRapideWPerK: parseFloat(hRapide.toFixed(1)),
         hOpaqueWPerK: parseFloat(hOpaque.toFixed(1)),
         hCiWPerK: parseFloat(hCi.toFixed(1)),
+        cAirWhPerK: parseFloat((cAirWhPerK || 0).toFixed(1)),
+        cMassWhPerK: parseFloat((cMassWhPerK || 0).toFixed(1)),
         depKw: parseFloat(depKw.toFixed(2)),
         depOpaqueMassKw: parseFloat(depOpaqueMassKw.toFixed(2)),
         gainsOpaqueMassKw: parseFloat(gainsOpaqueMassKw.toFixed(2)),
@@ -2271,6 +2273,7 @@ function calculateGlobalHabitatMetrics() {
     let totalHRapideWPerK = 0;
     let totalHOpaqueWPerK = 0;
     let totalHCiWPerK = 0;
+    let totalCMassWhPerK = 0;
     const totalCumulativeHours = new Array(24).fill(0);
     const totalTheoCumulativeHours = new Array(24).fill(0);
     const roomSnapshots = [];
@@ -2366,6 +2369,7 @@ function calculateGlobalHabitatMetrics() {
         totalHRapideWPerK += (energy.hRapideWPerK || 0);
         totalHOpaqueWPerK += (energy.hOpaqueWPerK || 0);
         totalHCiWPerK += (energy.hCiWPerK || 0);
+        totalCMassWhPerK += (energy.cMassWhPerK || 0);
     }
 
     if (totalVolume === 0) return null;
@@ -2428,6 +2432,7 @@ function calculateGlobalHabitatMetrics() {
         totalHRapideWPerK: parseFloat(totalHRapideWPerK.toFixed(1)),
         totalHOpaqueWPerK: parseFloat(totalHOpaqueWPerK.toFixed(1)),
         totalHCiWPerK: parseFloat(totalHCiWPerK.toFixed(1)),
+        totalCMassWhPerK: parseFloat(totalCMassWhPerK.toFixed(1)),
         totalVolumeM3: parseFloat(totalVolume.toFixed(1))
     };
 }
@@ -2856,18 +2861,21 @@ function actualiserCockpitGlobal() {
     }
 
     // ============================================================
-    // 4. FLUX THERMIQUES EN °C/h (COUPLAGE HORAIRE 2R2C AIR + PAROIS, W AU SURVOL)
+    // 4. FLUX THERMIQUES EN °C/h (CAPACITÉS PROPRES PAR NŒUD & COUPLAGE 1H, W AU SURVOL)
     // ============================================================
     const totalVolM3 = metrics.totalVolumeM3 || 150;
-    // Capacité thermique de la masse lourde des parois : ~ 22 Wh/(K·m³)
-    const cMassTotalKwhPerK = Math.max(0.80, totalVolM3 * 0.022);
-    // Sur un pas de temps d'1 heure, le nœud Air (constante de temps propre ~15 min) est couplé aux parois via H_ci :
-    // la variation réelle en °C/h de l'ambiance intérieure sollicite la capacité couplée Air + Parois (~19 à 21 Wh/(K·m³))
+    // Capacité thermique propre du volume d'air + mobilier léger (sans la masse des parois) : ~ 3.5 Wh/(K·m³)
+    const cAirTotalKwhPerK = Math.max(0.25, totalVolM3 * 0.0035);
+    // Capacité thermique réelle des parois lourdes agrégée depuis la configuration (matériaux, épaisseur, ITE/ITI, dalles)
+    const cMassTotalKwhPerK = (metrics.totalCMassWhPerK && metrics.totalCMassWhPerK > 0)
+        ? Math.max(0.80, metrics.totalCMassWhPerK / 1000)
+        : Math.max(0.80, totalVolM3 * 0.022);
+    // Sur un pas de temps d'1 heure, la tendance globale de la température de l'air est amortie par le couplage H_ci avec les parois
     const hCiCoupling = Math.max(80, metrics.totalHCiWPerK || (totalVolM3 * 3.0));
     const hRapCoupling = Math.max(15, metrics.totalHRapideWPerK || (totalVolM3 * 0.35));
     const hOpCoupling = Math.max(15, metrics.totalHOpaqueWPerK || (totalVolM3 * 0.35));
     const massCouplingFactor1h = hCiCoupling / (hCiCoupling + hRapCoupling + hOpCoupling);
-    const cEffAirKwhPerK = Math.max(0.50, (totalVolM3 * 0.0035) + (cMassTotalKwhPerK * massCouplingFactor1h));
+    const cEffAirKwhPerK = Math.max(0.50, cAirTotalKwhPerK + (cMassTotalKwhPerK * massCouplingFactor1h));
 
     // 4.1 Apports Solaires via les vitrages
     const solGainKw = metrics.totalGainsSolairesKw || 0;
@@ -2886,18 +2894,18 @@ function actualiserCockpitGlobal() {
         if (txtFluxSolarVal.parentElement) txtFluxSolarVal.parentElement.title = solarTooltip;
     }
 
-    // 4.2 Flux Direct Rapide Air <-> Extérieur (Vitrages + Renouvellement d'air VMC, hors murs opaques)
+    // 4.2 Flux Direct Rapide Air <-> Extérieur (Vitrages + Renouvellement d'air VMC, sans capacité thermique des parois)
     const depEnveloppeKw = metrics.totalDeperditionsKw || 0;
     const condGainKw = metrics.totalGainsConductionKw || 0;
     const depOpaqueKw = metrics.totalDepOpaqueMassKw || 0;
     const gainsOpaqueKw = metrics.totalGainsOpaqueMassKw || 0;
-    const depRate = depEnveloppeKw / cEffAirKwhPerK;
-    const condRate = condGainKw / cEffAirKwhPerK;
+    const depRate = depEnveloppeKw / cAirTotalKwhPerK;
+    const condRate = condGainKw / cAirTotalKwhPerK;
     const depWatts = Math.round(depEnveloppeKw * 1000);
     const condWatts = Math.round(condGainKw * 1000);
     const lossTooltip = depEnveloppeKw >= condGainKw
-        ? `❄️ Échange direct rapide Vitrages & VMC ↔ Extérieur : -${depRate.toFixed(2)} °C/h (-${depWatts} W / -${depEnveloppeKw.toFixed(2)} kW)\n• Éléments sans inertie (Vitres + VMC/Infiltrations) : H_rapide = ${metrics.totalHRapideWPerK || 0} W/K\n• Air intérieur : ${metrics.avgTemp.toFixed(1)} °C ↔ Air extérieur : ${extTemp.toFixed(1)} °C`
-        : `🌡️ Gain direct rapide Vitrages & VMC ↔ Extérieur : +${condRate.toFixed(2)} °C/h (+${condWatts} W / +${condGainKw.toFixed(2)} kW)\n• Éléments sans inertie (Vitres + VMC/Infiltrations) : H_rapide = ${metrics.totalHRapideWPerK || 0} W/K\n• Air intérieur : ${metrics.avgTemp.toFixed(1)} °C ↔ Air extérieur : ${extTemp.toFixed(1)} °C`;
+        ? `❄️ Échange direct rapide Vitrages & VMC ↔ Extérieur : -${depRate.toFixed(2)} °C/h sur l'air seul (-${depWatts} W / -${depEnveloppeKw.toFixed(2)} kW)\n• Éléments sans inertie des parois (Vitres + VMC/Infiltrations) : H_rapide = ${metrics.totalHRapideWPerK || 0} W/K\n• Air intérieur : ${metrics.avgTemp.toFixed(1)} °C ↔ Air extérieur : ${extTemp.toFixed(1)} °C`
+        : `🌡️ Gain direct rapide Vitrages & VMC ↔ Extérieur : +${condRate.toFixed(2)} °C/h sur l'air seul (+${condWatts} W / +${condGainKw.toFixed(2)} kW)\n• Éléments sans inertie des parois (Vitres + VMC/Infiltrations) : H_rapide = ${metrics.totalHRapideWPerK || 0} W/K\n• Air intérieur : ${metrics.avgTemp.toFixed(1)} °C ↔ Air extérieur : ${extTemp.toFixed(1)} °C`;
 
     const txtFluxExtTag = document.getElementById('txt-flux-ext-tag');
     const txtFluxExtVal = document.getElementById('txt-flux-ext-val');
@@ -3195,7 +3203,7 @@ function actualiserCockpitGlobal() {
     const hRapide07 = Math.max(15, metrics.totalHRapideWPerK || (totalVolM3 * 0.35));
     const hOpaque07 = Math.max(15, metrics.totalHOpaqueWPerK || (totalVolM3 * 0.35));
     const hCi07 = Math.max(80, metrics.totalHCiWPerK || (totalVolM3 * 3.0));
-    const cMassWh07 = Math.max(800, totalVolM3 * 22);
+    const cMassWh07 = Math.max(800, cMassTotalKwhPerK * 1000);
     const pIntNightW = (totalVolM3 / 2.5) * 1.6;
 
     for (let s = 0; s < hoursTo07h; s++) {
